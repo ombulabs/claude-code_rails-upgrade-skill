@@ -7,7 +7,7 @@ description: Analyzes Rails applications and generates comprehensive upgrade rep
 
 ## Skill Identity
 - **Name:** Rails Upgrade Assistant
-- **Version:** 2.0
+- **Version:** 3.0
 - **Purpose:** Intelligent Rails application upgrades from 2.3 through 8.1
 - **Based on:** Official Rails CHANGELOGs, FastRuby.io methodology, and the FastRuby.io ebook
 - **Upgrade Strategy:** Sequential only (no version skipping)
@@ -33,21 +33,34 @@ This skill follows the proven FastRuby.io upgrade methodology:
 
 ---
 
-## Core Workflow (3-Step Process)
+## Core Workflow (4-Step Process)
 
-### Step 1: Breaking Changes Detection Script
-- Claude generates an executable bash script tailored to the specific upgrade
-- Script scans the user's codebase for breaking changes
+### Step 1: Run Test Suite (MANDATORY FIRST STEP)
+- **CRITICAL:** Before any upgrade work begins, run the existing test suite
+- Claude executes `bundle exec rspec` or `bundle exec rails test` to verify baseline
+- All tests MUST pass before proceeding with any upgrade
+- If tests fail, stop and help user fix failing tests first
+- Record test count and coverage as baseline metrics
+- See `workflows/test-suite-verification-workflow.md` for details
+
+### Step 2: Verify load_defaults Matches Current Rails Version
+- **CRITICAL:** Check if `load_defaults` in `config/application.rb` matches the current Rails gem version
+- If `load_defaults` is BEHIND the current Rails version:
+  - **ASK USER** if they want to update `load_defaults` first
+  - **RECOMMEND** updating `load_defaults` to match current Rails before upgrading to next version
+  - Generate a `load_defaults` update report showing what changes
+  - Run tests again after updating `load_defaults` to verify nothing breaks
+- If `load_defaults` matches current Rails version → Proceed to Step 3
+- See `workflows/load-defaults-verification-workflow.md` for details
+
+### Step 3: Run Breaking Changes Detection (DIRECT)
+- **Claude runs detection checks directly** using Grep, Glob, and Read tools
+- No script generation - Claude searches the codebase in real-time
 - Finds issues with file:line references
-- Generates findings report (TXT file)
-- Runs in < 30 seconds
+- Collects all findings immediately
+- See `workflows/direct-detection-workflow.md` for patterns to search
 
-### Step 2: User Runs Script & Shares Findings
-- User executes the detection script in their project directory
-- Script outputs `rails_{version}_upgrade_findings.txt`
-- User shares findings report back with Claude
-
-### Step 3: Claude Generates Reports Based on Actual Findings
+### Step 4: Generate Reports Based on Findings
 - **Comprehensive Upgrade Report**: Breaking changes analysis with OLD vs NEW code examples, custom code warnings with ⚠️ flags, step-by-step migration plan, testing checklist and rollback plan
 - **app:update Preview Report**: Shows exact configuration file changes (OLD vs NEW), lists new files to be created, impact assessment (HIGH/MEDIUM/LOW)
 
@@ -57,29 +70,21 @@ This skill follows the proven FastRuby.io upgrade methodology:
 
 Claude should activate this skill when user says:
 
-**Initial Upgrade Requests (Generate Detection Script):**
+**Upgrade Requests:**
 - "Upgrade my Rails app to [version]"
 - "Help me upgrade from Rails [x] to [y]"
 - "What breaking changes are in Rails [version]?"
 - "Plan my upgrade from [x] to [y]"
 - "What Rails version am I using?"
 - "Analyze my Rails app for upgrade"
-- "Create a detection script for Rails [version]"
-- "Generate a breaking changes script"
 - "Find breaking changes in my code"
+- "Check my app for Rails [version] compatibility"
 
-**After Script Execution (Generate Reports):**
-- "Here's my findings.txt"
-- "I ran the script, here are the results"
-- "The detection script found [X] issues"
-- "Can you analyze these findings?"
-- *User shares/uploads findings.txt file*
-
-**Specific Report Requests (Only After Findings Shared):**
+**Specific Report Requests:**
 - "Show me the app:update changes"
 - "Preview configuration changes for Rails [version]"
 - "Generate the upgrade report"
-- "Create the comprehensive report"
+- "What will change if I upgrade?"
 
 ---
 
@@ -163,14 +168,15 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `version-guides/upgrade-8.0-to-8.1.md` - Rails 8.0 → 8.1 (bundler-audit)
 
 ### Workflow Guides (Load when generating deliverables)
+- `workflows/test-suite-verification-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
+- `workflows/load-defaults-verification-workflow.md` - **MANDATORY SECOND STEP** - Verify load_defaults matches Rails version
+- `workflows/direct-detection-workflow.md` - How to run breaking change detection directly
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
-- `workflows/detection-script-workflow.md` - How to generate detection scripts
 - `workflows/app-update-preview-workflow.md` - How to generate app:update previews
 
 ### Examples (Load when user needs clarification)
 - `examples/simple-upgrade.md` - Single-hop upgrade example
 - `examples/multi-hop-upgrade.md` - Multi-hop upgrade example
-- `examples/detection-script-only.md` - Detection script only request
 
 ### Reference Materials
 - `reference/dual-boot-strategy.md` - Dual-boot with next_rails gem
@@ -181,9 +187,8 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `reference/testing-checklist.md` - Comprehensive testing
 - `reference/gem-compatibility.md` - Common gem version requirements
 
-### Detection Script Resources
-- `detection-scripts/patterns/rails-*.yml` - Version-specific patterns
-- `detection-scripts/templates/detection-script-template.sh` - Bash template
+### Detection Pattern Resources
+- `detection-scripts/patterns/rails-*.yml` - Version-specific patterns for direct detection
 
 ### Report Templates
 - `templates/upgrade-report-template.md` - Main upgrade report structure
@@ -195,72 +200,86 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 
 When user requests an upgrade, follow this workflow:
 
-### Step 1: Detect Current Version
+### Step 1: Run Test Suite (MANDATORY FIRST STEP)
 ```
-1. Read Gemfile to find current Rails version
-2. Read config/application.rb for load_defaults version
-3. Store: current_version, target_version
+⚠️  THIS STEP IS REQUIRED BEFORE ANY OTHER WORK
+
+1. Read: workflows/test-suite-verification-workflow.md
+2. Detect test framework (RSpec, Minitest, or both)
+3. Run test suite with: bundle exec rspec OR bundle exec rails test
+4. Capture results: total tests, passing, failing, pending
+5. If ANY tests fail:
+   - STOP the upgrade process
+   - Report failing tests to user
+   - Offer to help fix failing tests
+   - Do NOT proceed until all tests pass
+6. If all tests pass:
+   - Record baseline metrics (test count, coverage if available)
+   - Proceed to Step 2
 ```
 
-### Step 2: Validate Upgrade Path
+### Step 2: Detect Current Version & Verify load_defaults
+```
+1. Read Gemfile to find current Rails gem version
+2. Read config/application.rb for load_defaults version
+3. Store: rails_gem_version, load_defaults_version, target_version
+4. Compare rails_gem_version with load_defaults_version
+```
+
+### Step 3: Check load_defaults Alignment (BLOCKING STEP)
+```
+⚠️  THIS STEP MAY BLOCK THE UPGRADE
+
+1. Read: workflows/load-defaults-verification-workflow.md
+2. If load_defaults_version < rails_gem_version (e.g., load_defaults 7.0 on Rails 7.2):
+   - STOP and inform user of mismatch
+   - Explain: "Your app is on Rails X.Y but using load_defaults X.Z"
+   - RECOMMEND: "Update load_defaults to X.Y before upgrading to next version"
+   - ASK USER: "Would you like to update load_defaults to X.Y first?"
+   - If YES → Generate load_defaults update report, help update, re-run tests
+   - If NO → Warn about risks and proceed (user's choice)
+3. If load_defaults_version == rails_gem_version:
+   - Proceed to Step 4
+```
+
+### Step 4: Validate Upgrade Path
 ```
 1. Check if upgrade is single-hop or multi-hop
 2. If multi-hop, explain sequential requirement
 3. Plan individual hops
 ```
 
-### Step 3: Load Detection Script Resources
+### Step 5: Run Breaking Changes Detection (DIRECT)
 ```
-1. Read: detection-scripts/patterns/rails-{VERSION}-patterns.yml
-2. Read: detection-scripts/templates/detection-script-template.sh
-3. Read: workflows/detection-script-workflow.md (for generation instructions)
+Claude runs detection directly using tools - NO script generation needed
+
+1. Read: workflows/direct-detection-workflow.md
+2. Read: detection-scripts/patterns/rails-{VERSION}-patterns.yml
+3. For each pattern in the patterns file:
+   - Use Grep tool to search for the pattern
+   - Collect file paths and line numbers
+   - Store findings with context
+4. Read: version-guides/upgrade-{FROM}-to-{TO}.md for context
+5. Compile all findings into structured data
 ```
 
-### Step 4: Generate Detection Script
-```
-1. Follow workflow in detection-script-workflow.md
-2. Generate version-specific bash script
-3. Deliver script to user
-4. Instruct user to run script and share findings.txt
-```
-
-### Step 5: Wait for User to Run Script
-```
-User runs: ./detect_rails_{version}_breaking_changes.sh
-Script outputs: rails_{version}_upgrade_findings.txt
-User shares findings back with Claude
-```
-
-### Step 6: Load Report Generation Resources
+### Step 6: Load Report Resources & Generate Reports
 ```
 1. Read: templates/upgrade-report-template.md
-2. Read: version-guides/upgrade-{FROM}-to-{TO}.md
-3. Read: templates/app-update-preview-template.md
-4. Read: workflows/upgrade-report-workflow.md
-5. Read: workflows/app-update-preview-workflow.md
+2. Read: templates/app-update-preview-template.md
+3. Read: workflows/upgrade-report-workflow.md
+4. Read: workflows/app-update-preview-workflow.md
 ```
-
-### Step 7: Analyze User's Actual Findings
-```
-1. Parse the findings.txt file
-2. Extract detected breaking changes and affected files
-3. Read user's actual config files for context
-4. Identify custom code patterns from findings
-```
-
-### Step 8: Generate Reports Based on Findings
 
 **Deliverable #1: Comprehensive Upgrade Report**
-- **Workflow:** See `workflows/upgrade-report-workflow.md`
-- **Input:** Actual findings from script + version guide data
+- **Input:** Direct detection findings + version guide data
 - **Output:** Report with real code examples from user's project
 
 **Deliverable #2: app:update Preview**
-- **Workflow:** See `workflows/app-update-preview-workflow.md`
 - **Input:** Actual config files + findings
 - **Output:** Preview with real file paths and changes
 
-### Step 9: Present Reports
+### Step 7: Present Reports & Offer Help
 ```
 1. Present Comprehensive Upgrade Report first
 2. Present app:update Preview Report second
@@ -274,10 +293,12 @@ User shares findings back with Claude
 
 Before starting ANY upgrade:
 
-### 1. Test Coverage Assessment
-- [ ] Run test suite - all tests passing?
-- [ ] Check test coverage (aim for >70%)
+### 1. Test Coverage Assessment (AUTOMATED - Step 1 of Workflow)
+- [x] Run test suite - all tests passing? **← Claude runs this automatically**
+- [x] Check test coverage (aim for >70%) **← Claude captures this if SimpleCov is configured**
 - [ ] Review critical paths have coverage
+
+**Note:** This step is now automated. Claude will run the test suite and BLOCK the upgrade if any tests fail.
 
 ### 2. Dependency Audit
 - [ ] Run `bundle outdated`
@@ -306,50 +327,78 @@ Before starting ANY upgrade:
 ### Pattern 1: Full Upgrade Request
 **User says:** "Upgrade my Rails app to 8.1"
 
-**Action - Phase 1 (Generate Script):**
-1. Detect current version
-2. Validate upgrade path
-3. Load: `workflows/detection-script-workflow.md`
-4. Generate detection script
-5. Deliver script with instructions to run it
-6. Wait for user to share findings.txt
+**Action - Step 1 (MANDATORY: Verify Tests Pass):**
+1. Load: `workflows/test-suite-verification-workflow.md`
+2. Detect test framework (RSpec or Minitest)
+3. Run test suite: `bundle exec rspec` or `bundle exec rails test`
+4. If tests FAIL → STOP and help fix tests first
+5. If tests PASS → Record baseline and proceed
 
-**Action - Phase 2 (Generate Reports):**
-1. Parse findings.txt
-2. Load: `workflows/upgrade-report-workflow.md`
-3. Load: `workflows/app-update-preview-workflow.md`
-4. Generate Comprehensive Upgrade Report (using actual findings)
-5. Generate app:update Preview (using actual findings)
-6. Reference: `examples/simple-upgrade.md` for structure
+**Action - Step 2 (MANDATORY: Verify load_defaults):**
+1. Load: `workflows/load-defaults-verification-workflow.md`
+2. Read Gemfile.lock for current Rails gem version
+3. Read config/application.rb for load_defaults version
+4. If load_defaults < Rails gem version:
+   - INFORM user: "Your app uses Rails X.Y but load_defaults is set to X.Z"
+   - RECOMMEND: "Update load_defaults to X.Y before upgrading to the next version"
+   - ASK: "Would you like to update load_defaults to X.Y first? (Recommended)"
+   - If YES → Help update load_defaults, re-run tests, then proceed
+   - If NO → Warn about risks, proceed with upgrade
+5. If load_defaults matches → Proceed to Step 3
+
+**Action - Step 3 (Run Detection Directly):**
+1. Validate upgrade path
+2. Load: `workflows/direct-detection-workflow.md`
+3. Load: `detection-scripts/patterns/rails-{VERSION}-patterns.yml`
+4. Use Grep/Glob/Read tools to search for each pattern
+5. Collect findings with file:line references
+
+**Action - Step 4 (Generate Reports):**
+1. Load: `workflows/upgrade-report-workflow.md`
+2. Load: `workflows/app-update-preview-workflow.md`
+3. Generate Comprehensive Upgrade Report (using direct findings)
+4. Generate app:update Preview (using actual config files)
+5. Present both reports to user
+6. Offer to help implement changes
 
 ### Pattern 2: Multi-Hop Request
 **User says:** "Help me upgrade from Rails 5.2 to 8.1"
 
-**Action:**
+**Action - Step 1 (MANDATORY: Verify Tests Pass):**
+1. Run test suite BEFORE planning any upgrade work
+2. If tests fail → STOP and fix first
+3. If tests pass → Proceed with planning
+
+**Action - Step 2 (MANDATORY: Verify load_defaults):**
+1. Check if load_defaults matches current Rails version
+2. If mismatched → Recommend updating load_defaults FIRST
+3. For multi-hop: Ensure load_defaults is current before starting
+
+**Action - Step 3 (Plan & Execute):**
 1. Explain sequential requirement
 2. Calculate hops: 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1
 3. Reference: `reference/multi-hop-strategy.md`
 4. Follow Pattern 1 for FIRST hop (5.2 → 6.0)
 5. After first hop complete, repeat for next hops
+6. **IMPORTANT:** After each hop, ensure load_defaults is updated before next hop
 
-### Pattern 3: Detection Script Only
-**User says:** "Create a detection script for Rails 8.0"
+### Pattern 3: Breaking Changes Analysis Only
+**User says:** "What breaking changes affect my app for Rails 8.0?"
 
-**Action:**
-1. Load: `workflows/detection-script-workflow.md`
-2. Generate detection script only
-3. Reference: `examples/detection-script-only.md`
-4. Do NOT generate reports yet (wait for findings)
+**Action - Step 1 (MANDATORY: Verify Tests Pass):**
+1. Run test suite first
+2. If tests fail → Warn user and recommend fixing first
+3. If tests pass → Proceed with analysis
 
-### Pattern 4: User Returns with Findings
-**User says:** "Here's my findings.txt" or shares script output
+**Action - Step 2 (MANDATORY: Verify load_defaults):**
+1. Check load_defaults alignment
+2. If mismatched → Recommend updating first
 
-**Action:**
-1. Parse findings.txt
-2. Load: `workflows/upgrade-report-workflow.md`
-3. Load: `workflows/app-update-preview-workflow.md`
-4. Generate Comprehensive Upgrade Report
-5. Generate app:update Preview
+**Action - Step 3 (Run Detection):**
+1. Load: `workflows/direct-detection-workflow.md`
+2. Run detection directly using tools
+3. Present findings summary
+4. Offer to generate full upgrade report
 
 ---
 
@@ -357,22 +406,15 @@ Before starting ANY upgrade:
 
 Before delivering, verify:
 
-**For Detection Script:**
-- [ ] All {PLACEHOLDERS} replaced with actual values
-- [ ] Patterns match target Rails version
-- [ ] Script includes all breaking changes from pattern file
-- [ ] File paths use user's actual project structure
-- [ ] User instructions are clear
-
-**After User Runs Script (Before Generating Reports):**
-- [ ] Received and parsed findings.txt from user
-- [ ] Identified all detected breaking changes
-- [ ] Collected affected file paths
-- [ ] Noted custom code warnings from findings
+**For Direct Detection:**
+- [ ] All patterns from version-specific YAML file checked
+- [ ] Grep/Glob tools used correctly for each pattern
+- [ ] File:line references collected for all findings
+- [ ] Context captured for each finding
 
 **For Comprehensive Upgrade Report:**
 - [ ] All {PLACEHOLDERS} replaced with actual values
-- [ ] Used ACTUAL findings from script (not generic examples)
+- [ ] Used ACTUAL findings from direct detection (not generic examples)
 - [ ] Breaking changes section includes real file:line references
 - [ ] Custom code warnings based on actual detected issues
 - [ ] Code examples use user's actual code from affected files
@@ -388,15 +430,18 @@ Before delivering, verify:
 
 ## Key Principles
 
-1. **Always Generate Detection Script First** (unless user only wants reports and has findings)
-2. **Wait for User to Run Script** (reports depend on actual findings)
-3. **Always Use Actual Findings** (no generic examples in reports)
-4. **Always Flag Custom Code** (with ⚠️ warnings based on detected issues)
-5. **Always Use Templates** (for consistency)
-6. **Always Check Quality** (before delivery)
-7. **Load Workflows as Needed** (don't hold everything in memory)
-8. **Sequential Process is Critical** (script → findings → reports)
-9. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
+1. **ALWAYS Run Test Suite First** (MANDATORY - no exceptions, no upgrade work until tests pass)
+2. **Block on Failing Tests** (if tests fail, STOP and help fix them before any upgrade work)
+3. **ALWAYS Verify load_defaults** (MANDATORY - check if load_defaults matches current Rails version)
+4. **Recommend Updating load_defaults First** (if behind current Rails, update load_defaults BEFORE upgrading to next version)
+5. **Run Detection Directly** (use Grep/Glob/Read tools - no script generation needed)
+6. **Always Use Actual Findings** (no generic examples in reports)
+7. **Always Flag Custom Code** (with ⚠️ warnings based on detected issues)
+8. **Always Use Templates** (for consistency)
+9. **Always Check Quality** (before delivery)
+10. **Load Workflows as Needed** (don't hold everything in memory)
+11. **Sequential Process is Critical** (tests → load_defaults check → detection → reports)
+12. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
 
 ---
 
@@ -404,10 +449,15 @@ Before delivering, verify:
 
 A successful upgrade assistance session:
 
-✅ Generated detection script (Phase 1)
-✅ User ran script and shared findings.txt (Phase 2)
-✅ Generated Comprehensive Upgrade Report using actual findings (Phase 3)
-✅ Generated app:update Preview using actual findings (Phase 3)
+✅ **Ran test suite FIRST** (Step 1 - MANDATORY)
+✅ **Verified all tests pass** (blocked if tests failed)
+✅ **Recorded baseline metrics** (test count, coverage)
+✅ **Checked load_defaults alignment** (Step 2 - MANDATORY)
+✅ **Recommended load_defaults update if behind** (asked user before proceeding)
+✅ **Updated load_defaults if user agreed** (re-ran tests after update)
+✅ **Ran detection directly** (using Grep/Glob/Read tools - no script)
+✅ **Generated Comprehensive Upgrade Report** using actual findings
+✅ **Generated app:update Preview** using actual config files
 ✅ Used user's actual code from findings (not generic examples)
 ✅ Flagged all custom code with ⚠️ warnings based on detected issues
 ✅ Provided clear next steps
@@ -415,8 +465,29 @@ A successful upgrade assistance session:
 
 ---
 
-**Version:** 2.0
+**Version:** 3.0
 **Last Updated:** January 2025
 **Skill Type:** Modular with external workflows and examples
 **Methodology:** Based on FastRuby.io upgrade best practices and "The Complete Guide to Upgrade Rails" ebook
 **Attribution:** Content based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)
+
+**v3.0 Changes:**
+- **MAJOR:** Removed script generation - Claude now runs detection directly using tools
+- Detection uses Grep, Glob, and Read tools instead of generating bash scripts
+- Eliminated user round-trip (no more "run this script and share results")
+- Streamlined from 5-step to 4-step process
+- New workflow file: `workflows/direct-detection-workflow.md`
+- Removed: `workflows/detection-script-workflow.md`, `examples/detection-script-only.md`
+
+**v2.2 Changes:**
+- Added mandatory `load_defaults` verification as Step 2 of all upgrade workflows
+- If `load_defaults` is behind current Rails version, skill now:
+  - Informs user of the mismatch
+  - Recommends updating `load_defaults` to match current Rails BEFORE upgrading to next version
+  - Asks user for confirmation before proceeding
+- New workflow file: `workflows/load-defaults-verification-workflow.md`
+
+**v2.1 Changes:**
+- Added mandatory test suite verification as Step 1 of all upgrade workflows
+- Upgrade process now BLOCKS if any tests fail
+- New workflow file: `workflows/test-suite-verification-workflow.md`
