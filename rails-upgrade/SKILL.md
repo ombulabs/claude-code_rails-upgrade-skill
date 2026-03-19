@@ -33,6 +33,74 @@ This skill follows the proven FastRuby.io upgrade methodology:
 
 ---
 
+## CRITICAL: Dual-Boot Code Pattern with `NextRails.next?`
+
+### Always Use `NextRails.next?` — Never Use `respond_to?`
+
+When proposing code fixes that must work with both the current and target Rails versions (dual-boot), **always use `NextRails.next?` from the `next_rails` gem** instead of `respond_to?` or other feature-detection patterns.
+
+**Why `respond_to?` is problematic:**
+- It is **hard to understand**: a reader must know which Rails version added or removed the method to understand what the branch is really about
+- It is **hard to maintain**: `respond_to?` checks accumulate over time and become impossible to clean up because their intent ("which Rails version is this for?") is lost
+- It is **fragile**: it couples code to framework implementation details and may produce false positives (e.g., a method exists but behaves differently) or false negatives (e.g., a gem monkey-patches the method in)
+- It **obscures intent**: the code does not communicate *why* there are two paths — only that some method may or may not exist
+
+**Why `NextRails.next?` is better:**
+- It is **explicit and readable**: anyone reading the code immediately understands "this branch is for the next Rails version"
+- It is **easy to clean up**: after the upgrade, search for `NextRails.next?` and remove all branches, keeping only the new-version code
+- It is **the standard**: it is the established dual-boot mechanism in the FastRuby.io methodology
+
+### Pattern: Use `NextRails.next?` for Version-Dependent Code
+
+❌ **WRONG — Do NOT use `respond_to?`:**
+```ruby
+# BAD: Hard to understand, hard to maintain, intent is unclear
+if config.respond_to?(:fixture_paths=)
+  config.fixture_paths = ["#{::Rails.root}/spec/fixtures"]
+else
+  config.fixture_path = "#{::Rails.root}/spec/fixtures"
+end
+```
+
+✅ **CORRECT — Use `NextRails.next?`:**
+```ruby
+# GOOD: Explicit dual-boot branching — clear intent, easy to clean up later
+if NextRails.next?
+  config.fixture_paths = ["#{::Rails.root}/spec/fixtures"]
+else
+  config.fixture_path = "#{::Rails.root}/spec/fixtures"
+end
+```
+
+### When to Apply This Pattern
+
+Use `NextRails.next?` branching whenever a breaking change requires different code for the current vs. target Rails version, including but not limited to:
+
+- **Configuration changes** (e.g., `fixture_path` → `fixture_paths`, `config.secrets` → `config.credentials`)
+- **API changes** (e.g., method renames, changed signatures, removed methods)
+- **Gem version differences** (e.g., different gem APIs across Rails versions)
+- **Initializer changes** (e.g., different middleware, different default settings)
+
+### Prerequisites
+
+Before using `NextRails.next?` in code, ensure the project has `next_rails` set up:
+
+1. `next_rails` gem is in the Gemfile
+2. `Gemfile.next` symlink exists (created by `next --init`)
+3. The `NextRails.next?` method is available via the gem
+
+If `next_rails` is NOT set up, **recommend setting it up first** before proposing any dual-boot code changes. See `reference/dual-boot-strategy.md`.
+
+### After Upgrade Completes
+
+Once the upgrade is finalized and the old Rails version is dropped:
+- Remove all `if NextRails.next?` / `else` branches
+- Keep only the `NextRails.next?` (new version) code path
+- Remove the `next_rails` gem from the Gemfile if no longer needed
+- This cleanup is part of the post-upgrade checklist
+
+---
+
 ## Core Workflow (4-Step Process)
 
 ### Step 1: Run Test Suite (MANDATORY FIRST STEP)
@@ -442,6 +510,7 @@ Before delivering, verify:
 10. **Load Workflows as Needed** (don't hold everything in memory)
 11. **Sequential Process is Critical** (tests → load_defaults check → detection → reports)
 12. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
+13. **Always Use `NextRails.next?` for Dual-Boot Code** (NEVER use `respond_to?` for version branching — it is hard to understand, hard to maintain, and obscures intent. Use `NextRails.next?` from the `next_rails` gem instead. See "Dual-Boot Code Pattern" section above.)
 
 ---
 

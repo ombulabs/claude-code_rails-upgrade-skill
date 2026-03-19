@@ -377,6 +377,55 @@ bundle update --conservative gem_name
 
 ---
 
+## Using `NextRails.next?` in Application Code
+
+Beyond the Gemfile, use `NextRails.next?` anywhere your application code must behave differently across Rails versions. This is the **only** acceptable way to branch on version — never use `respond_to?` for this purpose.
+
+**Why NOT `respond_to?`:**
+- Hard to understand: readers must know which Rails version introduced a method to grasp the intent
+- Hard to maintain: `respond_to?` checks pile up and become impossible to clean up because their purpose is lost
+- Fragile: may give wrong results if gems monkey-patch methods in or out
+- Obscures intent: the code says "does this method exist?" when it means "are we on the next Rails version?"
+
+### Examples in Application Code
+
+**spec/rails_helper.rb:**
+```ruby
+if NextRails.next?
+  config.fixture_paths = ["#{::Rails.root}/spec/fixtures"]
+else
+  config.fixture_path = "#{::Rails.root}/spec/fixtures"
+end
+```
+
+**config/initializers/session_store.rb:**
+```ruby
+if NextRails.next?
+  Rails.application.config.session_store :cookie_store, key: '_myapp_session'
+else
+  Rails.application.config.session_store :cookie_store, key: '_myapp_session', secure: Rails.env.production?
+end
+```
+
+**app/models/user.rb:**
+```ruby
+if NextRails.next?
+  serialize :preferences, coder: JSON
+else
+  serialize :preferences, JSON
+end
+```
+
+### Cleanup After Upgrade
+
+Once the upgrade is complete and you drop the old Rails version:
+1. Search for all `NextRails.next?` references: `grep -r "NextRails.next?" .`
+2. Keep only the `NextRails.next?` (true) branch code
+3. Remove all `else` branches
+4. Remove the `next_rails` gem if no longer needed
+
+---
+
 ## When to Use Dual-Boot
 
 **Use dual-boot when:**
