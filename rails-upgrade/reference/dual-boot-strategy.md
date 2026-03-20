@@ -24,14 +24,27 @@ The fastest way to set up dual-booting is with the [next_rails](https://github.c
 **Step 1: Add `next_rails` to the Gemfile:**
 ```ruby
 # Gemfile
-gem 'next_rails', group: :development
+gem 'next_rails'
 ```
 
 **Step 2: Install the gem and initialize dual-boot:**
 ```bash
 bundle install
+```
+
+**⚠️ IMPORTANT:** Before running `next --init`, check if dual-boot is already initialized:
+```bash
+# Check if Gemfile.next already exists
+ls -la Gemfile.next
+```
+
+**Only run `next --init` if `Gemfile.next` does NOT exist:**
+```bash
+# Only if Gemfile.next does not exist:
 next --init
 ```
+
+Running `next --init` when dual-boot is already set up will duplicate the `next?` method definition in the Gemfile, causing errors.
 
 This creates:
 - `Gemfile.next` - Symlink to your Gemfile

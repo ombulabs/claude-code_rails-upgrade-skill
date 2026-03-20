@@ -85,9 +85,10 @@ Use `NextRails.next?` branching whenever a breaking change requires different co
 
 Before using `NextRails.next?` in code, ensure the project has `next_rails` set up:
 
-1. Add `next_rails` gem to the Gemfile: `gem 'next_rails', group: :development`
+1. Add `next_rails` gem to the Gemfile: `gem 'next_rails'`
 2. Run `bundle install`
 3. Run `next --init` to create the `Gemfile.next` symlink
+   - **IMPORTANT:** Before running `next --init`, check if `Gemfile.next` already exists. If it does, **do NOT run `next --init` again** — it will duplicate the `next?` method definition in the Gemfile.
 4. Run `bundle install` to install dependencies for the current Rails version
 5. Run `next bundle install` to install dependencies for the next Rails version
    - If `next bundle install` does not work, use: `BUNDLE_GEMFILE=Gemfile.next bundle install`
@@ -313,14 +314,33 @@ When user requests an upgrade, follow this workflow:
    - Proceed to Step 4
 ```
 
-### Step 4: Validate Upgrade Path
+### Step 4: Set Up Dual-Boot with next_rails (IF NOT ALREADY SET UP)
+```
+⚠️  DO NOT run next --init if Gemfile.next already exists.
+    Running it twice duplicates the next? method definition in the Gemfile.
+
+1. Check if Gemfile.next already exists
+2. If Gemfile.next does NOT exist:
+   a. Add gem 'next_rails' to Gemfile (all environments, not just development)
+   b. Run: bundle install
+   c. Run: next --init
+   d. Run: bundle install
+   e. Run: next bundle install (fallback: BUNDLE_GEMFILE=Gemfile.next bundle install)
+3. If Gemfile.next ALREADY exists:
+   - Skip initialization — dual-boot is already set up
+   - Verify next_rails gem is in Gemfile, add if missing
+   - Run: bundle install
+   - Run: next bundle install (fallback: BUNDLE_GEMFILE=Gemfile.next bundle install)
+```
+
+### Step 5: Validate Upgrade Path
 ```
 1. Check if upgrade is single-hop or multi-hop
 2. If multi-hop, explain sequential requirement
 3. Plan individual hops
 ```
 
-### Step 5: Run Breaking Changes Detection (DIRECT)
+### Step 6: Run Breaking Changes Detection (DIRECT)
 ```
 Claude runs detection directly using tools - NO script generation needed
 
@@ -334,7 +354,7 @@ Claude runs detection directly using tools - NO script generation needed
 5. Compile all findings into structured data
 ```
 
-### Step 6: Load Report Resources & Generate Reports
+### Step 7: Load Report Resources & Generate Reports
 ```
 1. Read: templates/upgrade-report-template.md
 2. Read: templates/app-update-preview-template.md
@@ -350,7 +370,7 @@ Claude runs detection directly using tools - NO script generation needed
 - **Input:** Actual config files + findings
 - **Output:** Preview with real file paths and changes
 
-### Step 7: Present Reports & Offer Help
+### Step 8: Present Reports & Offer Help
 ```
 1. Present Comprehensive Upgrade Report first
 2. Present app:update Preview Report second
