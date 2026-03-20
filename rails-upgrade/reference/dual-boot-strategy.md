@@ -21,14 +21,32 @@ The fastest way to set up dual-booting is with the [next_rails](https://github.c
 
 ### Installation
 
+**Step 1: Add `next_rails` to the Gemfile:**
+```ruby
+# Gemfile
+gem 'next_rails', group: :development
+```
+
+**Step 2: Install the gem and initialize dual-boot:**
 ```bash
-gem install next_rails
+bundle install
 next --init
 ```
 
 This creates:
 - `Gemfile.next` - Symlink to your Gemfile
 - `Gemfile.next.lock` - Lock file for the next Rails version
+
+**Step 3: Install dependencies for both Rails versions:**
+```bash
+bundle install
+next bundle install
+```
+
+If `next bundle install` does not work (e.g., the `next` command is not found in PATH), use:
+```bash
+BUNDLE_GEMFILE=Gemfile.next bundle install
+```
 
 ### How It Works
 

@@ -85,11 +85,14 @@ Use `NextRails.next?` branching whenever a breaking change requires different co
 
 Before using `NextRails.next?` in code, ensure the project has `next_rails` set up:
 
-1. `next_rails` gem is in the Gemfile
-2. `Gemfile.next` symlink exists (created by `next --init`)
-3. The `NextRails.next?` method is available via the gem
+1. Add `next_rails` gem to the Gemfile: `gem 'next_rails', group: :development`
+2. Run `bundle install`
+3. Run `next --init` to create the `Gemfile.next` symlink
+4. Run `bundle install` to install dependencies for the current Rails version
+5. Run `next bundle install` to install dependencies for the next Rails version
+   - If `next bundle install` does not work, use: `BUNDLE_GEMFILE=Gemfile.next bundle install`
 
-If `next_rails` is NOT set up, **recommend setting it up first** before proposing any dual-boot code changes. See `reference/dual-boot-strategy.md`.
+If `next_rails` is NOT set up, **set it up first** before proposing any dual-boot code changes. See `reference/dual-boot-strategy.md`.
 
 ### After Upgrade Completes
 
