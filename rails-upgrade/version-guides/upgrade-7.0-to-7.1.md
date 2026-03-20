@@ -165,6 +165,40 @@ Ensure files in `lib/` follow Zeitwerk naming:
 
 ---
 
+#### 6. legacy_connection_handling Removed
+
+**What Changed:**
+`config.active_record.legacy_connection_handling` was deprecated in Rails 7.0 and is **completely removed in Rails 7.1**. Setting it will raise an error on boot.
+
+**Detection Pattern:**
+```ruby
+# config/application.rb or config/environments/*.rb
+config.active_record.legacy_connection_handling = false
+config.active_record.legacy_connection_handling = true
+```
+
+**Fix:**
+```ruby
+# BEFORE (Rails 7.0) — causes error in 7.1
+config.active_record.legacy_connection_handling = false
+
+# AFTER (Rails 7.1) — remove the line entirely
+# (delete this configuration — it no longer exists)
+```
+
+**Dual-boot compatible:**
+```ruby
+if NextRails.next?
+  # Do nothing — legacy_connection_handling is removed in 7.1
+else
+  config.active_record.legacy_connection_handling = false
+end
+```
+
+**Note:** If you still have code relying on the legacy connection handling behavior (per-class connection switching), you must migrate to the new connection handling model using `connects_to` and `connected_to` before upgrading.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### 6. Query Log Tags Format
@@ -312,6 +346,7 @@ end
 2. Update `preview_path` to `preview_paths`
 3. Review SSL configuration
 4. Configure `autoload_lib` if using lib/
+5. Remove `config.active_record.legacy_connection_handling` (causes error in 7.1)
 
 ### Phase 4: Configuration
 ```bash
@@ -334,6 +369,7 @@ Update `config.load_defaults` to 7.1
 - [ ] `preview_path` → `preview_paths` (array)
 - [ ] Review `force_ssl` setting
 - [ ] Configure `autoload_lib`
+- [ ] Remove `config.active_record.legacy_connection_handling` (raises error in 7.1)
 - [ ] Update `load_defaults` to 7.1
 
 ---
@@ -366,6 +402,24 @@ config.force_ssl = false
 
 **Fix:**
 Ensure `lib/my_file.rb` defines `MyFile`
+
+### Issue: App Crashes on Boot with `legacy_connection_handling` Error
+
+**Cause:** `config.active_record.legacy_connection_handling` is set in a config file but was removed in Rails 7.1
+
+**Fix:**
+Remove the line entirely from all config files:
+```bash
+grep -rn "legacy_connection_handling" config/
+```
+Delete every occurrence found. For dual-boot compatibility:
+```ruby
+if NextRails.next?
+  # Do nothing — removed in 7.1
+else
+  config.active_record.legacy_connection_handling = false
+end
+```
 
 ---
 
