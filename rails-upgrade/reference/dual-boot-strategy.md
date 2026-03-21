@@ -32,19 +32,19 @@ gem 'next_rails'
 bundle install
 ```
 
-**⚠️ IMPORTANT:** Before running `next --init`, check if dual-boot is already initialized:
+**⚠️ IMPORTANT:** Before running `next_rails --init`, check if dual-boot is already initialized:
 ```bash
 # Check if Gemfile.next already exists
 ls -la Gemfile.next
 ```
 
-**Only run `next --init` if `Gemfile.next` does NOT exist:**
+**Only run `next_rails --init` if `Gemfile.next` does NOT exist:**
 ```bash
 # Only if Gemfile.next does not exist:
-next --init
+next_rails --init
 ```
 
-Running `next --init` when dual-boot is already set up will duplicate the `next?` method definition in the Gemfile, causing errors.
+Running `next_rails --init` when dual-boot is already set up will duplicate the `next?` method definition in the Gemfile, causing errors.
 
 This creates:
 - `Gemfile.next` - Symlink to your Gemfile
@@ -477,7 +477,7 @@ Once the upgrade is complete and you drop the old Rails version:
 
 | Command | Purpose |
 |---------|---------|
-| `next --init` | Initialize dual-boot |
+| `next_rails --init` | Initialize dual-boot |
 | `next bundle install` | Install next version gems |
 | `next bundle exec rspec` | Run tests with next version |
 | `BUNDLE_GEMFILE=Gemfile.next` | Environment variable for next version |

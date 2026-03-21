@@ -328,7 +328,7 @@ git checkout -b rails-71-upgrade
 
 # Set up dual-boot (optional but recommended)
 gem install next_rails
-next --init
+next_rails --init
 ```
 
 ### Phase 2: Gemfile Updates

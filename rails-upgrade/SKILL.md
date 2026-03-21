@@ -87,8 +87,8 @@ Before using `NextRails.next?` in code, ensure the project has `next_rails` set 
 
 1. Add `next_rails` gem to the Gemfile: `gem 'next_rails'`
 2. Run `bundle install`
-3. Run `next --init` to create the `Gemfile.next` symlink
-   - **IMPORTANT:** Before running `next --init`, check if `Gemfile.next` already exists. If it does, **do NOT run `next --init` again** — it will duplicate the `next?` method definition in the Gemfile.
+3. Run `next_rails --init` to create the `Gemfile.next` symlink
+   - **IMPORTANT:** Before running `next_rails --init`, check if `Gemfile.next` already exists. If it does, **do NOT run `next_rails --init` again** — it will duplicate the `next?` method definition in the Gemfile.
 4. Run `bundle install` to install dependencies for the current Rails version
 5. Run `next bundle install` to install dependencies for the next Rails version
    - If `next bundle install` does not work, use: `BUNDLE_GEMFILE=Gemfile.next bundle install`
@@ -316,14 +316,14 @@ When user requests an upgrade, follow this workflow:
 
 ### Step 4: Set Up Dual-Boot with next_rails (IF NOT ALREADY SET UP)
 ```
-⚠️  DO NOT run next --init if Gemfile.next already exists.
+⚠️  DO NOT run next_rails --init if Gemfile.next already exists.
     Running it twice duplicates the next? method definition in the Gemfile.
 
 1. Check if Gemfile.next already exists
 2. If Gemfile.next does NOT exist:
    a. Add gem 'next_rails' to Gemfile (all environments, not just development)
    b. Run: bundle install
-   c. Run: next --init
+   c. Run: next_rails --init
    d. Run: bundle install
    e. Run: next bundle install (fallback: BUNDLE_GEMFILE=Gemfile.next bundle install)
 3. If Gemfile.next ALREADY exists:

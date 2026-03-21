@@ -215,7 +215,7 @@ git checkout -b rails-61-upgrade
 
 # Set up dual-boot
 gem install next_rails
-next --init
+next_rails --init
 ```
 
 ### Phase 2: Gemfile Updates
