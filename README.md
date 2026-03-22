@@ -25,6 +25,15 @@ We've encountered (and solved) edge cases that don't appear in any documentation
 
 ## How to Use This Skill
 
+### Prerequisites
+
+This skill depends on the [rails-load-defaults skill](https://github.com/fastruby/rails-load-defaults-skill) for incremental `load_defaults` verification and updates. Install it first:
+
+```bash
+git clone https://github.com/fastruby/rails-load-defaults-skill.git
+cp -r rails-load-defaults-skill ~/.claude/skills/rails-load-defaults
+```
+
 ### Installation
 
 Add this skill to your Claude Code configuration:
