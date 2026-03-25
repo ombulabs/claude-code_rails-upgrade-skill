@@ -27,11 +27,20 @@ We've encountered (and solved) edge cases that don't appear in any documentation
 
 ### Prerequisites
 
-This skill depends on the [rails-load-defaults skill](https://github.com/fastruby/rails-load-defaults-skill) for incremental `load_defaults` verification and updates. Install it first:
+This skill depends on the following skills. Install them first:
+
+**1. [rails-load-defaults skill](https://github.com/fastruby/rails-load-defaults-skill)** — incremental `load_defaults` verification and updates:
 
 ```bash
 git clone https://github.com/fastruby/rails-load-defaults-skill.git
 cp -r rails-load-defaults-skill ~/.claude/skills/rails-load-defaults
+```
+
+**2. [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill)** — dual-boot setup and management with `next_rails`:
+
+```bash
+git clone https://github.com/ombulabs/claude-code_dual-boot-skill.git
+cp -r claude-code_dual-boot-skill/dual-boot ~/.claude/skills/dual-boot
 ```
 
 ### Installation
@@ -80,22 +89,9 @@ This skill implements the **FastRuby.io upgrade methodology**, which includes:
 
 ### Dual-Boot Strategy
 
-Run your application with two versions of Rails simultaneously using the [`next_rails`](https://github.com/fastruby/next_rails) gem:
+Run your application with two versions of Rails simultaneously using the [`next_rails`](https://github.com/fastruby/next_rails) gem. This allows you to test both versions during the transition and deploy backwards-compatible changes before the version bump.
 
-```ruby
-# Gemfile
-if next?
-  gem 'rails', '~> 7.1.0'
-else
-  gem 'rails', '~> 7.0.0'
-end
-```
-
-This allows you to:
-- Run `bundle install` with two different dependency sets
-- Execute `bundle exec rake test` against both Rails versions
-- Deploy backwards-compatible changes to production before the version bump
-- Catch compatibility issues early in CI
+See the [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill) for setup, code patterns, CI configuration, and post-upgrade cleanup.
 
 ### Sequential Upgrades Only
 
