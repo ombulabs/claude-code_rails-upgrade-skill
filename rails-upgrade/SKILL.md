@@ -16,7 +16,7 @@ description: Analyzes Rails applications and generates comprehensive upgrade rep
 
 ## Dependencies
 
-- **rails-load-defaults skill** ([github.com/fastruby/rails-load-defaults-skill](https://github.com/fastruby/rails-load-defaults-skill)) — Handles incremental `load_defaults` updates with tiered risk assessment (Tier 1: low-risk, Tier 2: needs codebase grep, Tier 3: requires human review). Must be installed for Step 2 of the upgrade workflow.
+- **rails-load-defaults skill** ([github.com/ombulabs/claude-code_rails-load-defaults-skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)) — Handles incremental `load_defaults` updates with tiered risk assessment (Tier 1: low-risk, Tier 2: needs codebase grep, Tier 3: requires human review). Must be installed for Step 2 of the upgrade workflow.
 - **dual-boot skill** ([github.com/ombulabs/claude-code_dual-boot-skill](https://github.com/ombulabs/claude-code_dual-boot-skill)) — Sets up and manages dual-boot environments using the `next_rails` gem. Covers setup, `NextRails.next?` code patterns, CI configuration, and post-upgrade cleanup. Must be installed for Step 4 of the upgrade workflow.
 
 ---
@@ -69,7 +69,7 @@ When proposing code fixes that must work with both the current and target Rails 
 - **DELEGATE** to the `rails-load-defaults` skill for detection and incremental update
 - That skill handles tiered, per-config updates with test runs between each change
 - If `load_defaults` matches current Rails version → Proceed to Step 3
-- **DEPENDENCY:** Requires the [rails-load-defaults skill](https://github.com/fastruby/rails-load-defaults-skill)
+- **DEPENDENCY:** Requires the [rails-load-defaults skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
 
 ### Step 3: Run Breaking Changes Detection (DIRECT)
 - **Claude runs detection checks directly** using Grep, Glob, and Read tools
@@ -187,7 +187,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 
 ### Workflow Guides (Load when generating deliverables)
 - `workflows/test-suite-verification-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
-- **EXTERNAL DEPENDENCY:** `rails-load-defaults` skill - **MANDATORY SECOND STEP** - Verify and update load_defaults to match Rails version (https://github.com/fastruby/rails-load-defaults-skill)
+- **EXTERNAL DEPENDENCY:** `rails-load-defaults` skill - **MANDATORY SECOND STEP** - Verify and update load_defaults to match Rails version (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
 - `workflows/direct-detection-workflow.md` - How to run breaking change detection directly
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
 - `workflows/app-update-preview-workflow.md` - How to generate app:update previews

@@ -29,11 +29,11 @@ We've encountered (and solved) edge cases that don't appear in any documentation
 
 This skill depends on the following skills. Install them first:
 
-**1. [rails-load-defaults skill](https://github.com/fastruby/rails-load-defaults-skill)** — incremental `load_defaults` verification and updates:
+**1. [rails-load-defaults skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)** — incremental `load_defaults` verification and updates:
 
 ```bash
-git clone https://github.com/fastruby/rails-load-defaults-skill.git
-cp -r rails-load-defaults-skill ~/.claude/skills/rails-load-defaults
+git clone https://github.com/ombulabs/claude-code_rails-load-defaults-skill.git
+cp -r claude-code_rails-load-defaults-skill ~/.claude/skills/rails-load-defaults
 ```
 
 **2. [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill)** — dual-boot setup and management with `next_rails`:
