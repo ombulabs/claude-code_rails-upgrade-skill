@@ -205,7 +205,7 @@ This is a cosmetic change. Your database structure is unaffected. You may see la
 
 ---
 
-#### 10. MySQL Unsigned Types Deprecation
+#### 9. MySQL Unsigned Types Deprecation
 
 **What Changed:**
 MySQL `unsigned: true` generates deprecation warnings.
@@ -223,7 +223,7 @@ t.check_constraint "count >= 0"
 
 ---
 
-#### 11. .gitignore Update
+#### 10. .gitignore Update
 
 **What Changed:**
 Recommended `.gitignore` pattern for credential keys changed.
