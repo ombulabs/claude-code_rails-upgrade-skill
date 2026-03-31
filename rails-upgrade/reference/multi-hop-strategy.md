@@ -4,9 +4,67 @@
 
 ---
 
-## Core Principle
+## Core Principles
 
-**Never skip Rails versions.** Upgrade sequentially, one minor/major version at a time.
+1. **Never skip Rails versions.** Upgrade sequentially, one minor/major version at a time.
+2. **Always start from the latest patch of your current version.** Before hopping to the next minor/major, upgrade to the latest patch release of your current series first.
+
+---
+
+## Step 0: Upgrade to Latest Patch Release
+
+Before beginning any minor or major version hop, ensure you are on the **latest patch release** of your current Rails series. For example, if you are on Rails 3.2.19, upgrade to 3.2.22.5 first.
+
+### Why This Matters
+
+- **Security fixes** — Patch releases contain critical security patches that may also exist in the next minor version. Starting from the latest patch ensures you're not carrying known vulnerabilities.
+- **Bug fixes** — Later patches fix bugs that could cause confusing failures during an upgrade, making it harder to distinguish pre-existing issues from upgrade-related ones.
+- **Deprecation warnings** — Later patch releases may include additional deprecation warnings that prepare you for the next version.
+- **Smaller delta** — The jump to the next minor/major is smaller and better tested from the latest patch than from an arbitrary earlier patch.
+
+### How to Find the Latest Patch
+
+1. Check [rubygems.org/gems/rails/versions](https://rubygems.org/gems/rails/versions) for all releases in your series
+2. Or run: `gem search rails --versions | grep "^rails "` to see available versions
+3. The latest patch for each series is the target before hopping
+
+### Latest Patch Versions Reference
+
+| Series | Latest Patch | Notes |
+|--------|-------------|-------|
+| 2.3.x | 2.3.18 | End of life |
+| 3.0.x | 3.0.20 | End of life |
+| 3.1.x | 3.1.12 | End of life |
+| 3.2.x | 3.2.22.5 | End of life |
+| 4.0.x | 4.0.13 | End of life |
+| 4.1.x | 4.1.16 | End of life |
+| 4.2.x | 4.2.11.3 | End of life |
+| 5.0.x | 5.0.7.2 | End of life |
+| 5.1.x | 5.1.7 | End of life |
+| 5.2.x | 5.2.8.1 | End of life |
+| 6.0.x | 6.0.6.1 | End of life |
+| 6.1.x | 6.1.7.10 | End of life |
+| 7.0.x | 7.0.8.7 | Security only |
+| 7.1.x | 7.1.5.1 | Security only |
+| 7.2.x | 7.2.2.1 | Maintained |
+| 8.0.x | 8.0.2 | Maintained |
+
+> **Note:** This table may become outdated. Always verify against [rubygems.org](https://rubygems.org/gems/rails/versions) before starting an upgrade.
+
+### Process
+
+```
+1. Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
+2. Look up latest patch for that series (e.g., 3.2.22.5)
+3. If current version < latest patch:
+   a. Update Gemfile: gem 'rails', '3.2.22.5'
+   b. Run: bundle update rails
+   c. Run test suite — all tests must pass
+   d. Review CHANGELOG for security fixes and behavioral changes
+   e. Deploy patch upgrade to production
+   f. Monitor for issues
+4. Once on latest patch, proceed to Step 1 (Map Your Path)
+```
 
 ---
 

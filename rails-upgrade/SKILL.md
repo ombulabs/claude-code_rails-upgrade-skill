@@ -3,11 +3,11 @@ name: rails-upgrade
 description: Analyzes Rails applications and generates comprehensive upgrade reports with breaking changes, deprecations, and step-by-step migration guides for Rails 2.3 through 8.1. Use when upgrading Rails applications, planning multi-hop upgrades, or querying version-specific changes. Based on FastRuby.io methodology and "The Complete Guide to Upgrade Rails" ebook.
 ---
 
-# Rails Upgrade Assistant Skill v2.0
+# Rails Upgrade Assistant Skill v3.1
 
 ## Skill Identity
 - **Name:** Rails Upgrade Assistant
-- **Version:** 3.0
+- **Version:** 3.1
 - **Purpose:** Intelligent Rails application upgrades from 2.3 through 8.1
 - **Based on:** Official Rails CHANGELOGs, FastRuby.io methodology, and the FastRuby.io ebook
 - **Upgrade Strategy:** Sequential only (no version skipping)
@@ -54,7 +54,19 @@ When proposing code fixes that must work with both the current and target Rails 
 
 ---
 
-## Core Workflow (4-Step Process)
+## Core Workflow (5-Step Process)
+
+### Step 0: Verify Latest Patch Version (MANDATORY PRE-STEP)
+- **CRITICAL:** Before any upgrade work begins, verify the app is on the latest patch release of its current Rails series
+- Read `Gemfile.lock` to find the exact current Rails version (e.g., `3.2.19`)
+- Compare against the latest patch for that series (see `reference/multi-hop-strategy.md` for the reference table)
+- If the app is NOT on the latest patch:
+  - Inform user: "Your app is on Rails X.Y.Z but the latest patch is X.Y.W — you should upgrade to the latest patch first"
+  - Guide user through updating the Gemfile and running `bundle update rails`
+  - Run test suite after patch upgrade to verify nothing broke
+  - Deploy patch upgrade before proceeding with the minor/major version hop
+- If the app IS on the latest patch → Proceed to Step 1
+- **Why:** Patch releases contain security fixes, bug fixes, and additional deprecation warnings that make the next version hop safer and easier to debug
 
 ### Step 1: Run Test Suite (MANDATORY FIRST STEP)
 - **CRITICAL:** Before any upgrade work begins, run the existing test suite
@@ -218,6 +230,23 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 
 When user requests an upgrade, follow this workflow:
 
+### Step 0: Verify Latest Patch Version (MANDATORY PRE-STEP)
+```
+⚠️  THIS STEP IS REQUIRED BEFORE ANY OTHER WORK
+
+1. Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
+2. Compare against latest patch for that series
+   (see reference/multi-hop-strategy.md — "Latest Patch Versions Reference" table)
+3. If current version < latest patch:
+   - INFORM user: "Your app is on Rails X.Y.Z but the latest patch is X.Y.W"
+   - Guide through Gemfile update and bundle update rails
+   - Run test suite after patch upgrade
+   - Deploy patch upgrade before proceeding
+   - Do NOT proceed to next minor/major until on latest patch
+4. If current version == latest patch:
+   - Proceed to Step 1
+```
+
 ### Step 1: Run Test Suite (MANDATORY FIRST STEP)
 ```
 ⚠️  THIS STEP IS REQUIRED BEFORE ANY OTHER WORK
@@ -347,6 +376,12 @@ Before starting ANY upgrade:
 ### Pattern 1: Full Upgrade Request
 **User says:** "Upgrade my Rails app to 8.1"
 
+**Action - Step 0 (MANDATORY: Verify Latest Patch):**
+1. Read `Gemfile.lock` for exact Rails version
+2. Compare against latest patch for that series (see `reference/multi-hop-strategy.md`)
+3. If not on latest patch → Guide user through patch upgrade first
+4. If on latest patch → Proceed to Step 1
+
 **Action - Step 1 (MANDATORY: Verify Tests Pass):**
 1. Load: `workflows/test-suite-verification-workflow.md`
 2. Detect test framework (RSpec or Minitest)
@@ -381,6 +416,11 @@ Before starting ANY upgrade:
 ### Pattern 2: Multi-Hop Request
 **User says:** "Help me upgrade from Rails 5.2 to 8.1"
 
+**Action - Step 0 (MANDATORY: Verify Latest Patch):**
+1. Check exact current version from `Gemfile.lock`
+2. If not on latest patch of current series → Upgrade to latest patch first
+3. For multi-hop: This check applies at the START and again after each hop
+
 **Action - Step 1 (MANDATORY: Verify Tests Pass):**
 1. Run test suite BEFORE planning any upgrade work
 2. If tests fail → STOP and fix first
@@ -401,6 +441,9 @@ Before starting ANY upgrade:
 
 ### Pattern 3: Breaking Changes Analysis Only
 **User says:** "What breaking changes affect my app for Rails 8.0?"
+
+**Action - Step 0 (MANDATORY: Verify Latest Patch):**
+1. Check if on latest patch — warn if not, recommend patching first
 
 **Action - Step 1 (MANDATORY: Verify Tests Pass):**
 1. Run test suite first
@@ -447,19 +490,20 @@ Before delivering, verify:
 
 ## Key Principles
 
-1. **ALWAYS Run Test Suite First** (MANDATORY - no exceptions, no upgrade work until tests pass)
-2. **Block on Failing Tests** (if tests fail, STOP and help fix them before any upgrade work)
-3. **ALWAYS Verify load_defaults** (MANDATORY - check if load_defaults matches current Rails version)
-4. **Recommend Updating load_defaults First** (if behind current Rails, update load_defaults BEFORE upgrading to next version)
-5. **Run Detection Directly** (use Grep/Glob/Read tools - no script generation needed)
-6. **Always Use Actual Findings** (no generic examples in reports)
-7. **Always Flag Custom Code** (with ⚠️ warnings based on detected issues)
-8. **Always Use Templates** (for consistency)
-9. **Always Check Quality** (before delivery)
-10. **Load Workflows as Needed** (don't hold everything in memory)
-11. **Sequential Process is Critical** (tests → load_defaults check → detection → reports)
-12. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
-13. **Always Use `NextRails.next?` for Dual-Boot Code** (NEVER use `respond_to?` for version branching. DELEGATE to the `dual-boot` skill for patterns and setup.)
+1. **ALWAYS Verify Latest Patch First** (MANDATORY - ensure app is on latest patch of current series before any version hop)
+2. **ALWAYS Run Test Suite** (MANDATORY - no exceptions, no upgrade work until tests pass)
+3. **Block on Failing Tests** (if tests fail, STOP and help fix them before any upgrade work)
+4. **ALWAYS Verify load_defaults** (MANDATORY - check if load_defaults matches current Rails version)
+5. **Recommend Updating load_defaults First** (if behind current Rails, update load_defaults BEFORE upgrading to next version)
+6. **Run Detection Directly** (use Grep/Glob/Read tools - no script generation needed)
+7. **Always Use Actual Findings** (no generic examples in reports)
+8. **Always Flag Custom Code** (with ⚠️ warnings based on detected issues)
+9. **Always Use Templates** (for consistency)
+10. **Always Check Quality** (before delivery)
+11. **Load Workflows as Needed** (don't hold everything in memory)
+12. **Sequential Process is Critical** (patch check → tests → load_defaults check → detection → reports)
+13. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
+14. **Always Use `NextRails.next?` for Dual-Boot Code** (NEVER use `respond_to?` for version branching. DELEGATE to the `dual-boot` skill for patterns and setup.)
 
 ---
 
@@ -467,7 +511,9 @@ Before delivering, verify:
 
 A successful upgrade assistance session:
 
-✅ **Ran test suite FIRST** (Step 1 - MANDATORY)
+✅ **Verified latest patch version** (Step 0 - MANDATORY)
+✅ **Upgraded to latest patch if needed** (before any minor/major hop)
+✅ **Ran test suite** (Step 1 - MANDATORY)
 ✅ **Verified all tests pass** (blocked if tests failed)
 ✅ **Recorded baseline metrics** (test count, coverage)
 ✅ **Checked load_defaults alignment** (Step 2 - MANDATORY)
@@ -483,17 +529,24 @@ A successful upgrade assistance session:
 
 ---
 
-**Version:** 3.0
-**Last Updated:** January 2025
+**Version:** 3.1
+**Last Updated:** March 2026
 **Skill Type:** Modular with external workflows and examples
 **Methodology:** Based on FastRuby.io upgrade best practices and "The Complete Guide to Upgrade Rails" ebook
 **Attribution:** Content based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)
+
+**v3.1 Changes:**
+- Added mandatory Step 0: Verify Latest Patch Version — ensures app is on latest patch of current series before any minor/major hop
+- Added latest patch versions reference table in `reference/multi-hop-strategy.md`
+- Updated workflow from 4-step to 5-step process
+- All request patterns now include Step 0 patch verification
+- Updated Key Principles and Success Criteria to include patch verification
 
 **v3.0 Changes:**
 - **MAJOR:** Removed script generation - Claude now runs detection directly using tools
 - Detection uses Grep, Glob, and Read tools instead of generating bash scripts
 - Eliminated user round-trip (no more "run this script and share results")
-- Streamlined from 5-step to 4-step process
+- Streamlined detection from 5-step to 4-step process
 - New workflow file: `workflows/direct-detection-workflow.md`
 - Removed: `workflows/detection-script-workflow.md`, `examples/detection-script-only.md`
 
