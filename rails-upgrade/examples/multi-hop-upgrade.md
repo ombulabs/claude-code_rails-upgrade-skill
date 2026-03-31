@@ -20,8 +20,8 @@ I'll help you upgrade from Rails 5.2 to 8.0! This is a multi-hop upgrade that re
 
 ```
 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0
- |     |     |     |     |     |     |
-Hop1  Hop2  Hop3  Hop4  Hop5  Hop6  Hop7
+ |     |     |     |     |     |
+Hop1  Hop2  Hop3  Hop4  Hop5  Hop6
 ```
 
 ### Estimated Timeline

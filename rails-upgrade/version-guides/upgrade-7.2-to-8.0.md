@@ -152,10 +152,10 @@ Remove this line from your configuration files.
 
 ---
 
-#### 5. Ruby 3.1+ Strictly Required
+#### 5. Ruby 3.2+ Strictly Required
 
 **What Changed:**
-Rails 8.0 requires Ruby 3.1.0 or newer.
+Rails 8.0 requires Ruby 3.2.0 or newer.
 
 **Fix:**
 ```bash

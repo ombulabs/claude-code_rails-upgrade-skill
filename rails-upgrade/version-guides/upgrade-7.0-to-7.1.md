@@ -201,7 +201,7 @@ end
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. Query Log Tags Format
+#### 7. Query Log Tags Format
 
 **What Changed:**
 New query log format options available.
@@ -220,7 +220,7 @@ config.active_record.query_log_tags_format = :sqlcommenter  # or :legacy
 
 ---
 
-#### 7. Cache Format Version 7.1
+#### 8. Cache Format Version 7.1
 
 **What Changed:**
 New cache serialization format available.
@@ -235,7 +235,7 @@ config.active_support.cache_format_version = 7.1
 
 ---
 
-#### 8. Content Security Policy Updates
+#### 9. Content Security Policy Updates
 
 **What Changed:**
 CSP configuration syntax updated.
@@ -248,7 +248,7 @@ Review and update CSP directives as needed.
 
 ---
 
-#### 9. Secret Key File Location Changed
+#### 10. Secret Key File Location Changed
 
 **What Changed:**
 The location of `secrets.yml.enc` has changed.
@@ -268,7 +268,7 @@ Note: Most applications use `credentials.yml.enc` instead, which is unaffected.
 
 ---
 
-#### 10. Active Record inspect Output Changed
+#### 11. Active Record inspect Output Changed
 
 **What Changed:**
 `ActiveRecord::Core#inspect` now respects `attributes_for_inspect` configuration.
