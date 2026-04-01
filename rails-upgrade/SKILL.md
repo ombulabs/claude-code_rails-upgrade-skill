@@ -3,14 +3,15 @@ name: rails-upgrade
 description: Analyzes Rails applications and generates comprehensive upgrade reports with breaking changes, deprecations, and step-by-step migration guides for Rails 2.3 through 8.1. Use when upgrading Rails applications, planning multi-hop upgrades, or querying version-specific changes. Based on FastRuby.io methodology and "The Complete Guide to Upgrade Rails" ebook.
 ---
 
-# Rails Upgrade Assistant Skill v3.1
+# Rails Upgrade Assistant Skill
 
 ## Skill Identity
 - **Name:** Rails Upgrade Assistant
-- **Version:** 3.1
 - **Purpose:** Intelligent Rails application upgrades from 2.3 through 8.1
-- **Based on:** Official Rails CHANGELOGs, FastRuby.io methodology, and the FastRuby.io ebook
+- **Skill Type:** Modular with external workflows and examples
 - **Upgrade Strategy:** Sequential only (no version skipping)
+- **Methodology:** Based on FastRuby.io upgrade best practices and "The Complete Guide to Upgrade Rails" ebook
+- **Attribution:** Content based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)
 
 ---
 
@@ -532,36 +533,4 @@ A successful upgrade assistance session:
 
 ---
 
-**Version:** 3.1
-**Last Updated:** March 2026
-**Skill Type:** Modular with external workflows and examples
-**Methodology:** Based on FastRuby.io upgrade best practices and "The Complete Guide to Upgrade Rails" ebook
-**Attribution:** Content based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)
-
-**v3.1 Changes:**
-- Added mandatory Step 0: Verify Latest Patch Version — ensures app is on latest patch of current series before any minor/major hop
-- Added latest patch versions reference table in `reference/multi-hop-strategy.md`
-- Updated workflow from 4-step to 5-step process
-- All request patterns now include Step 0 patch verification
-- Updated Key Principles and Success Criteria to include patch verification
-
-**v3.0 Changes:**
-- **MAJOR:** Removed script generation - Claude now runs detection directly using tools
-- Detection uses Grep, Glob, and Read tools instead of generating bash scripts
-- Eliminated user round-trip (no more "run this script and share results")
-- Streamlined detection from 5-step to 4-step process
-- New workflow file: `workflows/direct-detection-workflow.md`
-- Removed: `workflows/detection-script-workflow.md`, `examples/detection-script-only.md`
-
-**v2.2 Changes:**
-- Added mandatory `load_defaults` verification as Step 2 of all upgrade workflows
-- If `load_defaults` is behind current Rails version, skill now:
-  - Informs user of the mismatch
-  - Recommends updating `load_defaults` to match current Rails BEFORE upgrading to next version
-  - Asks user for confirmation before proceeding
-- ~~New workflow file: `workflows/load-defaults-verification-workflow.md`~~ (removed in v3.0 — replaced by external `rails-load-defaults` skill dependency)
-
-**v2.1 Changes:**
-- Added mandatory test suite verification as Step 1 of all upgrade workflows
-- Upgrade process now BLOCKS if any tests fail
-- New workflow file: `workflows/test-suite-verification-workflow.md`
+See [CHANGELOG.md](CHANGELOG.md) for version history and current version.
