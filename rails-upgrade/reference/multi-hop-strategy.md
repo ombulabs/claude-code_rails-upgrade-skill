@@ -30,26 +30,53 @@ Before beginning any minor or major version hop, ensure you are on the **latest 
 
 ### Latest Patch Versions Reference
 
-| Series | Latest Patch | Notes |
-|--------|-------------|-------|
-| 2.3.x | 2.3.18 | End of life |
-| 3.0.x | 3.0.20 | End of life |
-| 3.1.x | 3.1.12 | End of life |
-| 3.2.x | 3.2.22.5 | End of life |
-| 4.0.x | 4.0.13 | End of life |
-| 4.1.x | 4.1.16 | End of life |
-| 4.2.x | 4.2.11.3 | End of life |
-| 5.0.x | 5.0.7.2 | End of life |
-| 5.1.x | 5.1.7 | End of life |
-| 5.2.x | 5.2.8.1 | End of life |
-| 6.0.x | 6.0.6.1 | End of life |
-| 6.1.x | 6.1.7.10 | End of life |
-| 7.0.x | 7.0.8.7 | Security only |
-| 7.1.x | 7.1.5.1 | Security only |
-| 7.2.x | 7.2.2.1 | Maintained |
-| 8.0.x | 8.0.2 | Maintained |
+#### End-of-Life Series (static — these versions are frozen)
 
-> **Note:** This table may become outdated. Always verify against [rubygems.org](https://rubygems.org/gems/rails/versions) before starting an upgrade.
+| Series | Latest Patch |
+|--------|-------------|
+| 2.3.x | 2.3.18 |
+| 3.0.x | 3.0.20 |
+| 3.1.x | 3.1.12 |
+| 3.2.x | 3.2.22.5 |
+| 4.0.x | 4.0.13 |
+| 4.1.x | 4.1.16 |
+| 4.2.x | 4.2.11.3 |
+| 5.0.x | 5.0.7.2 |
+| 5.1.x | 5.1.7 |
+| 5.2.x | 5.2.8.1 |
+| 6.0.x | 6.0.6.1 |
+| 6.1.x | 6.1.7.10 |
+
+#### Active Series (look up dynamically — these receive new patches)
+
+For series that are still maintained or receiving security updates, **always resolve the latest patch at runtime** using one of these methods:
+
+**Option A — RubyGems API (preferred, structured JSON):**
+```bash
+curl -s https://rubygems.org/api/v1/versions/rails.json | \
+  ruby -rjson -e '
+    series = ARGV[0]
+    versions = JSON.parse(STDIN.read)
+      .map { |v| v["number"] }
+      .select { |v| v.start_with?(series) }
+      .sort_by { |v| Gem::Version.new(v) }
+    puts versions.last
+  ' "7.1."
+```
+Replace `"7.1."` with the target series prefix (e.g., `"7.0."`, `"7.2."`, `"8.0."`).
+
+**Option B — gem search (works offline if gem sources are cached):**
+```bash
+gem search '^rails$' --versions | grep "^rails " | \
+  ruby -e '
+    series = ARGV[0]
+    versions = STDIN.read.scan(/[\d.]+/).select { |v| v.start_with?(series) }
+      .sort_by { |v| Gem::Version.new(v) }
+    puts versions.last
+  ' "7.1."
+```
+
+> **Why dynamic?** Active series receive new patch releases for security and bug fixes. A hard-coded table goes stale; querying RubyGems ensures the skill always targets the correct version.
 
 ### Process
 
