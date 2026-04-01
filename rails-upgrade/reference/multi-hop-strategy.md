@@ -4,9 +4,94 @@
 
 ---
 
-## Core Principle
+## Core Principles
 
-**Never skip Rails versions.** Upgrade sequentially, one minor/major version at a time.
+1. **Never skip Rails versions.** Upgrade sequentially, one minor/major version at a time.
+2. **Always start from the latest patch of your current version.** Before hopping to the next minor/major, upgrade to the latest patch release of your current series first.
+
+---
+
+## Step 0: Upgrade to Latest Patch Release
+
+Before beginning any minor or major version hop, ensure you are on the **latest patch release** of your current Rails series. For example, if you are on Rails 3.2.19, upgrade to 3.2.22.5 first.
+
+### Why This Matters
+
+- **Security fixes** — Patch releases contain critical security patches that may also exist in the next minor version. Starting from the latest patch ensures you're not carrying known vulnerabilities.
+- **Bug fixes** — Later patches fix bugs that could cause confusing failures during an upgrade, making it harder to distinguish pre-existing issues from upgrade-related ones.
+- **Deprecation warnings** — Later patch releases may include additional deprecation warnings that prepare you for the next version.
+- **Smaller delta** — The jump to the next minor/major is smaller and better tested from the latest patch than from an arbitrary earlier patch.
+
+### How to Find the Latest Patch
+
+1. Check [rubygems.org/gems/rails/versions](https://rubygems.org/gems/rails/versions) for all releases in your series
+2. Or run: `gem search rails --versions | grep "^rails "` to see available versions
+3. The latest patch for each series is the target before hopping
+
+### Latest Patch Versions Reference
+
+#### End-of-Life Series (static — these versions are frozen)
+
+| Series | Latest Patch |
+|--------|-------------|
+| 2.3.x | 2.3.18 |
+| 3.0.x | 3.0.20 |
+| 3.1.x | 3.1.12 |
+| 3.2.x | 3.2.22.5 |
+| 4.0.x | 4.0.13 |
+| 4.1.x | 4.1.16 |
+| 4.2.x | 4.2.11.3 |
+| 5.0.x | 5.0.7.2 |
+| 5.1.x | 5.1.7 |
+| 5.2.x | 5.2.8.1 |
+| 6.0.x | 6.0.6.1 |
+| 6.1.x | 6.1.7.10 |
+
+#### Active Series (look up dynamically — these receive new patches)
+
+For series that are still maintained or receiving security updates, **always resolve the latest patch at runtime** using one of these methods:
+
+**Option A — RubyGems API (preferred, structured JSON):**
+```bash
+curl -s https://rubygems.org/api/v1/versions/rails.json | \
+  ruby -rjson -e '
+    series = ARGV[0]
+    versions = JSON.parse(STDIN.read)
+      .map { |v| v["number"] }
+      .select { |v| v.start_with?(series) }
+      .sort_by { |v| Gem::Version.new(v) }
+    puts versions.last
+  ' "7.1."
+```
+Replace `"7.1."` with the target series prefix (e.g., `"7.0."`, `"7.2."`, `"8.0."`).
+
+**Option B — gem search (works offline if gem sources are cached):**
+```bash
+gem search '^rails$' --versions | grep "^rails " | \
+  ruby -e '
+    series = ARGV[0]
+    versions = STDIN.read.scan(/[\d.]+/).select { |v| v.start_with?(series) }
+      .sort_by { |v| Gem::Version.new(v) }
+    puts versions.last
+  ' "7.1."
+```
+
+> **Why dynamic?** Active series receive new patch releases for security and bug fixes. A hard-coded table goes stale; querying RubyGems ensures the skill always targets the correct version.
+
+### Process
+
+```
+1. Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
+2. Look up latest patch for that series (e.g., 3.2.22.5)
+3. If current version < latest patch:
+   a. Update Gemfile: gem 'rails', '3.2.22.5'
+   b. Run: bundle update rails
+   c. Run test suite — all tests must pass
+   d. Review CHANGELOG for security fixes and behavioral changes
+   e. Deploy patch upgrade to production
+   f. Monitor for issues
+4. Once on latest patch, proceed to Step 1 (Map Your Path)
+```
 
 ---
 
