@@ -92,10 +92,21 @@ class User < ActiveRecord::Base
 end
 ```
 
-**Temporary workaround (not recommended):**
+4. **Remove `require 'strong_parameters'`** (if backported from Rails 3.2):
+
+The `strong_parameters` gem is built into Rails 4.0. Any `require 'strong_parameters'` calls will fail if the gem is not in the Gemfile.
+
 ```ruby
-# Gemfile
-gem 'protected_attributes'
+# BEFORE
+require 'strong_parameters' # in engine.rb or controller
+
+# AFTER — remove the require entirely
+# (strong_parameters is built into Rails 4)
+```
+
+If you need dual-boot compatibility during the transition:
+```ruby
+require 'strong_parameters' unless NextRails.next?
 ```
 
 ---
@@ -287,7 +298,20 @@ has_many :invitations, :finder_sql => 'SELECT id from items where id is NULL'
 ```
 
 **Fix:**
-`:finder_sql` is deprecated in Rails 4 with no direct replacement. Rewrite using scopes, lambdas, or custom query methods.
+`:finder_sql` is deprecated in Rails 4 with no direct replacement. Rewrite using standard associations with scopes or custom query methods:
+
+```ruby
+# BEFORE
+has_many :invitations, :finder_sql => 'SELECT * FROM invitations WHERE invited_by_id = #{id}'
+
+# AFTER — rewrite as a standard association with a lambda
+has_many :invitations, -> { where('invited_by_id = ?', id) }
+
+# OR — if the SQL is too complex for a lambda, use a method
+def invitations
+  Invitation.find_by_sql(["SELECT * FROM invitations WHERE invited_by_id = ?", id])
+end
+```
 
 ---
 
@@ -316,11 +340,6 @@ User.find_by(name: name, email: email)
 User.find_or_create_by(email: email)
 ```
 
-**Temporary workaround:**
-```ruby
-# Gemfile
-gem 'activerecord-deprecated_finders'
-```
 
 ---
 
@@ -465,6 +484,8 @@ If your code stores cache keys externally (e.g., in Redis, a database, or a back
 1. Invalidate/regenerate stored cache keys after upgrading
 2. Or set `self.cache_timestamp_format = :number` on affected models to preserve the old format
 
+**Skill behavior:** When this change is detected, ask the user which approach they prefer — the right choice depends on whether external systems rely on the cache key format.
+
 ---
 
 #### 9. Observers Extracted
@@ -490,6 +511,8 @@ Sweepers are no longer included.
 # Gemfile
 gem 'rails-observers'
 ```
+
+Note: This is the same gem as #9 (Observers) — `rails-observers` bundles both Observers and Sweepers.
 
 ---
 
@@ -731,33 +754,7 @@ request.headers.merge!(headers)
 
 ---
 
-#### 23. `strong_parameters` Gem Built-in
-
-**What Changed:**
-The `strong_parameters` gem (used as a backport in Rails 3.2) is built into Rails 4.0. The `require 'strong_parameters'` call will fail if the gem is not in the Gemfile.
-
-**Detection Pattern:**
-```ruby
-require 'strong_parameters'
-```
-
-**Fix:**
-```ruby
-# BEFORE
-require 'strong_parameters' # in engine.rb or controller
-
-# AFTER — remove the require entirely
-# (strong_parameters is built into Rails 4)
-```
-
-If you need dual-boot compatibility during the transition:
-```ruby
-require 'strong_parameters' unless NextRails.next?
-```
-
----
-
-#### 24. `ActiveRecord::ImmutableRelation` Error
+#### 23. `ActiveRecord::ImmutableRelation` Error
 
 **What Changed:**
 In Rails 4, calling methods like `count` on a relation that has already been loaded or modified can raise `ActiveRecord::ImmutableRelation`.
@@ -772,7 +769,7 @@ Rewrite the query to avoid modifying a frozen relation, e.g., use `.distinct.cou
 
 ---
 
-#### 25. PaperTrail Version Models Require `VersionConcern`
+#### 24. PaperTrail Version Models Require `VersionConcern`
 
 **What Changed:**
 If using PaperTrail with custom version models (subclassing `Version`), Rails 4 requires explicitly including `PaperTrail::VersionConcern`.
@@ -829,9 +826,7 @@ bundle exec rake rails4:check
 gem 'rails', '~> 4.0.0'
 
 # Add if needed
-gem 'protected_attributes'  # Temporary for attr_accessible
-gem 'rails-observers'       # If using observers
-gem 'activerecord-deprecated_finders'  # For old finders
+gem 'rails-observers'       # If using observers or sweepers
 ```
 
 ```bash
@@ -841,15 +836,14 @@ bundle update rails
 ### Phase 3: Fix Breaking Changes
 1. Add lambda to all scopes
 2. **Migrate all association `:conditions`, `:order`, `:extend`, `:uniq` options to lambda syntax** (this is typically the highest-volume change)
-3. Remove `:finder_sql` and `:readonly` association options
+3. Rewrite `:finder_sql` associations as scopes or methods; remove `:readonly` options
 4. Update dynamic finders to where/find_by
 5. Add HTTP methods to routes
-6. Migrate to Strong Parameters (can be done incrementally)
+6. Migrate to Strong Parameters and remove `require 'strong_parameters'` calls
 7. Replace `rescue_action` with `rescue_from`
 8. Fix partials that rely on implicit magic variables (pass `locals:` explicitly)
 9. Replace `ActiveSupport::BufferedLogger` with `ActiveSupport::Logger`
-10. Remove `require 'strong_parameters'` calls (built-in to Rails 4)
-11. Cast dates to strings in YAML fixtures (`<%= 3.days.ago.to_s(:db) %>`)
+10. Cast dates to strings in YAML fixtures (`<%= 3.days.ago.to_s(:db) %>`)
 
 ### Phase 4: Configuration
 ```bash
