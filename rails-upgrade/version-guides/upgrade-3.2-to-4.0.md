@@ -342,7 +342,6 @@ User.find_by(name: name, email: email)
 User.find_or_create_by(email: email)
 ```
 
-
 ---
 
 #### 5. Routes Require HTTP Method
