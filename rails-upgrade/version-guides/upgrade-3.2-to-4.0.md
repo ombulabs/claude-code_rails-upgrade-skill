@@ -428,7 +428,35 @@ Pass the variable explicitly via `locals:`:
 
 No fix is needed when rendering with `collection:` or `object:` — the variable is still defined in those cases.
 
-**Detection Script:** Run `ruby detection-scripts/3.2-to-4.0/detect-partial-magic-vars.rb` from the skill root. It scans `app/views` for partials that reference their own name as a variable. Results need manual review — only partials rendered without `collection:`, `object:`, or `locals:` require changes.
+**Detection Script:**
+```ruby
+require 'find'
+
+SEARCH_DIR = ARGV[0] || 'app/views'
+EXTENSIONS = %w[.html.erb .html.haml .html.slim]
+
+def partial_file?(file)
+  base = File.basename(file)
+  EXTENSIONS.any? { |ext| base.start_with?('_') && base.end_with?(ext) }
+end
+
+def extract_partial_name(file)
+  File.basename(file).match(/^_(.*?)\./)[1]
+end
+
+Find.find(SEARCH_DIR) do |path|
+  next unless File.file?(path) && partial_file?(path)
+
+  partial_name = extract_partial_name(path)
+  content = File.read(path)
+
+  if content.match?(/\s#{Regexp.escape(partial_name)}\s/)
+    puts "[!] '#{path}' references variable '#{partial_name}' -- verify render calls"
+  end
+end
+```
+
+Results need manual review — only partials rendered without `collection:`, `object:`, or `locals:` require changes.
 
 ---
 
