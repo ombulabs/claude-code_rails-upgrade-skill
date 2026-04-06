@@ -428,7 +428,7 @@ Pass the variable explicitly via `locals:`:
 
 No fix is needed when rendering with `collection:` or `object:` — the variable is still defined in those cases.
 
-**Detection Script:** Run `ruby detection-scripts/detect-partial-magic-vars.rb` from the skill root. It scans `app/views` for partials that reference their own name as a variable. Results need manual review — only partials rendered without `collection:`, `object:`, or `locals:` require changes.
+**Detection Script:** Run `ruby detection-scripts/3.2-to-4.0/detect-partial-magic-vars.rb` from the skill root. It scans `app/views` for partials that reference their own name as a variable. Results need manual review — only partials rendered without `collection:`, `object:`, or `locals:` require changes.
 
 ---
 
