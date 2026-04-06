@@ -185,9 +185,9 @@ has_one :active_visit, class_name: "Visit",
 belongs_to :clinic_patient_link, primary_key: :person_id, foreign_key: :person_id,
   conditions: clinic_id_conditions_proc, extend: MultiKeyAssociation::BelongsTo
 
-# AFTER
+# AFTER — this pattern is rare and complex; verify manually
 belongs_to :clinic_patient_link, ->(object) {
-  (extending MultiKeyAssociation::BelongsTo).where(clinic_id_conditions_proc.call(object))
+  where(clinic_id_conditions_proc.call(object)).extending(MultiKeyAssociation::BelongsTo)
 }, primary_key: :person_id, foreign_key: :person_id
 
 # BEFORE
