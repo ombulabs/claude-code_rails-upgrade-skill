@@ -862,18 +862,18 @@ Error → section lookup for the most common errors encountered during this upgr
 
 | Error | See |
 |-------|-----|
-| `ActiveModel::ForbiddenAttributesError` | §2 Strong Parameters — use `user_params` not `params[:user]` |
-| Scope returns wrong results or errors | §3a Scopes — add lambda |
-| `Unknown key: :conditions` | §3b Association conditions — move to lambda |
-| `No route matches` | §5 Routes — add HTTP method |
-| `NoMethodError: undefined method 'rescue_action'` | §6 rescue_action — use `rescue_from` |
-| `undefined local variable or method` in partial | §7 Partial magic variables — pass `locals:` |
-| Cache misses after upgrade | §8 cache_key format — changed to `:nsec` |
-| `invalid date` in fixtures | §14 Fixture dates — cast with `.to_s(:db)` |
-| `eager_load is set to nil` | §15 config.eager_load — set in all environments |
-| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | §17 BufferedLogger — renamed to `ActiveSupport::Logger` |
-| `ActiveRecord::ImmutableRelation` | §23 ImmutableRelation — use `.distinct.count` |
-| Controller specs don't see custom headers | §22 Test headers — use `request.headers.merge!` |
+| `ActiveModel::ForbiddenAttributesError` | Section 2 (Strong Parameters) — use `user_params` not `params[:user]` |
+| Scope returns wrong results or errors | Section 3a (Scopes) — add lambda |
+| `Unknown key: :conditions` | Section 3b (Association conditions) — move to lambda |
+| `No route matches` | Section 5 (Routes) — add HTTP method |
+| `NoMethodError: undefined method 'rescue_action'` | Section 6 (rescue_action) — use `rescue_from` |
+| `undefined local variable or method` in partial | Section 7 (Partial magic variables) — pass `locals:` |
+| Cache misses after upgrade | Section 8 (cache_key format) — changed to `:nsec` |
+| `invalid date` in fixtures | Section 14 (Fixture dates) — cast with `.to_s(:db)` |
+| `eager_load is set to nil` | Section 15 (config.eager_load) — set in all environments |
+| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 17 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
+| `ActiveRecord::ImmutableRelation` | Section 23 (ImmutableRelation) — use `.distinct.count` |
+| Controller specs don't see custom headers | Section 22 (Test headers) — use `request.headers.merge!` |
 
 ---
 
