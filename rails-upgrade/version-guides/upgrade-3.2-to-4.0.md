@@ -305,7 +305,9 @@ has_many :invitations, :finder_sql => 'SELECT id from items where id is NULL'
 has_many :invitations, :finder_sql => 'SELECT * FROM invitations WHERE invited_by_id = #{id}'
 
 # AFTER — rewrite as a standard association with a lambda
-has_many :invitations, -> { where('invited_by_id = ?', id) }
+# Note: the owner must be passed as a parameter, since `id` inside a
+# bare lambda refers to the relation scope, not the owning record.
+has_many :invitations, ->(owner) { where(invited_by_id: owner.id) }
 
 # OR — if the SQL is too complex for a lambda, use a method
 def invitations
