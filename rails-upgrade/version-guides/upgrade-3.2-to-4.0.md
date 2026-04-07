@@ -185,9 +185,9 @@ has_one :active_visit, class_name: "Visit",
 belongs_to :clinic_patient_link, primary_key: :person_id, foreign_key: :person_id,
   conditions: clinic_id_conditions_proc, extend: MultiKeyAssociation::BelongsTo
 
-# AFTER
+# AFTER — this pattern is rare and complex; verify manually
 belongs_to :clinic_patient_link, ->(object) {
-  (extending MultiKeyAssociation::BelongsTo).where(clinic_id_conditions_proc.call(object))
+  where(clinic_id_conditions_proc.call(object)).extending(MultiKeyAssociation::BelongsTo)
 }, primary_key: :person_id, foreign_key: :person_id
 
 # BEFORE
@@ -305,7 +305,9 @@ has_many :invitations, :finder_sql => 'SELECT id from items where id is NULL'
 has_many :invitations, :finder_sql => 'SELECT * FROM invitations WHERE invited_by_id = #{id}'
 
 # AFTER — rewrite as a standard association with a lambda
-has_many :invitations, -> { where('invited_by_id = ?', id) }
+# Note: the owner must be passed as a parameter, since `id` inside a
+# bare lambda refers to the relation scope, not the owning record.
+has_many :invitations, ->(owner) { where(invited_by_id: owner.id) }
 
 # OR — if the SQL is too complex for a lambda, use a method
 def invitations
@@ -339,7 +341,6 @@ User.where(email: email)
 User.find_by(name: name, email: email)
 User.find_or_create_by(email: email)
 ```
-
 
 ---
 
@@ -431,7 +432,7 @@ No fix is needed when rendering with `collection:` or `object:` — the variable
 ```ruby
 require 'find'
 
-SEARCH_DIR = 'app/views'
+SEARCH_DIR = ARGV[0] || 'app/views'
 EXTENSIONS = %w[.html.erb .html.haml .html.slim]
 
 def partial_file?(file)
@@ -450,12 +451,12 @@ Find.find(SEARCH_DIR) do |path|
   content = File.read(path)
 
   if content.match?(/\s#{Regexp.escape(partial_name)}\s/)
-    puts "[!] '#{path}' references variable '#{partial_name}' — verify render calls"
+    puts "[!] '#{path}' references variable '#{partial_name}' -- verify render calls"
   end
 end
 ```
 
-⚠️ This script finds candidates that need manual review. Not all results require changes — only partials rendered without `collection:`, `object:`, or `locals:`.
+Results need manual review — only partials rendered without `collection:`, `object:`, or `locals:` require changes.
 
 ---
 
@@ -883,138 +884,24 @@ For each model with `attr_accessible`:
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Mass Assignment Error
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** `ActiveModel::ForbiddenAttributesError`
-
-**Cause:** Using `params[:model]` directly instead of permitted params
-
-**Fix:**
-```ruby
-# Use the params method
-User.new(user_params)  # Not params[:user]
-```
-
-### Issue: Scope Not Working
-
-**Error:** Scope returns wrong results or errors
-
-**Cause:** Missing lambda
-
-**Fix:**
-```ruby
-scope :active, -> { where(active: true) }
-```
-
-### Issue: Route Not Found
-
-**Error:** `No route matches`
-
-**Cause:** Missing HTTP method on `match`
-
-**Fix:**
-```ruby
-get '/path' => 'controller#action'
-```
-
-### Issue: Association Conditions Not Working
-
-**Error:** `Unknown key: :conditions` or unexpected query results
-
-**Cause:** Hash-style `:conditions` on associations no longer supported
-
-**Fix:**
-```ruby
-# Move conditions into a lambda
-has_many :active_items, -> { where(active: true) }
-```
-
-### Issue: Fixture Date Errors
-
-**Error:** `invalid date` in test fixtures
-
-**Cause:** Dynamic date expressions in YAML fixtures need explicit string casting in Rails 4
-
-**Fix:**
-```yaml
-accepted_at: "<%= 3.days.ago.to_s(:db) %>"
-```
-
-### Issue: Partial Raises `undefined local variable`
-
-**Error:** `undefined local variable or method 'something'` in a partial
-
-**Cause:** Rails 4 no longer defines an implicit variable named after the partial unless rendered with `collection:` or `object:`
-
-**Fix:**
-```ruby
-<%= render partial: "something", locals: { something: nil } %>
-```
-
-### Issue: Cache Keys Don't Match After Upgrade
-
-**Error:** Cache misses or stale data after upgrading
-
-**Cause:** `cache_timestamp_format` changed from `:number` to `:nsec`, producing different cache key strings
-
-**Fix:**
-Invalidate cached data, or set `self.cache_timestamp_format = :number` on affected models to preserve the old format.
-
-### Issue: `rescue_action` Not Found
-
-**Error:** `NoMethodError: undefined method 'rescue_action'`
-
-**Cause:** `rescue_action` was removed in Rails 4
-
-**Fix:**
-Replace with `rescue_from` using specific exception classes (avoid `rescue_from Exception`):
-```ruby
-rescue_from ActiveRecord::RecordNotFound do |exception|
-  render_api_error 404, "Not Found"
-end
-```
-
-### Issue: `config.eager_load` Missing
-
-**Error:** `eager_load is set to nil. Please update your config/environments/*.rb`
-
-**Cause:** Rails 4 requires this setting in every environment
-
-**Fix:**
-Add `config.eager_load = true` (production) or `config.eager_load = false` (dev/test) to each environment file.
-
-### Issue: `ActiveSupport::BufferedLogger` Not Found
-
-**Error:** `NameError: uninitialized constant ActiveSupport::BufferedLogger`
-
-**Cause:** Class renamed in Rails 4
-
-**Fix:**
-```ruby
-ActiveSupport::Logger.new("path/to/log")
-```
-
-### Issue: `ActiveRecord::ImmutableRelation`
-
-**Error:** `ActiveRecord::ImmutableRelation: can't modify frozen relation`
-
-**Cause:** Calling mutating methods like `count('distinct ...')` on a loaded/frozen relation
-
-**Fix:**
-Use `.distinct.count` or restructure the query to avoid modifying a frozen relation.
-
-### Issue: Test Request Headers Not Applied
-
-**Error:** Controller specs don't see custom headers
-
-**Cause:** `request.env.merge!` no longer works for setting headers in Rails 4
-
-**Fix:**
-```ruby
-request.headers.merge!(headers)
-```
+| Error | See |
+|-------|-----|
+| `ActiveModel::ForbiddenAttributesError` | Section 2 (Strong Parameters) — use `user_params` not `params[:user]` |
+| Scope returns wrong results or errors | Section 3a (Scopes) — add lambda |
+| `Unknown key: :conditions` | Section 3b (Association conditions) — move to lambda |
+| `No route matches` | Section 5 (Routes) — add HTTP method |
+| `NoMethodError: undefined method 'rescue_action'` | Section 6 (rescue_action) — use `rescue_from` |
+| `undefined local variable or method` in partial | Section 7 (Partial magic variables) — pass `locals:` |
+| Cache misses after upgrade | Section 8 (cache_key format) — changed to `:nsec` |
+| `invalid date` in fixtures | Section 14 (Fixture dates) — cast with `.to_s(:db)` |
+| `eager_load is set to nil` | Section 15 (config.eager_load) — set in all environments |
+| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 17 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
+| `ActiveRecord::ImmutableRelation` | Section 23 (ImmutableRelation) — use `.distinct.count` |
+| Controller specs don't see custom headers | Section 22 (Test headers) — use `request.headers.merge!` |
 
 ---
 
