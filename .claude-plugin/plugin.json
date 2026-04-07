@@ -1,7 +1,7 @@
 {
   "name": "rails-upgrade",
   "description": "Analyzes Rails applications and generates comprehensive upgrade reports with breaking changes, deprecations, and step-by-step migration guides for Rails 2.3 through 8.1. Based on FastRuby.io methodology.",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "author": {
     "name": "OmbuLabs.ai",
     "url": "https://www.ombulabs.ai"
