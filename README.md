@@ -43,9 +43,17 @@ git clone https://github.com/ombulabs/claude-code_dual-boot-skill.git
 cp -r claude-code_dual-boot-skill/dual-boot ~/.claude/skills/dual-boot
 ```
 
-### Installation
+### Installation (Plugin)
 
-Add this skill to your Claude Code configuration:
+Install as a Claude Code plugin for automatic setup:
+
+```bash
+claude plugin add --from https://github.com/ombulabs/claude-code_rails-upgrade-skill
+```
+
+### Installation (Manual)
+
+Alternatively, add this skill manually to your Claude Code configuration:
 
 ```bash
 # Clone the repository
