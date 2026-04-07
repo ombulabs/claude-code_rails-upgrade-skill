@@ -1,15 +1,15 @@
 # Upgrade Report Workflow
 
-**Purpose:** Generate comprehensive upgrade reports based on actual detection script findings
+**Purpose:** Generate comprehensive upgrade reports based on actual detection findings
 
-**When to use:** After user has run the detection script and shared findings.txt
+**When to use:** After direct detection has been run and findings have been collected
 
 ---
 
 ## Prerequisites
 
-- User has run the detection script
-- User has shared findings.txt or script output
+- Direct detection has been run using Grep/Glob/Read tools
+- Detection findings have been collected with file:line references
 - Target Rails version is known
 - Version guide available for the upgrade
 
@@ -17,9 +17,9 @@
 
 ## Step-by-Step Workflow
 
-### Step 1: Parse Findings File
+### Step 1: Parse Detection Findings
 
-Extract from the findings.txt:
+Extract from the detection findings:
 
 ```
 1. Total issues found

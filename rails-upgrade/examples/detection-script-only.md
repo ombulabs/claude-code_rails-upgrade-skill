@@ -202,7 +202,7 @@ echo "" | tee -a "$OUTPUT_FILE"
 # Ruby version check
 if [ -f ".ruby-version" ]; then
   echo "Ruby version: $(cat .ruby-version)" | tee -a "$OUTPUT_FILE"
-  echo "Required for Rails 8.0: 3.1.0+" | tee -a "$OUTPUT_FILE"
+  echo "Required for Rails 8.0: 3.2.0+" | tee -a "$OUTPUT_FILE"
 fi
 echo "" | tee -a "$OUTPUT_FILE"
 
