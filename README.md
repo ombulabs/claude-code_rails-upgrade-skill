@@ -45,10 +45,16 @@ cp -r claude-code_dual-boot-skill/dual-boot ~/.claude/skills/dual-boot
 
 ### Installation (Plugin)
 
-Install as a Claude Code plugin for automatic setup:
+Install as a Claude Code plugin with a single command:
 
 ```bash
-claude plugin add --from https://github.com/ombulabs/claude-code_rails-upgrade-skill
+claude plugin install rails-upgrade@ombulabs/claude-code_rails-upgrade-skill
+```
+
+Or for local testing from a cloned repo:
+
+```bash
+claude --plugin-dir ./claude-code_rails-upgrade-skill
 ```
 
 ### Installation (Manual)

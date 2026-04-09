@@ -4,8 +4,12 @@
   "version": "3.1.0",
   "author": {
     "name": "OmbuLabs.ai",
-    "url": "https://www.ombulabs.ai"
+    "url": "https://www.ombulabs.ai",
+    "email": "hello@ombulabs.com"
   },
+  "repository": "https://github.com/ombulabs/claude-code_rails-upgrade-skill",
+  "homepage": "https://www.ombulabs.ai",
+  "skills": "rails-upgrade",
   "keywords": [
     "ruby",
     "rails",
@@ -13,6 +17,9 @@
     "migration",
     "fastruby",
     "breaking-changes",
-    "deprecations"
+    "tech-debt",
+    "deprecations",
+    "legacy-code",
+    "ruby-on-rails"
   ]
 }
