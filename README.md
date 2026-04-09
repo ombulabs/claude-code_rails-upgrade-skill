@@ -52,14 +52,14 @@ Add the marketplace and install the plugin:
 claude plugin marketplace add ombulabs/claude-code_rails-upgrade-skill
 
 # Install the plugin
-claude plugin install rails-upgrade@ombulabs-rails-upgrade
+claude plugin install rails-upgrade@fastruby-upgrade-rails
 ```
 
 Or from within Claude Code:
 
 ```
 /plugin marketplace add ombulabs/claude-code_rails-upgrade-skill
-/plugin install rails-upgrade@ombulabs-rails-upgrade
+/plugin install rails-upgrade@fastruby-upgrade-rails
 ```
 
 For local testing from a cloned repo:

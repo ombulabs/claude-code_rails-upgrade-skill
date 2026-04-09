@@ -1,5 +1,8 @@
 {
-  "name": "ombulabs-rails-upgrade",
+  "name": "fastruby-upgrade-rails",
+  "metadata": {
+    "description": "Claude Code plugins for Rails upgrades by OmbuLabs.ai, based on FastRuby.io methodology."
+  },
   "owner": {
     "name": "OmbuLabs.ai",
     "url": "https://www.ombulabs.ai"
