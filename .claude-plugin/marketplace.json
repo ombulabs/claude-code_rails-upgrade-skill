@@ -1,0 +1,15 @@
+{
+  "name": "ombulabs-rails-upgrade",
+  "owner": {
+    "name": "OmbuLabs.ai",
+    "url": "https://www.ombulabs.ai"
+  },
+  "plugins": [
+    {
+      "name": "rails-upgrade",
+      "source": "./",
+      "description": "Analyzes Rails applications and generates comprehensive upgrade reports with breaking changes, deprecations, and step-by-step migration guides for Rails 2.3 through 8.1. Based on FastRuby.io methodology.",
+      "version": "3.1.0"
+    }
+  ]
+}
