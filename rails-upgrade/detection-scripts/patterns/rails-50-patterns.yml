@@ -27,8 +27,8 @@ breaking_changes:
       exclude: "optional:"
       search_paths:
         - "app/models/"
-      explanation: "Rails 5.0 makes belongs_to required by default. Nullable associations will fail validation"
-      fix: "Add optional: true to belongs_to associations that can be nil"
+      explanation: "Rails 5.0 makes belongs_to required by default. Review each match to determine if the association can be nil"
+      fix: "Add optional: true only to belongs_to associations that can legitimately be nil. Leave required ones as-is"
       variable_name: "BELONGS_TO_REQUIRED"
 
     - name: "protected_attributes gem"
