@@ -66,8 +66,8 @@ breaking_changes:
       search_paths:
         - "app/models/"
         - "app/controllers/"
-      explanation: "Returning false from a callback no longer halts the chain in Rails 5.0"
-      fix: "Replace 'return false' with 'throw :abort' in before_* callbacks"
+      explanation: "Returning false from a callback no longer halts the chain in Rails 5.0. This is a noisy pattern -- only matches inside before_* callbacks need fixing"
+      fix: "Replace 'return false' with 'throw :abort' in before_* callbacks. Ignore matches in non-callback methods"
       variable_name: "CALLBACK_HALT"
 
     - name: "assigns in tests"
