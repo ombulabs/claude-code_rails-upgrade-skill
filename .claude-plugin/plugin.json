@@ -9,7 +9,7 @@
   },
   "repository": "https://github.com/ombulabs/claude-code_rails-upgrade-skill",
   "homepage": "https://www.ombulabs.ai",
-  "skills": "./rails-upgrade",
+  "skills": "./",
   "keywords": [
     "ruby",
     "rails",

@@ -1,7 +1,9 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "fastruby-upgrade-rails",
+  "version": "1.0.0",
   "metadata": {
-    "description": "Claude Code plugins for Rails upgrades by OmbuLabs.ai, based on FastRuby.io methodology."
+    "description": "Claude Code plugin for Rails upgrades by OmbuLabs.ai, based on FastRuby.io methodology."
   },
   "owner": {
     "name": "OmbuLabs.ai",
@@ -12,7 +14,13 @@
       "name": "rails-upgrade",
       "source": "./",
       "description": "Analyzes Rails applications and generates comprehensive upgrade reports with breaking changes, deprecations, and step-by-step migration guides for Rails 2.3 through 8.1. Based on FastRuby.io methodology.",
-      "version": "3.1.0"
+      "version": "3.1.0",
+      "author": {
+        "name": "OmbuLabs.ai",
+        "url": "https://www.ombulabs.ai"
+      },
+      "category": "development",
+      "tags": ["ruby", "rails", "upgrade", "migration", "fastruby", "breaking-changes"]
     }
   ]
 }
