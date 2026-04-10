@@ -294,6 +294,16 @@ breaking_changes:
       fix: "Replace .select('distinct column').pluck(:column) with .distinct.pluck(:column)"
       variable_name: "SELECT_DISTINCT_PLUCK"
 
+    - name: "ActiveRecord::ImmutableRelation risk"
+      pattern: "\\.count\\(['\"]distinct"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.0 raises ActiveRecord::ImmutableRelation when calling count with a string on a loaded/modified relation"
+      fix: "Replace .count('distinct column') with .distinct.count"
+      variable_name: "IMMUTABLE_RELATION"
+
     - name: "Fixture dynamic dates without string cast"
       pattern: "<%=.*\\.(ago|from_now|since|until).*%>"
       exclude: "to_s"
