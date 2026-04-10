@@ -136,6 +136,16 @@ breaking_changes:
       fix: "Remove the readonly option — it is no longer supported"
       variable_name: "ASSOCIATION_READONLY"
 
+    - name: "Ruby 1.8 version requirement"
+      pattern: "ruby.*['\"]1\\.8"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+        - ".ruby-version"
+      explanation: "Rails 4.0 requires Ruby 1.9.3+ (2.0+ recommended) — it will not boot on Ruby 1.8"
+      fix: "Upgrade Ruby to 1.9.3+ (2.1+ recommended)"
+      variable_name: "RUBY_VERSION"
+
     - name: "Route match without HTTP method"
       pattern: "^\\s*match\\s+['\"/]"
       exclude: "via:"
@@ -283,16 +293,6 @@ breaking_changes:
       explanation: "Rails 4.0 introduced .distinct as the preferred way to get distinct results"
       fix: "Replace .select('distinct column').pluck(:column) with .distinct.pluck(:column)"
       variable_name: "SELECT_DISTINCT_PLUCK"
-
-    - name: "Ruby 1.8 version requirement"
-      pattern: "ruby.*['\"]1\\.8"
-      exclude: ""
-      search_paths:
-        - "Gemfile"
-        - ".ruby-version"
-      explanation: "Rails 4.0 requires Ruby 1.9.3+ (2.0+ recommended)"
-      fix: "Upgrade Ruby to 1.9.3+ (2.1+ recommended)"
-      variable_name: "RUBY_VERSION"
 
     - name: "Fixture dynamic dates without string cast"
       pattern: "<%=.*\\.(ago|from_now|since|until).*%>"
