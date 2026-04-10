@@ -119,6 +119,12 @@ dependencies:
     message: "Required if tests use assigns() or assert_template"
     url: "https://github.com/rails/rails-controller-testing"
 
+  test_unit:
+    check: false
+    gem_name: "test-unit"
+    message: "Required if you see 'cannot load such file -- test/unit/assertions' after upgrading Ruby"
+    url: "https://github.com/test-unit/test-unit"
+
   rails_upgrader:
     check: false
     gem_name: "rails_upgrader"
