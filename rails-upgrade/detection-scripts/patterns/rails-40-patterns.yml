@@ -127,6 +127,15 @@ breaking_changes:
       fix: "Replace find_or_initialize_by_column(val) with find_or_initialize_by(column: val)"
       variable_name: "FIND_OR_INITIALIZE_BY"
 
+    - name: "Association :readonly option on through"
+      pattern: "(has_many|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.0 removed :readonly from has_many :through associations"
+      fix: "Remove the readonly option — it is no longer supported"
+      variable_name: "ASSOCIATION_READONLY"
+
     - name: "Route match without HTTP method"
       pattern: "^\\s*match\\s+['\"/]"
       exclude: "via:"
