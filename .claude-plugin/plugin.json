@@ -1,6 +1,6 @@
 {
   "name": "rails-upgrade",
-  "version": "1.0.0",
+  "version": "3.1.0",
   "description": "Plan and execute Rails version upgrades following FastRuby.io methodology",
   "skills": "./rails-upgrade/",
   "author": {
