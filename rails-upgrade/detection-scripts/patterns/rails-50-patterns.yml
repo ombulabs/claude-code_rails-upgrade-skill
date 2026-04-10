@@ -50,7 +50,7 @@ breaking_changes:
       variable_name: "ATTR_ACCESSIBLE"
 
     - name: "Parameters used as hash"
-      pattern: "params\\[.*\\]\\.(slice|except|merge|symbolize_keys|to_hash)\\b"
+      pattern: "params(\\[.*\\])?\\.(slice|except|merge|symbolize_keys|to_hash)\\b"
       exclude: ""
       search_paths:
         - "app/controllers/"
