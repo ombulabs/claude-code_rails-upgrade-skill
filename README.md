@@ -29,29 +29,35 @@ We've encountered (and solved) edge cases that don't appear in any documentation
 
 This skill depends on the following skills. Install them first:
 
-**1. [rails-load-defaults skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)** — incremental `load_defaults` verification and updates:
+**Via the OmbuLabs marketplace (recommended)** - installs all three skills at once:
+
+```bash
+claude plugin marketplace add https://github.com/ombulabs/claude-skills.git
+claude plugin install rails-upgrade@ombulabs-skills
+claude plugin install rails-load-defaults@ombulabs-skills
+claude plugin install dual-boot@ombulabs-skills
+```
+
+**Manual install:**
+
+**1. [rails-load-defaults skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)** - incremental `load_defaults` verification and updates:
 
 ```bash
 git clone https://github.com/ombulabs/claude-code_rails-load-defaults-skill.git
-cp -r claude-code_rails-load-defaults-skill ~/.claude/skills/rails-load-defaults
+cp -r claude-code_rails-load-defaults-skill/rails-load-defaults ~/.claude/skills/
 ```
 
-**2. [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill)** — dual-boot setup and management with `next_rails`:
+**2. [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill)** - dual-boot setup and management with `next_rails`:
 
 ```bash
 git clone https://github.com/ombulabs/claude-code_dual-boot-skill.git
-cp -r claude-code_dual-boot-skill/dual-boot ~/.claude/skills/dual-boot
+cp -r claude-code_dual-boot-skill/dual-boot ~/.claude/skills/
 ```
 
-### Installation
-
-Add this skill to your Claude Code configuration:
+**3. This skill:**
 
 ```bash
-# Clone the repository
 git clone https://github.com/ombulabs/claude-code_rails-upgrade-skill.git
-
-# Add to your Claude Code skills directory
 cp -r claude-code_rails-upgrade-skill/rails-upgrade ~/.claude/skills/
 ```
 
