@@ -9,5 +9,5 @@
   },
   "repository": "https://github.com/ombulabs/claude-code_rails-upgrade-skill",
   "license": "MIT",
-  "keywords": ["rails", "ruby", "upgrade", "migration"]
+  "keywords": ["ruby", "rails", "upgrade", "migration", "fastruby", "breaking-changes", "tech-debt", "deprecations", "legacy-code", "ruby-on-rails"]
 }
