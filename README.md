@@ -33,9 +33,9 @@ This skill depends on two companion skills: [rails-load-defaults](https://github
 
 ```bash
 claude plugin marketplace add https://github.com/ombulabs/claude-skills.git
-claude plugin install rails-upgrade@ombulabs-skills
-claude plugin install rails-load-defaults@ombulabs-skills
-claude plugin install dual-boot@ombulabs-skills
+claude plugin install rails-upgrade@ombulabs-ai
+claude plugin install rails-load-defaults@ombulabs-ai
+claude plugin install dual-boot@ombulabs-ai
 ```
 
 **Manual install:**
