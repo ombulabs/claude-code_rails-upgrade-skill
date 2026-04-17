@@ -88,6 +88,7 @@ Follows the FastRuby.io methodology: current-version deprecations are the primar
 
 ### Step 5: Set Up Dual-Boot
 - **DELEGATE** to the `dual-boot` skill.
+- **Precondition:** `gem "next_rails"` must be at the Gemfile root, not inside a `:development`/`:test` group. Otherwise `NextRails.next?` in production-mode config raises `NameError`.
 - Contract: working `Gemfile.next`, boot confirmed on both Gemfiles (`rails runner 'puts Rails.version'` on each), model suite passes on `Gemfile.next`.
 - **DEPENDENCY:** [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill).
 
@@ -112,6 +113,8 @@ Broader than `rails runner`. On `Gemfile.next`:
 - Start the Rails server.
 - Start background workers (sidekiq, sucker_punch, delayed_job) — check `Procfile` for what's expected.
 - Run `assets:precompile` in production mode.
+
+**Baseline first.** Run each smoke command on the current `Gemfile` before running it on `Gemfile.next`. Only failures that appear on `Gemfile.next` but not on `Gemfile` are upgrade-caused. This is especially important for `assets:precompile`, which frequently has long-standing app-side issues unrelated to the Rails bump.
 
 ### Step 9: Remove Dual-Boot
 - **DELEGATE** to the `dual-boot` cleanup contract.
