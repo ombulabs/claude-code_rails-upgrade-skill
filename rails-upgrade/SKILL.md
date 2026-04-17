@@ -55,63 +55,73 @@ When proposing code fixes that must work with both the current and target Rails 
 
 ---
 
-## Core Workflow (7-Step Process)
+## Core Workflow
 
-### Step 0: Verify Latest Patch Version (MANDATORY PRE-STEP)
-- **CRITICAL:** Before any upgrade work begins, verify the app is on the latest patch release of its current Rails series
-- Read `Gemfile.lock` to find the exact current Rails version (e.g., `3.2.19`)
+Follows the FastRuby.io methodology: current-version deprecations are the primary signal for what breaks next version, fix the build in dependency order, and treat `load_defaults` alignment as optional post-upgrade work.
+
+### Step 1: Run Test Suite
+- Run the existing test suite on the current Rails. All tests must pass before proceeding.
+- Ensure deprecation warnings are NOT silenced in the test environment before running. Reconfigure to `:stderr` or `:log` if needed so Step 3 has the full list.
+- Run `bundle exec rspec` or `bundle exec rails test`.
+- If tests fail, stop and help fix them first.
+- Record test count, coverage, and the deprecation-warning list as baseline.
+- See `workflows/test-suite-verification-workflow.md`.
+
+### Step 2: Verify Latest Patch Version
+- Before hopping minor/major, verify the app is on the latest patch of its current Rails series.
+- Read `Gemfile.lock` for the exact current Rails version.
 - Compare against the latest patch for that series:
-  - **EOL series (≤ 7.1):** Use the static table in `references/multi-hop-strategy.md`
-  - **Active series (≥ 7.2):** Query the RubyGems API at runtime (see `references/multi-hop-strategy.md` for commands)
-- If the app is NOT on the latest patch:
-  - Inform user: "Your app is on Rails X.Y.Z but the latest patch is X.Y.W — you should upgrade to the latest patch first"
-  - Guide user through updating the Gemfile and running `bundle update rails`
-  - Run test suite after patch upgrade to verify nothing broke
-  - Deploy patch upgrade before proceeding with the minor/major version hop
-- If the app IS on the latest patch → Proceed to Step 1
-- **Why:** Patch releases contain security fixes, bug fixes, and additional deprecation warnings that make the next version hop safer and easier to debug
+  - **EOL series (≤ 7.1):** static table in `references/multi-hop-strategy.md`.
+  - **Active series (≥ 7.2):** query RubyGems at runtime (commands in the same reference).
+- If not on latest patch: update the Gemfile, run `bundle update rails`, run tests, deploy the patch, then proceed.
+- **Why:** patch releases contain security fixes, bug fixes, and additional deprecation warnings that make the next hop safer.
 
-### Step 1: Run Test Suite (MANDATORY FIRST STEP)
-- **CRITICAL:** Before any upgrade work begins, run the existing test suite
-- Claude executes `bundle exec rspec` or `bundle exec rails test` to verify baseline
-- All tests MUST pass before proceeding with any upgrade
-- If tests fail, stop and help user fix failing tests first
-- Record test count and coverage as baseline metrics
-- See `workflows/test-suite-verification-workflow.md` for details
+### Step 3: Resolve Deprecation Warnings
+- **DELEGATE** to `workflows/deprecation-resolution-workflow.md`.
+- Methodology: regex search, `next_rails` deprecation tooling, `synvert-ruby`, prefer backward-compatible fixes over `NextRails.next?` conditionals when possible.
+- Goal: the deprecation list from Step 1 is empty (or down to known, justified exceptions) before introducing the next Rails version.
 
-### Step 2: Set Up Dual-Boot with next_rails (EARLY SETUP)
-- **DELEGATE** to the `dual-boot` skill for setup and initialization
-- That skill handles:
-  - Checking if Gemfile.next already exists (to avoid duplicate `next?` method)
-  - Adding next_rails gem and running next_rails --init
-  - Installing dependencies for both Rails versions
-  - Configuring the Gemfile with `if next?` conditionals
-- **DEPENDENCY:** Requires the [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill)
+### Step 4: Review Ruby Compatibility
+- Verify the current Ruby meets the target Rails' minimum Ruby version.
+- Check `Gemfile`, `.ruby-version`, `.tool-versions`, and `ruby --version`.
+- If Ruby needs bumping, handle it as a separate upgrade before continuing.
 
-### Step 3: Run Breaking Changes Detection (DIRECT)
-- **Claude runs detection checks directly** using Grep, Glob, and Read tools
-- No script generation - Claude searches the codebase in real-time
-- Finds issues with file:line references
-- Collects all findings immediately
-- See `workflows/direct-detection-workflow.md` for patterns to search
+### Step 5: Set Up Dual-Boot
+- **DELEGATE** to the `dual-boot` skill.
+- Contract: working `Gemfile.next`, boot confirmed on both Gemfiles (`rails runner 'puts Rails.version'` on each), model suite passes on `Gemfile.next`.
+- **DEPENDENCY:** [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill).
 
-### Step 4: Generate Reports Based on Findings
-- **Comprehensive Upgrade Report**: Breaking changes analysis with OLD vs NEW code examples, custom code warnings with ⚠️ flags, step-by-step migration plan, testing checklist and rollback plan
-- **app:update Preview Report**: Shows exact configuration file changes (OLD vs NEW), lists new files to be created, impact assessment (HIGH/MEDIUM/LOW)
+### Step 6: Run Breaking Changes Detection
+- Claude runs detection directly using Grep/Glob/Read — no script generation.
+- Load `detection-scripts/patterns/rails-{VERSION}-patterns.yml` and `version-guides/upgrade-{FROM}-to-{TO}.md` for context.
+- Collect findings with file:line references. See `workflows/direct-detection-workflow.md`.
+- Generate the Comprehensive Upgrade Report and `app:update` Preview from actual findings (templates in `templates/`).
 
-### Step 5: Implement Changes & Upgrade Rails Version
-- Fix breaking changes identified in the reports
-- Use `NextRails.next?` for code that must work with both versions (DELEGATE to dual-boot skill for patterns)
-- Update Gemfile to target Rails version
-- Run test suite against both versions during the transition
-- Do not fix deprecations printed by the next version, these will be addressed later before the next upgrade
-- Deploy and verify
+### Step 7: Fix Broken Build
+Fix-order discipline:
+- **Errors before failures** — errors can mask failures.
+- **Unit → integration → system** — a broken unit suite produces noise everywhere else.
+- **RSpec:** Models → Services → Mailers → Helpers → Controllers → Integration → System.
+- **Minitest:** Models → Mailers → Helpers → Controllers → Integration → System.
 
-### Step 6: Align load_defaults to New Version (FINAL STEP)
-- **DELEGATE** to the `rails-load-defaults` skill for detection and incremental update
-- That skill handles tiered, per-config updates with test runs between each change
-- This is done AFTER the Rails version upgrade is complete, as the last step
-- **DEPENDENCY:** Requires the [rails-load-defaults skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
+Use `NextRails.next?` for code that must work on both versions (DELEGATE to dual-boot for patterns). Do not fix deprecations printed by the next version here — those belong in the next upgrade's Step 3.
+
+### Step 8: Smoke Test
+Broader than `rails runner`. On `Gemfile.next`:
+- Open a Rails console.
+- Start the Rails server.
+- Start background workers (sidekiq, sucker_punch, delayed_job) — check `Procfile` for what's expected.
+- Run `assets:precompile` in production mode.
+
+### Step 9: Remove Dual-Boot
+- **DELEGATE** to the `dual-boot` cleanup contract.
+- Removes `Gemfile.next`, drops `next_rails`, collapses remaining `NextRails.next?` call sites, consolidates CI to a single bundle.
+
+### Step 10: Align `load_defaults` (OPTIONAL, post-upgrade)
+- **Optional and separate from the upgrade.** The upgrade is complete at Step 9. Users may run this later once the target version is stable in production.
+- **Do NOT** invoke `bin/rails app:update`'s defaults hunk as part of the upgrade.
+- **DELEGATE** to the `rails-load-defaults` skill when the user chooses to run it.
+- **DEPENDENCY:** [rails-load-defaults skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill).
 
 ---
 
@@ -227,8 +237,8 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `examples/multi-hop-upgrade.md` - Multi-hop upgrade example
 
 ### External Dependencies
-- **dual-boot skill** - Dual-boot setup and management with next_rails (Step 2) (https://github.com/ombulabs/claude-code_dual-boot-skill)
-- **rails-load-defaults skill** - Incremental load_defaults alignment (Step 6, final step) (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
+- **dual-boot skill** - Dual-boot setup (Step 5) and removal (Step 9) (https://github.com/ombulabs/claude-code_dual-boot-skill)
+- **rails-load-defaults skill** - Optional `load_defaults` alignment, post-upgrade (Step 10) (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
 
 ### Reference Materials
 - `references/deprecation-warnings.md` - Finding and fixing deprecations
@@ -244,115 +254,6 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 ### Report Templates
 - `templates/upgrade-report-template.md` - Main upgrade report structure
 - `templates/app-update-preview-template.md` - Configuration preview
-
----
-
-## High-Level Workflow
-
-When user requests an upgrade, follow this workflow:
-
-### Step 0: Verify Latest Patch Version (MANDATORY PRE-STEP)
-```
-⚠️  THIS STEP IS REQUIRED BEFORE ANY OTHER WORK
-
-1. Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
-2. Compare against latest patch for that series:
-   - EOL series (≤ 6.1): use static table in references/multi-hop-strategy.md
-   - Active series (≥ 7.0): query RubyGems API (see references/multi-hop-strategy.md for commands)
-3. If current version < latest patch:
-   - INFORM user: "Your app is on Rails X.Y.Z but the latest patch is X.Y.W"
-   - Guide through Gemfile update and bundle update rails
-   - Run test suite after patch upgrade
-   - Deploy patch upgrade before proceeding
-   - Do NOT proceed to next minor/major until on latest patch
-4. If current version == latest patch:
-   - Proceed to Step 1
-```
-
-### Step 1: Run Test Suite (MANDATORY FIRST STEP)
-```
-⚠️  THIS STEP IS REQUIRED BEFORE ANY OTHER WORK
-
-1. Read: workflows/test-suite-verification-workflow.md
-2. Detect test framework (RSpec, Minitest, or both)
-3. Run test suite with: bundle exec rspec OR bundle exec rails test
-4. Capture results: total tests, passing, failing, pending
-5. If ANY tests fail:
-   - STOP the upgrade process
-   - Report failing tests to user
-   - Offer to help fix failing tests
-   - Do NOT proceed until all tests pass
-6. If all tests pass:
-   - Record baseline metrics (test count, coverage if available)
-   - Proceed to Step 2
-```
-
-### Step 2: Set Up Dual-Boot with next_rails (EARLY SETUP)
-```
-DELEGATE to the dual-boot skill for setup and initialization.
-That skill handles:
-- Checking if Gemfile.next already exists (to avoid duplicate `next?` method)
-- Adding next_rails gem and running next_rails --init
-- Installing dependencies for both Rails versions
-- Configuring the Gemfile with `if next?` conditionals
-```
-
-### Step 3: Validate Upgrade Path
-```
-1. Check if upgrade is single-hop or multi-hop
-2. If multi-hop, explain sequential requirement
-3. Plan individual hops
-```
-
-### Step 4: Run Breaking Changes Detection (DIRECT)
-```
-Claude runs detection directly using tools - NO script generation needed
-
-1. Read: workflows/direct-detection-workflow.md
-2. Read: detection-scripts/patterns/rails-{VERSION}-patterns.yml
-3. For each pattern in the patterns file:
-   - Use Grep tool to search for the pattern
-   - Collect file paths and line numbers
-   - Store findings with context
-4. Read: version-guides/upgrade-{FROM}-to-{TO}.md for context
-5. Compile all findings into structured data
-```
-
-### Step 5: Load Report Resources & Generate Reports
-```
-1. Read: templates/upgrade-report-template.md
-2. Read: templates/app-update-preview-template.md
-3. Read: workflows/upgrade-report-workflow.md
-4. Read: workflows/app-update-preview-workflow.md
-```
-
-**Deliverable #1: Comprehensive Upgrade Report**
-- **Input:** Direct detection findings + version guide data
-- **Output:** Report with real code examples from user's project
-
-**Deliverable #2: app:update Preview**
-- **Input:** Actual config files + findings
-- **Output:** Preview with real file paths and changes
-
-### Step 6: Present Reports & Implement Changes
-```
-1. Present Comprehensive Upgrade Report first
-2. Present app:update Preview Report second
-3. Implement breaking change fixes using `NextRails.next?` for dual-boot code
-4. Update Gemfile to target Rails version
-5. Run test suite against both versions
-6. Deploy and verify
-```
-
-### Step 7: Align load_defaults (FINAL STEP)
-```
-⚠️  THIS STEP HAPPENS AFTER THE UPGRADE IS COMPLETE
-
-1. DELEGATE to the rails-load-defaults skill
-2. That skill walks through each config change one at a time, grouped by risk tier
-3. Tests are re-run between each change
-4. Consolidates into config/application.rb when done
-```
 
 ---
 
@@ -394,87 +295,17 @@ Before starting ANY upgrade:
 ### Pattern 1: Full Upgrade Request
 **User says:** "Upgrade my Rails app to 8.1"
 
-**Action - Step 0 (MANDATORY: Verify Latest Patch):**
-1. Read `Gemfile.lock` for exact Rails version
-2. Compare against latest patch for that series (see `references/multi-hop-strategy.md`)
-3. If not on latest patch → Guide user through patch upgrade first
-4. If on latest patch → Proceed to Step 1
-
-**Action - Step 1 (MANDATORY: Verify Tests Pass):**
-1. Load: `workflows/test-suite-verification-workflow.md`
-2. Detect test framework (RSpec or Minitest)
-3. Run test suite: `bundle exec rspec` or `bundle exec rails test`
-4. If tests FAIL → STOP and help fix tests first
-5. If tests PASS → Record baseline and proceed
-
-**Action - Step 2 (Set Up Dual-Boot):**
-1. DELEGATE to the `dual-boot` skill for setup
-2. Set up next_rails, Gemfile.next, and dual-boot CI
-
-**Action - Step 3 (Run Detection Directly):**
-1. Validate upgrade path
-2. Load: `workflows/direct-detection-workflow.md`
-3. Load: `detection-scripts/patterns/rails-{VERSION}-patterns.yml`
-4. Use Grep/Glob/Read tools to search for each pattern
-5. Collect findings with file:line references
-
-**Action - Step 4 (Generate Reports):**
-1. Load: `workflows/upgrade-report-workflow.md`
-2. Load: `workflows/app-update-preview-workflow.md`
-3. Generate Comprehensive Upgrade Report (using direct findings)
-4. Generate app:update Preview (using actual config files)
-5. Present both reports to user
-
-**Action - Step 5 (Implement & Upgrade):**
-1. Fix breaking changes using `NextRails.next?` for dual-boot code
-2. Update Gemfile to target Rails version
-3. Run tests against both versions, deploy and verify
-
-**Action - Step 6 (Align load_defaults - FINAL):**
-1. DELEGATE to the `rails-load-defaults` skill
-2. Walk through each config incrementally after the upgrade is complete
+Run the full Core Workflow (Steps 1–9). Step 10 (`load_defaults`) is optional and can be deferred until the target version is stable in production.
 
 ### Pattern 2: Multi-Hop Request
 **User says:** "Help me upgrade from Rails 5.2 to 8.1"
 
-**Action - Step 0 (MANDATORY: Verify Latest Patch):**
-1. Check exact current version from `Gemfile.lock`
-2. If not on latest patch of current series → Upgrade to latest patch first
-3. For multi-hop: This check applies at the START and again after each hop
-
-**Action - Step 1 (MANDATORY: Verify Tests Pass):**
-1. Run test suite BEFORE planning any upgrade work
-2. If tests fail → STOP and fix first
-3. If tests pass → Proceed with planning
-
-**Action - Step 2 (Set Up Dual-Boot):**
-1. DELEGATE to the `dual-boot` skill for setup (if not already set up)
-2. Dual-boot stays active throughout the multi-hop process
-
-**Action - Step 3 (Plan & Execute):**
-1. Explain sequential requirement
-2. Calculate hops: 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1
-3. Reference: `references/multi-hop-strategy.md`
-4. Follow Pattern 1 Steps 3-5 for FIRST hop (5.2 → 6.0)
-5. After first hop complete, repeat for next hops
-6. **IMPORTANT:** After each hop, align load_defaults to the new version before starting the next hop
+Upgrades must be sequential (see "CRITICAL: Sequential Upgrade Strategy" below). For each hop, run Steps 1–9 from scratch. Step 2's latest-patch check re-applies before each hop. Step 10 is optional per hop — typically run once at the end of the chain, not between hops.
 
 ### Pattern 3: Breaking Changes Analysis Only
 **User says:** "What breaking changes affect my app for Rails 8.0?"
 
-**Action - Step 0 (MANDATORY: Verify Latest Patch):**
-1. Check if on latest patch — warn if not, recommend patching first
-
-**Action - Step 1 (MANDATORY: Verify Tests Pass):**
-1. Run test suite first
-2. If tests fail → Warn user and recommend fixing first
-3. If tests pass → Proceed with analysis
-
-**Action - Step 2 (Run Detection):**
-1. Load: `workflows/direct-detection-workflow.md`
-2. Run detection directly using tools
-3. Present findings summary
-4. Offer to generate full upgrade report
+Run Steps 1, 2, and 6 to produce the Comprehensive Upgrade Report and `app:update` Preview without executing the upgrade. Offer to continue with Steps 3–9 when ready.
 
 ---
 
@@ -506,20 +337,15 @@ Before delivering, verify:
 
 ## Key Principles
 
-1. **ALWAYS Verify Latest Patch First** (MANDATORY - ensure app is on latest patch of current series before any version hop)
-2. **ALWAYS Run Test Suite** (MANDATORY - no exceptions, no upgrade work until tests pass)
-3. **Block on Failing Tests** (if tests fail, STOP and help fix them before any upgrade work)
-4. **Set Up Dual-Boot Early** (dual-boot is Step 2, right after tests pass - run both versions during the entire transition)
-5. **Run Detection Directly** (use Grep/Glob/Read tools - no script generation needed)
-6. **Always Use Actual Findings** (no generic examples in reports)
-7. **Always Flag Custom Code** (with ⚠️ warnings based on detected issues)
-8. **Always Use Templates** (for consistency)
-9. **Always Check Quality** (before delivery)
-10. **Load Workflows as Needed** (don't hold everything in memory)
-11. **Sequential Process is Critical** (patch check → tests → dual-boot → detection → reports → implement → load_defaults)
-12. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
-13. **Always Use `NextRails.next?` for Dual-Boot Code** (NEVER use `respond_to?` for version branching. DELEGATE to the `dual-boot` skill for patterns and setup.)
-14. **Align load_defaults Last** (load_defaults update happens AFTER the Rails version upgrade is complete, as the final step)
+1. **Run the test suite first** — no upgrade work until the current-Rails suite is green. Baseline deprecation warnings go in the record.
+2. **Resolve deprecations before hopping** — current-version deprecations are the primary signal for what breaks next. Fix them before introducing the next Rails.
+3. **Dual-boot bridges the transition** — `Gemfile.next` keeps the current Rails bootable while you fix the target. Use `NextRails.next?` for code that must work on both; never `respond_to?`.
+4. **Fix the build in dependency order** — errors before failures, unit → integration → system. A broken unit suite produces noise everywhere else.
+5. **Smoke test beyond `rails runner`** — console, server, workers, and `assets:precompile` all need to boot on `Gemfile.next` before removing it.
+6. **Remove dual-boot when done** — DELEGATE to the `dual-boot` cleanup contract. Collapse `NextRails.next?` call sites; don't leave the conditional machinery behind.
+7. **`load_defaults` is optional, post-upgrade** — do NOT invoke `bin/rails app:update`'s defaults hunk as part of the upgrade. Align later, incrementally, when the target is stable in production.
+8. **Upgrades are sequential** — no version skipping (see "CRITICAL: Sequential Upgrade Strategy").
+9. **Detect directly, report from real findings** — Grep/Glob/Read on the actual codebase. No generic examples in reports; always flag custom code with ⚠️.
 
 ---
 
@@ -527,21 +353,16 @@ Before delivering, verify:
 
 A successful upgrade assistance session:
 
-✅ **Verified latest patch version** (Step 0 - MANDATORY)
-✅ **Upgraded to latest patch if needed** (before any minor/major hop)
-✅ **Ran test suite** (Step 1 - MANDATORY)
-✅ **Verified all tests pass** (blocked if tests failed)
-✅ **Recorded baseline metrics** (test count, coverage)
-✅ **Set up dual-boot** (Step 2 - early, before upgrading)
-✅ **Ran detection directly** (using Grep/Glob/Read tools - no script)
-✅ **Generated Comprehensive Upgrade Report** using actual findings
-✅ **Generated app:update Preview** using actual config files
-✅ Used user's actual code from findings (not generic examples)
-✅ Flagged all custom code with ⚠️ warnings based on detected issues
-✅ **Implemented changes and upgraded Rails version**
-✅ **Aligned load_defaults** (final step, after upgrade is complete)
-✅ Provided clear next steps
-✅ Offered to help implement changes
+✅ Ran test suite on current Rails; all tests pass; deprecation list captured (Step 1)
+✅ App is on the latest patch of its current series before any minor/major hop (Step 2)
+✅ Deprecation warnings resolved before introducing the next Rails (Step 3)
+✅ Ruby version meets target Rails' minimum (Step 4)
+✅ Dual-boot set up; both Gemfiles boot; model suite green on `Gemfile.next` (Step 5)
+✅ Breaking changes detected directly; Comprehensive Upgrade Report and `app:update` Preview generated from real findings (Step 6)
+✅ Build green on target Rails, fixed in error-first / unit→integration→system order (Step 7)
+✅ Smoke test passed on `Gemfile.next`: console, server, workers, `assets:precompile` (Step 8)
+✅ Dual-boot removed; `NextRails.next?` call sites collapsed; CI back to a single bundle (Step 9)
+✅ `load_defaults` alignment deferred as optional post-upgrade work (Step 10)
 
 ---
 
