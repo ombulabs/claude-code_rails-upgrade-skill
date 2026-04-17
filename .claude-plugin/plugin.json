@@ -1,0 +1,24 @@
+{
+  "name": "rails-upgrade",
+  "version": "3.1.0",
+  "description": "Plan and execute Rails version upgrades following FastRuby.io methodology",
+  "skills": "./rails-upgrade/",
+  "author": {
+    "name": "OmbuLabs",
+    "url": "https://github.com/ombulabs"
+  },
+  "repository": "https://github.com/ombulabs/claude-code_rails-upgrade-skill",
+  "license": "MIT",
+  "keywords": [
+    "ruby",
+    "rails",
+    "upgrade",
+    "migration",
+    "fastruby",
+    "breaking-changes",
+    "tech-debt",
+    "deprecations",
+    "legacy-code",
+    "ruby-on-rails"
+  ]
+}

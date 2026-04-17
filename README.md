@@ -25,34 +25,33 @@ We've encountered (and solved) edge cases that don't appear in any documentation
 
 ## How to Use This Skill
 
-### Prerequisites
-
-This skill depends on the following skills. Install them first:
-
-**1. [rails-load-defaults skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)** — incremental `load_defaults` verification and updates:
-
-```bash
-git clone https://github.com/ombulabs/claude-code_rails-load-defaults-skill.git
-cp -r claude-code_rails-load-defaults-skill ~/.claude/skills/rails-load-defaults
-```
-
-**2. [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill)** — dual-boot setup and management with `next_rails`:
-
-```bash
-git clone https://github.com/ombulabs/claude-code_dual-boot-skill.git
-cp -r claude-code_dual-boot-skill/dual-boot ~/.claude/skills/dual-boot
-```
-
 ### Installation
 
-Add this skill to your Claude Code configuration:
+This skill depends on two companion skills: [rails-load-defaults](https://github.com/ombulabs/claude-code_rails-load-defaults-skill) and [dual-boot](https://github.com/ombulabs/claude-code_dual-boot-skill). The marketplace install handles all three.
+
+**Via the OmbuLabs marketplace (recommended):**
 
 ```bash
-# Clone the repository
-git clone https://github.com/ombulabs/claude-code_rails-upgrade-skill.git
+claude plugin marketplace add https://github.com/ombulabs/claude-skills.git
+claude plugin install rails-upgrade@ombulabs-ai
+claude plugin install rails-load-defaults@ombulabs-ai
+claude plugin install dual-boot@ombulabs-ai
+```
 
-# Add to your Claude Code skills directory
+**Manual install:**
+
+```bash
+# 1. This skill
+git clone https://github.com/ombulabs/claude-code_rails-upgrade-skill.git
 cp -r claude-code_rails-upgrade-skill/rails-upgrade ~/.claude/skills/
+
+# 2. rails-load-defaults (dependency)
+git clone https://github.com/ombulabs/claude-code_rails-load-defaults-skill.git
+cp -r claude-code_rails-load-defaults-skill/rails-load-defaults ~/.claude/skills/
+
+# 3. dual-boot (dependency)
+git clone https://github.com/ombulabs/claude-code_dual-boot-skill.git
+cp -r claude-code_dual-boot-skill/dual-boot ~/.claude/skills/
 ```
 
 ### Basic Usage
