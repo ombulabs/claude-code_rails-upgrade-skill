@@ -248,7 +248,7 @@ For large applications, consider dual-boot testing:
 
 ```ruby
 # Gemfile
-if ENV['RAILS_NEXT']
+if next?
   gem 'rails', '~> 7.0'
 else
   gem 'rails', '~> 6.1'
@@ -260,7 +260,7 @@ end
 bundle exec rspec
 
 # Run next version
-RAILS_NEXT=1 bundle exec rspec
+BUNDLE_GEMFILE=Gemfile.next bundle exec rspec
 ```
 
 **Benefits:**
