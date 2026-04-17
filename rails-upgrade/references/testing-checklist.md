@@ -262,7 +262,7 @@ Rollback immediately if:
 
 ```bash
 # Run tests with Rails next version
-RAILS_NEXT=1 bundle exec rspec
+BUNDLE_GEMFILE=Gemfile.next bundle exec rspec
 
 # Run with verbose deprecation warnings
 RUBYOPT="-W:deprecated" bundle exec rspec
