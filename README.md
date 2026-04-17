@@ -131,6 +131,7 @@ Be aware of these limitations:
 | **Accurate time estimates** | The difficulty ratings and time estimates are rough guidelines based on typical applications. Your mileage will vary based on codebase size, test coverage, and custom code complexity. |
 | **Automated code changes** | The skill provides guidance and examples, but you implement the changes. It won't automatically refactor your code. |
 | **Gem compatibility resolution** | While we note common gem version requirements, resolving complex dependency conflicts requires manual intervention. |
+| **Rails LTS upgrades** | While many of the things this Skill can do will work to upgrade Rails LTS, the strategy for those apps will be different and the Rails source code is not the same as the main Rails repository |
 
 ## Contributing
 
