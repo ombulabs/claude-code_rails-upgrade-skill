@@ -29,7 +29,16 @@ We've encountered (and solved) edge cases that don't appear in any documentation
 
 This skill depends on two companion skills: [rails-load-defaults](https://github.com/ombulabs/claude-code_rails-load-defaults-skill) and [dual-boot](https://github.com/ombulabs/claude-code_dual-boot-skill). The marketplace install handles all three.
 
-**Via the OmbuLabs marketplace (recommended):**
+**From inside the Claude Code CLI prompt (recommended):**
+
+```
+/plugin marketplace add ombulabs/claude-skills
+/plugin install rails-upgrade@ombulabs-ai
+/plugin install rails-load-defaults@ombulabs-ai
+/plugin install dual-boot@ombulabs-ai
+```
+
+**From your terminal:**
 
 ```bash
 claude plugin marketplace add https://github.com/ombulabs/claude-skills.git
