@@ -319,4 +319,4 @@ Add 50% if custom code warnings are present.
 **Related Files:**
 - Template: `templates/upgrade-report-template.md`
 - Version guides: `version-guides/upgrade-{FROM}-to-{TO}.md`
-- Testing checklist: `reference/testing-checklist.md`
+- Testing checklist: `references/testing-checklist.md`
