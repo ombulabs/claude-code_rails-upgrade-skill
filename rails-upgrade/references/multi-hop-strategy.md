@@ -46,6 +46,8 @@ Before beginning any minor or major version hop, ensure you are on the **latest 
 | 5.2.x | 5.2.8.1 |
 | 6.0.x | 6.0.6.1 |
 | 6.1.x | 6.1.7.10 |
+| 7.0.x | 7.0.10 |
+| 7.1.x | 7.1.6 |
 
 #### Active Series (look up dynamically — these receive new patches)
 
@@ -63,7 +65,7 @@ curl -s https://rubygems.org/api/v1/versions/rails.json | \
     puts versions.last
   ' "7.1."
 ```
-Replace `"7.1."` with the target series prefix (e.g., `"7.0."`, `"7.2."`, `"8.0."`).
+Replace `"7.2."` with the target series prefix (e.g., `"8.0."`, `"8.1."`).
 
 **Option B — gem search (works offline if gem sources are cached):**
 ```bash
@@ -73,7 +75,7 @@ gem search '^rails$' --versions | grep "^rails " | \
     versions = STDIN.read.scan(/[\d.]+/).select { |v| v.start_with?(series) }
       .sort_by { |v| Gem::Version.new(v) }
     puts versions.last
-  ' "7.1."
+  ' "7.2."
 ```
 
 > **Why dynamic?** Active series receive new patch releases for security and bug fixes. A hard-coded table goes stale; querying RubyGems ensures the skill always targets the correct version.

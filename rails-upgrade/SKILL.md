@@ -61,8 +61,8 @@ When proposing code fixes that must work with both the current and target Rails 
 - **CRITICAL:** Before any upgrade work begins, verify the app is on the latest patch release of its current Rails series
 - Read `Gemfile.lock` to find the exact current Rails version (e.g., `3.2.19`)
 - Compare against the latest patch for that series:
-  - **EOL series (≤ 6.1):** Use the static table in `references/multi-hop-strategy.md`
-  - **Active series (≥ 7.0):** Query the RubyGems API at runtime (see `references/multi-hop-strategy.md` for commands)
+  - **EOL series (≤ 7.1):** Use the static table in `references/multi-hop-strategy.md`
+  - **Active series (≥ 7.2):** Query the RubyGems API at runtime (see `references/multi-hop-strategy.md` for commands)
 - If the app is NOT on the latest patch:
   - Inform user: "Your app is on Rails X.Y.Z but the latest patch is X.Y.W — you should upgrade to the latest patch first"
   - Guide user through updating the Gemfile and running `bundle update rails`
