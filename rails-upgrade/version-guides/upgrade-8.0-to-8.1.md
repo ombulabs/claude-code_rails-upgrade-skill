@@ -1,7 +1,5 @@
 # Rails 8.0 → 8.1 Upgrade Guide
 
-**Difficulty:** ⭐ Easy
-**Estimated Time:** 1-2 days
 **Ruby Requirement:** 3.2.0+ (required)
 
 ---

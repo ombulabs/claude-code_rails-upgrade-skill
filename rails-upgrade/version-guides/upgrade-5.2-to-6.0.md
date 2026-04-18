@@ -1,7 +1,5 @@
 # Rails 5.2 → 6.0 Upgrade Guide
 
-**Difficulty:** ⭐⭐⭐ Hard
-**Estimated Time:** 1-2 weeks
 **Ruby Requirement:** 2.5.0+ (2.7+ recommended)
 
 ---

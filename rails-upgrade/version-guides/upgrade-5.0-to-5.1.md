@@ -1,7 +1,5 @@
 # Rails 5.0 → 5.1 Upgrade Guide
 
-**Difficulty:** ⭐ Easy
-**Estimated Time:** 1-2 days
 **Ruby Requirement:** 2.2.2+ (2.4+ recommended)
 
 **Based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)**
