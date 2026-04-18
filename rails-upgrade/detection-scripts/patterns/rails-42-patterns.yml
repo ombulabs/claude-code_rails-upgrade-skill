@@ -5,12 +5,12 @@ breaking_changes:
   high_priority:
     - name: "ActionMailer .deliver / .deliver! deprecated"
       pattern: "\\.deliver!?\\s*(#|$)"
-      exclude: "deliver_now|deliver_later"
+      exclude: ""
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 4.2 deprecates .deliver and .deliver! in favor of .deliver_now (sync) and .deliver_later (async via ActiveJob)"
-      fix: "Replace .deliver with .deliver_now for synchronous delivery, or .deliver_later for async via ActiveJob"
+      explanation: "Rails 4.2 deprecates .deliver and .deliver! in favor of .deliver_now / .deliver_now! (sync) and .deliver_later (async via ActiveJob)"
+      fix: "Replace .deliver with .deliver_now, and .deliver! with .deliver_now! (bang-preserving). Use .deliver_later for async delivery via ActiveJob"
       variable_name: "MAILER_DELIVER"
 
     - name: "respond_with usage"
@@ -31,13 +31,13 @@ breaking_changes:
       fix: "Add gem 'responders', '~> 2.0' to your Gemfile"
       variable_name: "CLASS_RESPOND_TO"
 
-    - name: "Missing raise_in_transactional_callbacks config"
-      pattern: "raise_in_transactional_callbacks"
+    - name: "Verify raise_in_transactional_callbacks is configured"
+      pattern: "class\\s+\\w+\\s*<\\s*Rails::Application"
       exclude: ""
       search_paths:
-        - "config/"
-      explanation: "Rails 4.2 still suppresses exceptions in after_commit/after_rollback callbacks but emits a deprecation warning. Rails 5.0+ always raises"
-      fix: "Add config.active_record.raise_in_transactional_callbacks = true to config/application.rb (matches Rails 5.0+ behavior)"
+        - "config/application.rb"
+      explanation: "Rails 4.2 still suppresses exceptions in after_commit/after_rollback callbacks but emits a deprecation warning. The application file should opt-in to raising (the Rails 5.0+ default). This match flags config/application.rb — read it and verify the config is present"
+      fix: "If config.active_record.raise_in_transactional_callbacks is NOT present in config/application.rb, add: config.active_record.raise_in_transactional_callbacks = true. If it is already set to true, no action needed"
       variable_name: "TRANSACTIONAL_CALLBACKS"
 
     - name: "RSpec 2.x in Gemfile"
@@ -80,13 +80,13 @@ breaking_changes:
       fix: "Review test assertions on sanitized output. If differences are unacceptable, temporarily add gem 'rails-deprecated_sanitizer'"
       variable_name: "HTML_SANITIZER"
 
-    - name: "Missing test_order config"
-      pattern: "config\\.active_support\\.test_order"
+    - name: "Verify test_order is set"
+      pattern: "Rails\\.application\\.configure"
       exclude: ""
       search_paths:
         - "config/environments/test.rb"
-      explanation: "Rails 4.2 emits a deprecation warning when test_order is not explicitly set. Default becomes :random"
-      fix: "Add config.active_support.test_order = :random (or :sorted to preserve 4.1 behavior) to config/environments/test.rb"
+      explanation: "Rails 4.2 emits a deprecation warning when config.active_support.test_order is not explicitly set. This match flags config/environments/test.rb — read it and verify the config is present"
+      fix: "If config.active_support.test_order is NOT present in config/environments/test.rb, add: config.active_support.test_order = :random (or :sorted to preserve 4.1 behavior)"
       variable_name: "TEST_ORDER"
 
     - name: "Serialized attributes with custom coder"
@@ -96,7 +96,7 @@ breaking_changes:
         - "app/models/"
       explanation: "Rails 4.2 changes how nil is handled with serialized attributes and custom coders - nil now saves NULL instead of passing through the coder"
       fix: "Review code that assigns nil to serialized attributes with custom coders. Check for tests that relied on the coder's nil representation (e.g., 'null' for JSON)"
-      variable_name: "SERIALIZED_COSTUM_CODER"
+      variable_name: "SERIALIZED_CUSTOM_CODER"
 
     - name: "serve_static_assets config"
       pattern: "serve_static_assets"

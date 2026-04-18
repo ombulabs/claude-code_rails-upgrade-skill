@@ -26,7 +26,7 @@ Rails 4.2 is a minor release that introduces async infrastructure and several ex
 #### 1. ActionMailer `#deliver` / `#deliver!` Deprecated
 
 **What Changed:**
-`deliver` and `deliver!` are deprecated in favor of `deliver_now` (synchronous) and `deliver_later` (enqueued via ActiveJob).
+`deliver` and `deliver!` are deprecated. The direct, bang-preserving replacements are `deliver_now` and `deliver_now!` (synchronous). `deliver_later` is a new async option that enqueues the mail via ActiveJob.
 
 Calling a mailer method is also now lazy — the instance method runs when you call `deliver_now` / `deliver_later`, not when you call the class method. Code that relied on the old eager behavior for non-mailing work should move to class methods on the mailer.
 
@@ -40,9 +40,11 @@ NotificationMailer.daily_summary(user).deliver!
 ```ruby
 # BEFORE
 UserMailer.welcome(user).deliver
+NotificationMailer.daily_summary(user).deliver!
 
-# AFTER — synchronous (drop-in replacement)
+# AFTER — synchronous (direct drop-in replacements)
 UserMailer.welcome(user).deliver_now
+NotificationMailer.daily_summary(user).deliver_now!
 
 # AFTER — enqueued via ActiveJob (preferred for non-urgent mail)
 UserMailer.welcome(user).deliver_later
@@ -484,7 +486,7 @@ bin/rake rails:update
 Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/4.2.11.3) for the exact diff.
 
 ### Phase 5: Fix Breaking Changes
-1. Replace `.deliver` / `.deliver!` with `.deliver_now` / `.deliver_later`
+1. Replace `.deliver` / `.deliver!` with `.deliver_now` / `.deliver_now!` (or `.deliver_later` for async)
 2. Replace `.find(obj)` / `.exists?(obj)` with `.find(obj.id)` / `.exists?(obj.id)`
 3. Replace `assert_tag` with `assert_select`
 4. Update `Procfile` with `-b 0.0.0.0` if external access needed
