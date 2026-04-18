@@ -1,7 +1,5 @@
 # Rails 4.1 → 4.2 Upgrade Guide
 
-**Difficulty:** ⭐⭐ Medium
-**Estimated Time:** 3-5 days
 **Ruby Requirement:** 1.9.3+ (2.0+ recommended)
 
 **Based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs), the official Rails 4.2 upgrade guide, and the FastRuby.io upgrade blog post.**
