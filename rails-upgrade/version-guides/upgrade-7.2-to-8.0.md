@@ -1,7 +1,5 @@
 # Rails 7.2 → 8.0 Upgrade Guide
 
-**Difficulty:** ⭐⭐⭐⭐ Very Hard
-**Estimated Time:** 1-2 weeks
 **Ruby Requirement:** 3.2.0+ (required)
 
 ---

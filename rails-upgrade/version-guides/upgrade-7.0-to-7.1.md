@@ -1,7 +1,5 @@
 # Rails 7.0 → 7.1 Upgrade Guide
 
-**Difficulty:** ⭐⭐ Medium
-**Estimated Time:** 3-5 days
 **Ruby Requirement:** 2.7.0+ (3.0+ recommended)
 
 **Based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)**

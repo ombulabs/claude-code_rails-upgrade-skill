@@ -1,7 +1,5 @@
 # Rails 6.1 → 7.0 Upgrade Guide
 
-**Difficulty:** ⭐⭐⭐ Hard
-**Estimated Time:** 1-2 weeks
 **Ruby Requirement:** 2.7.0+ (3.0+ recommended)
 
 ---

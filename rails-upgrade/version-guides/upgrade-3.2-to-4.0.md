@@ -1,7 +1,5 @@
 # Rails 3.2 → 4.0 Upgrade Guide
 
-**Difficulty:** ⭐⭐⭐ Hard
-**Estimated Time:** 1-2 weeks
 **Ruby Requirement:** 1.9.3+ (2.0+ recommended)
 
 **Based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)**

@@ -1,7 +1,5 @@
 # Rails 6.0 → 6.1 Upgrade Guide
 
-**Difficulty:** ⭐⭐ Medium
-**Estimated Time:** 3-5 days
 **Ruby Requirement:** 2.5.0+ (2.7+ recommended)
 
 **Based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)**
