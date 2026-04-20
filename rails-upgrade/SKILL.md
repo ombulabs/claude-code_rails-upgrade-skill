@@ -105,12 +105,16 @@ Follows the FastRuby.io methodology: current-version deprecations are the primar
 
 ### Step 7: Fix Broken Build
 Fix-order discipline:
-- **Errors before failures** — errors can mask failures.
-- **Unit → integration → system** — a broken unit suite produces noise everywhere else.
-- **RSpec:** Models → Services → Mailers → Helpers → Controllers → Integration → System.
-- **Minitest:** Models → Mailers → Helpers → Controllers → Integration → System.
+- **Errors before failures.** Errors can mask failures; a single autoload error on `Gemfile.next` can cascade into dozens of apparent assertion failures that vanish once the load path is fixed.
+- **Unit → integration → system.** A broken unit suite produces noise everywhere else. Run one layer at a time (`bundle exec rspec spec/models`, then `spec/services`, etc.); advance only when the current layer is green.
+- **RSpec order:** Models → Services → Mailers → Helpers → Controllers → Requests/Integration → System.
+- **Minitest order:** Models → Mailers → Helpers → Controllers → Integration → System.
 
-Use `NextRails.next?` for code that must work on both versions (DELEGATE to dual-boot for patterns). Do not fix deprecations printed by the next version here — those belong in the next upgrade's Step 3.
+Default: **fix forward** so the code works on both current and target Rails without branching. Use `NextRails.next?` only when the API is genuinely removed on target and no shared call form exists (DELEGATE to the `dual-boot` skill for the pattern). Every `NextRails.next?` added here is cleanup debt for Step 9.
+
+**Do not fix deprecations printed by the next version here.** Those belong in the *next* upgrade's Step 3, not this one.
+
+See `references/fix-broken-build.md` for a triage checklist of common failure categories (Zeitwerk, Strong Parameters, kwargs, frozen strings, credentials, asset pipeline) and the iteration rhythm.
 
 ### Step 8: Smoke Test
 Broader than `rails runner`. On `Gemfile.next`:
@@ -252,6 +256,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 ### Reference Materials
 - `references/deprecation-resolution/deprecation-warnings.md` - Where deprecations surface + Rails config options
 - `references/deprecation-resolution/deprecation-strategies.md` - Fix strategies (regex / synvert / `NextRails.next?` / gem upgrade) and regression prevention
+- `references/fix-broken-build.md` - Step 7 triage: failure categories (Zeitwerk, kwargs, frozen strings, etc.) and iteration rhythm
 - `references/staying-current.md` - Keeping up with Rails releases
 - `references/breaking-changes-by-version.md` - Quick lookup
 - `references/multi-hop-strategy.md` - Multi-version planning
