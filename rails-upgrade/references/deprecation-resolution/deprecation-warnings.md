@@ -1,62 +1,53 @@
-# Deprecation Warnings Guide
+# Deprecation Warnings: Where They Surface & How to Configure Rails
 
 **Based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)**
+
+This reference covers *where* deprecation warnings appear and *how to configure Rails* to report them. For the resolution workflow, see `workflows/deprecation-resolution-workflow.md`. For fix strategies (regex, synvert, backward-compat), see `deprecation-strategies.md`.
 
 ---
 
 ## Overview
 
-Deprecation warnings notify you that a specific feature (method, class, or API) will be removed in a future version and should be replaced. Features are deprecated rather than immediately removed to:
+Deprecation warnings announce that a feature (method, class, API) will be removed in a future Rails version. Features are deprecated rather than immediately removed to:
 
 - Provide backward compatibility
-- Give developers time to update their code
+- Give developers time to update
 - Allow gradual migration to new patterns
-
----
-
-## Finding Deprecation Warnings
-
-### In Test Suite Logs
-
-If you have good test coverage, run your test suite and check the logs:
-
-```bash
-# Run tests and capture output
-bundle exec rspec 2>&1 | tee test_output.log
-
-# Search for deprecation warnings
-grep "DEPRECATION WARNING" test_output.log
-```
 
 All Rails deprecation warnings start with `DEPRECATION WARNING:`.
 
-### In CI Services
+---
 
-Most CI services (CircleCI, GitHub Actions, Travis CI) display full test output. After the build finishes, search the logs for `DEPRECATION WARNING`.
+## Where Deprecations Surface
 
-### In Test Log File
+### Test Suite Logs
 
 ```bash
-# After running tests
+bundle exec rspec 2>&1 | tee test_output.log
+grep "DEPRECATION WARNING" test_output.log
+```
+
+Or directly from the Rails test log:
+
+```bash
 grep "DEPRECATION WARNING" log/test.log
 ```
 
-### In Production
+### CI Services
 
-The best way to discover production deprecation warnings is through a monitoring tool like [Honeybadger](https://www.honeybadger.io/), [Sentry](https://sentry.io/), or [Airbrake](https://airbrake.io/).
+Most CI (GitHub Actions, CircleCI, Travis) preserves full test output. Search the build log for `DEPRECATION WARNING`.
 
-**Configure Rails to notify on deprecations:**
+### Production
+
+Production warnings are best captured via an error tracker. Configure Rails to notify, then subscribe:
 
 ```ruby
 # config/environments/production.rb
 config.active_support.deprecation = :notify
 ```
 
-**Subscribe to deprecation events:**
-
 ```ruby
 # config/initializers/deprecation_warnings.rb
-
 ActiveSupport::Notifications.subscribe('deprecation.rails') do |name, start, finish, id, payload|
   # Honeybadger
   Honeybadger.notify(
@@ -66,156 +57,62 @@ ActiveSupport::Notifications.subscribe('deprecation.rails') do |name, start, fin
   )
 
   # Or Sentry
-  # Sentry.capture_message(
-  #   payload[:message],
-  #   level: :warning,
-  #   backtrace: payload[:callstack]
-  # )
+  # Sentry.capture_message(payload[:message], level: :warning, backtrace: payload[:callstack])
 
   # Or Airbrake
-  # Airbrake.notify(
-  #   error_class: "DeprecationWarning",
-  #   error_message: payload[:message],
-  #   backtrace: payload[:callstack]
-  # )
+  # Airbrake.notify(error_class: "DeprecationWarning", error_message: payload[:message], backtrace: payload[:callstack])
 end
 ```
 
-See the [ActiveSupport Instrumentation Guide](https://guides.rubyonrails.org/active_support_instrumentation.html#subscribing-to-an-event) for more details.
+See the [ActiveSupport Instrumentation Guide](https://guides.rubyonrails.org/active_support_instrumentation.html#subscribing-to-an-event) for details.
 
-### Alternative: Log to Production Log
+Alternative, log to `production.log`:
 
 ```ruby
-# config/environments/production.rb
 config.active_support.deprecation = :log
 ```
 
-Then check `log/production.log`, but this can be noisy on high-traffic applications.
+Noisy on high-traffic apps, prefer `:notify` + a tracker.
 
 ---
 
-## Tracking Deprecation Warnings
+## Configuration Options
 
-Once you've collected deprecation warnings, track them systematically:
+| Setting | Behavior |
+|---------|----------|
+| `:raise` | Raise an exception (stops execution) |
+| `:log` | Log to Rails logger |
+| `:notify` | Send to `ActiveSupport::Notifications` |
+| `:silence` | Ignore (not recommended, hides signal) |
+| `:stderr` | Print to stderr |
+| `:report` | Report via error reporter (Rails 7.1+) |
 
-### 1. Create Issues for Each Root Cause
-
-Use your project management tool (Jira, Linear, GitHub Issues) to create a story for each unique deprecation warning. This helps with:
-
-- Code review organization
-- Progress tracking
-- Team visibility
-
-### 2. Prioritize by Frequency
-
-Address the most common deprecation warnings first. They often fix the largest number of occurrences with a single change.
-
-### 3. Group Related Warnings
-
-Some warnings share a root cause. For example, `update_attributes` being deprecated affects multiple files but has one fix pattern.
-
----
-
-## Fixing Deprecation Warnings
-
-### Process
-
-1. **Pick a warning** from the top of your backlog
-2. **Understand the fix** - Most warnings clearly state what to replace
-3. **Search for all occurrences** in the project
-4. **Apply the fix** consistently
-5. **Run tests** for affected code
-6. **Create a pull request**
-7. **Move to the next warning**
-
-### Example Fix
-
-**Warning:**
-```
-DEPRECATION WARNING: update_attributes is deprecated and will be removed
-from Rails 6.1 (please, use update instead)
-```
-
-**Search and Replace:**
-```bash
-# Find all occurrences
-grep -r "update_attributes" app/ lib/ --include="*.rb"
-
-# In your editor, replace:
-# object.update_attributes(params)
-# with:
-# object.update(params)
-```
-
-### Warnings from Gems
-
-Sometimes deprecation warnings come from gems, not your code. In this case:
-
-1. Check if a newer version of the gem fixes the issue
-2. Run `bundle outdated` to see available updates
-3. Update the gem: `bundle update gem_name`
-4. If no fix exists, consider contributing a patch or finding an alternative
-
----
-
-## Preventing Future Deprecation Debt
-
-### Treat Warnings as Errors
-
-Configure test and development environments to raise on deprecation:
+### Recommended per environment
 
 ```ruby
+# config/environments/development.rb
+config.active_support.deprecation = :raise
+
 # config/environments/test.rb
 config.active_support.deprecation = :raise
 
-# config/environments/development.rb
-config.active_support.deprecation = :raise
+# config/environments/production.rb
+config.active_support.deprecation = :notify
 ```
 
-This immediately surfaces deprecations during development and in CI.
-
-### Use Rubocop for Regression Prevention
-
-Write custom Rubocop cops to prevent deprecated patterns. See [Lint/DeprecatedClassMethods](https://github.com/rubocop-hq/rubocop/blob/master/lib/rubocop/cop/lint/deprecated_class_methods.rb) for examples.
-
-Example custom cop:
-
-```ruby
-# lib/rubocop/cop/custom/no_update_attributes.rb
-
-module RuboCop
-  module Cop
-    module Custom
-      class NoUpdateAttributes < Base
-        MSG = 'Use `update` instead of `update_attributes`.'
-
-        def_node_matcher :update_attributes?, <<~PATTERN
-          (send _ {:update_attributes :update_attributes!} ...)
-        PATTERN
-
-        def on_send(node)
-          return unless update_attributes?(node)
-          add_offense(node)
-        end
-      end
-    end
-  end
-end
-```
+**Upgrade-time caveat:** if the suite currently silences deprecations, flip to `:stderr` or `:log` (not `:raise`) while collecting the baseline in Step 1. `:raise` halts the suite on the first warning and hides the rest of the list. Switch to `:raise` after the backlog is cleared to prevent regressions.
 
 ---
 
 ## Rails 6.1+ Disallowed Deprecations
 
-Rails 6.1 introduced a feature to disallow specific deprecations. Once you fix a deprecation, you can prevent it from reappearing:
+Rails 6.1 introduced `disallowed_warnings`, fix-then-lock so a pattern cannot reappear:
 
 ```ruby
 # config/environments/test.rb
 
-# Treat disallowed deprecations as failures
 ActiveSupport::Deprecation.disallowed_behavior = [:raise]
 
-# List of disallowed deprecation patterns
 ActiveSupport::Deprecation.disallowed_warnings = [
   # String match
   "update_attributes",
@@ -232,42 +129,11 @@ ActiveSupport::Deprecation.disallowed_warnings = [
 ]
 ```
 
-### How It Works
+Behavior:
+- **Allowed** deprecations, logged normally (warning level)
+- **Disallowed** deprecations, raise in dev/test, error-level in production
 
-- **Allowed deprecations**: Logged normally (warning level)
-- **Disallowed deprecations**: Raise an exception in development/test, logged as error in production
-
-### Recommended Workflow
-
-1. Fix a deprecation warning
-2. Add it to `disallowed_warnings`
-3. Any reintroduction will fail tests
-
----
-
-## Deprecation Configuration Options
-
-| Setting | Behavior |
-|---------|----------|
-| `:raise` | Raise an exception (stops execution) |
-| `:log` | Log to Rails logger |
-| `:notify` | Send to `ActiveSupport::Notifications` |
-| `:silence` | Ignore (not recommended) |
-| `:stderr` | Print to stderr |
-| `:report` | Report via error reporter (Rails 7.1+) |
-
-**Recommended settings:**
-
-```ruby
-# config/environments/development.rb
-config.active_support.deprecation = :raise
-
-# config/environments/test.rb
-config.active_support.deprecation = :raise
-
-# config/environments/production.rb
-config.active_support.deprecation = :notify
-```
+Intended use: after fixing a deprecation, add it to `disallowed_warnings`; any reintroduction fails tests. The resolution workflow uses this as its regression-prevention step.
 
 ---
 
@@ -302,41 +168,8 @@ config.active_support.deprecation = :notify
 
 ---
 
-## Quick Reference
-
-### Find Deprecations
-```bash
-# In test logs
-grep "DEPRECATION WARNING" log/test.log
-
-# In CI output
-# Search the build log for "DEPRECATION WARNING"
-
-# Run tests with verbose output
-RAILS_ENV=test bundle exec rspec 2>&1 | grep "DEPRECATION"
-```
-
-### Configure Strict Mode
-```ruby
-# config/environments/test.rb
-config.active_support.deprecation = :raise
-```
-
-### Track in Production
-```ruby
-# config/environments/production.rb
-config.active_support.deprecation = :notify
-
-# config/initializers/deprecation_warnings.rb
-ActiveSupport::Notifications.subscribe('deprecation.rails') do |*, payload|
-  YourErrorTracker.notify(payload[:message])
-end
-```
-
----
-
 ## Resources
 
 - [Rails Deprecation Behavior](https://guides.rubyonrails.org/configuring.html#config-active-support-deprecation)
 - [ActiveSupport Instrumentation](https://guides.rubyonrails.org/active_support_instrumentation.html)
-- [Rubocop](https://github.com/rubocop-hq/rubocop)
+- [Rubocop](https://github.com/rubocop-hq/rubocop) (see `deprecation-strategies.md` for custom-cop regression prevention)
