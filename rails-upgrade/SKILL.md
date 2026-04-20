@@ -68,7 +68,7 @@ Every step writes a short progress report to `upgrade_reports/<current>-to-<targ
 - Ensure deprecation warnings are NOT silenced in the test environment before running. Reconfigure to `:stderr` or `:log` if needed so Step 3 has the full list.
 - Run `bundle exec rspec` or `bundle exec rails test`.
 - If tests fail, stop and help fix them first.
-- Record test count, coverage, and the deprecation-warning list as baseline.
+- Record the list of deprecation warnings as a baseline.
 - See `workflows/test-suite-verification-workflow.md`.
 
 ### Step 2: Verify Latest Patch Version
