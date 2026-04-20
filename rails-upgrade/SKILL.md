@@ -82,9 +82,14 @@ Follows the FastRuby.io methodology: current-version deprecations are the primar
 - Methodology lives in `references/deprecation-resolution/` (fix strategies + Rails config for surfacing warnings).
 
 ### Step 4: Review Ruby Compatibility
-- Verify the current Ruby meets the target Rails' minimum Ruby version.
-- Check `Gemfile`, `.ruby-version`, `.tool-versions`, and `ruby --version`.
-- If Ruby needs bumping, handle it as a separate upgrade before continuing.
+- Verify the current Ruby meets the target Rails' minimum Ruby version (see the "Supported Upgrade Paths" table below for the Ruby-required column).
+- Check `Gemfile` (`ruby "X.Y.Z"`), `.ruby-version`, `.tool-versions`, and `ruby --version`. All four should agree; mismatches cause CI/dev drift.
+- If Ruby needs bumping, handle it as a **separate upgrade** before continuing. Ruby upgrades have their own deprecation cycle (notably 2.7 → 3.0 keyword-argument separation) and should not be entangled with the Rails hop.
+- Sanity-check top-level gem compatibility with the target Ruby+Rails combination before investing in dual-boot. Quick options:
+  - `bundle_report compatibility --rails-version <target>` (if the `bundle_report` gem is available) flags known-incompatible gems.
+  - [RailsBump](https://railsbump.org/) lookup for any gem whose compatibility is uncertain.
+  - `bundle outdated` to identify gems with available upgrades that may close the gap.
+- **Goal:** enter Step 5 knowing Ruby is sufficient and no hard gem-blocker stands between the current and target Rails. Deep gem-by-gem compatibility work continues during Step 6 once breakage is real, not theoretical.
 
 ### Step 5: Set Up Dual-Boot
 - **DELEGATE** to the `dual-boot` skill.
