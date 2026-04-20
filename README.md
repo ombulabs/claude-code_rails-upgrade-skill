@@ -74,9 +74,8 @@ In Claude Code, navigate to your Rails application directory and use natural lan
 
 ### Workflow
 
-1. **Ask for an upgrade** → Claude generates a `rails_{version}_upgrade_findings.txt` file using the Direct Detection workflow
-3. **Share the findings** → Claude generates detailed reports based on your actual code
-4. **Implement the changes** → Follow the step-by-step migration plan
+1. **Ask for an upgrade** → Claude generates detailed reports based on your actual code
+2. **Implement the changes** → Follow the step-by-step migration plan
 
 ## Available Commands
 
