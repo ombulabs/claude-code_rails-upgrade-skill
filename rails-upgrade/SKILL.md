@@ -59,6 +59,10 @@ When proposing code fixes that must work with both the current and target Rails 
 
 Follows the FastRuby.io methodology: current-version deprecations are the primary signal for what breaks next version, fix the build in dependency order, and treat `load_defaults` alignment as optional post-upgrade work.
 
+### Transparency
+
+Every step writes a short progress report to `upgrade_reports/<current>-to-<target>/NN-<step-slug>.md`. See `workflows/transparency-reports-workflow.md` for folder conventions, filename scheme, per-step template, and the rolling `00-summary.md`. Suggest the user add `upgrade_reports/` to `.gitignore` on first invocation.
+
 ### Step 1: Run Test Suite
 - Run the existing test suite on the current Rails. All tests must pass before proceeding.
 - Ensure deprecation warnings are NOT silenced in the test environment before running. Reconfigure to `:stderr` or `:log` if needed so Step 3 has the full list.
@@ -260,6 +264,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 ### Workflow Guides (Load when generating deliverables)
 - `workflows/test-suite-verification-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
 - `workflows/deprecation-resolution-workflow.md` - Step 3 procedure for resolving the deprecation backlog before the hop
+- `workflows/transparency-reports-workflow.md` - Per-step progress report conventions (folder layout, template, summary)
 - `workflows/direct-detection-workflow.md` - How to run breaking change detection directly
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
 - `workflows/app-update-preview-workflow.md` - How to generate app:update previews
