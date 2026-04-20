@@ -117,13 +117,25 @@ Default: **fix forward** so the code works on both current and target Rails with
 See `references/fix-broken-build.md` for a triage checklist of common failure categories (Zeitwerk, Strong Parameters, kwargs, frozen strings, credentials, asset pipeline) and the iteration rhythm.
 
 ### Step 8: Smoke Test
-Broader than `rails runner`. On `Gemfile.next`:
-- Open a Rails console.
-- Start the Rails server.
-- Start background workers (sidekiq, sucker_punch, delayed_job) — check `Procfile` for what's expected.
-- Run `assets:precompile` in production mode.
+Broader than `rails runner`. A passing test suite only proves the app boots enough to run tests; the smoke checks below prove it boots enough to *run*.
 
-**Baseline first.** Run each smoke command on the current `Gemfile` before running it on `Gemfile.next`. Only failures that appear on `Gemfile.next` but not on `Gemfile` are upgrade-caused. This is especially important for `assets:precompile`, which frequently has long-standing app-side issues unrelated to the Rails bump.
+**Baseline first.** Run each smoke command on the current `Gemfile` before running it on `Gemfile.next`. Only failures that appear on `Gemfile.next` but not on `Gemfile` are upgrade-caused. `assets:precompile` in particular frequently has long-standing app-side issues unrelated to the Rails bump.
+
+On `Gemfile.next`, with `BUNDLE_GEMFILE=Gemfile.next`:
+
+- **Rails console:** `bundle exec rails console` boots cleanly, a model query returns rows, no deprecation spam at startup.
+- **Rails server:** `bundle exec rails server` starts, `curl -I http://localhost:3000/` returns a non-5xx, at least one real route renders.
+- **Background workers:** open `Procfile` (or `Procfile.dev`) to identify each worker process and start them individually:
+  - Sidekiq: `bundle exec sidekiq` (and `sidekiqctl` if used), enqueue a trivial job and confirm processing.
+  - sucker_punch: exercise a job via `rails runner 'YourJob.perform_async(...)'`.
+  - delayed_job: `bundle exec rake jobs:work` + enqueue a test job.
+  - Resque / Good Job / Solid Queue: the equivalent `rake` task or bin command per gem.
+- **Asset pipeline:** `RAILS_ENV=production SECRET_KEY_BASE=dummy bundle exec rails assets:precompile`. Check manifest is written, no missing-module or parser errors. Clear `public/assets` first for a true cold build.
+- **Mailers** (if present): open console, send one mail with `deliver_now` using the letter_opener or test adapter.
+
+Failures in any of these are Step 7 work that tests missed, return to Step 7.
+
+Document the smoke pass in the Step 8 transparency report (which commands ran, which returned non-upgrade-caused failures the user is aware of).
 
 ### Step 9: Remove Dual-Boot
 - **DELEGATE** to the `dual-boot` cleanup contract.
