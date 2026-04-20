@@ -36,7 +36,7 @@ This skill follows the proven FastRuby.io upgrade methodology:
 
 **Key Resources:**
 - **DELEGATE** to the `dual-boot` skill for dual-boot setup with `next_rails` (see Dependencies)
-- See `references/deprecation-warnings.md` for managing deprecations
+- See `references/deprecation-resolution/` for managing deprecations (warnings config + fix strategies) and `workflows/deprecation-resolution-workflow.md` for the Step 3 procedure
 - See `references/staying-current.md` for maintaining upgrades over time
 
 ---
@@ -78,8 +78,8 @@ Follows the FastRuby.io methodology: current-version deprecations are the primar
 
 ### Step 3: Resolve Deprecation Warnings
 - **DELEGATE** to `workflows/deprecation-resolution-workflow.md`.
-- Methodology: regex search, `next_rails` deprecation tooling, `synvert-ruby`, prefer backward-compatible fixes over `NextRails.next?` conditionals when possible.
 - Goal: the deprecation list from Step 1 is empty (or down to known, justified exceptions) before introducing the next Rails version.
+- Methodology lives in `references/deprecation-resolution/` (fix strategies + Rails config for surfacing warnings).
 
 ### Step 4: Review Ruby Compatibility
 - Verify the current Ruby meets the target Rails' minimum Ruby version.
@@ -231,6 +231,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 
 ### Workflow Guides (Load when generating deliverables)
 - `workflows/test-suite-verification-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
+- `workflows/deprecation-resolution-workflow.md` - Step 3 procedure for resolving the deprecation backlog before the hop
 - `workflows/direct-detection-workflow.md` - How to run breaking change detection directly
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
 - `workflows/app-update-preview-workflow.md` - How to generate app:update previews
@@ -244,7 +245,8 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - **rails-load-defaults skill** - Optional `load_defaults` alignment, post-upgrade (Step 10) (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
 
 ### Reference Materials
-- `references/deprecation-warnings.md` - Finding and fixing deprecations
+- `references/deprecation-resolution/deprecation-warnings.md` - Where deprecations surface + Rails config options
+- `references/deprecation-resolution/deprecation-strategies.md` - Fix strategies (regex / synvert / `NextRails.next?` / gem upgrade) and regression prevention
 - `references/staying-current.md` - Keeping up with Rails releases
 - `references/breaking-changes-by-version.md` - Quick lookup
 - `references/multi-hop-strategy.md` - Multi-version planning
