@@ -138,8 +138,15 @@ Failures in any of these are Step 7 work that tests missed, return to Step 7.
 Document the smoke pass in the Step 8 transparency report (which commands ran, which returned non-upgrade-caused failures the user is aware of).
 
 ### Step 9: Remove Dual-Boot
-- **DELEGATE** to the `dual-boot` cleanup contract.
-- Removes `Gemfile.next`, drops `next_rails`, collapses remaining `NextRails.next?` call sites, consolidates CI to a single bundle.
+- **DELEGATE** to the `dual-boot` skill's cleanup contract.
+- Preconditions: Step 8 smoke test passed on `Gemfile.next`, target Rails is deployed (or deployable) as the sole Rails version, no pending work still requires the dual-boot bridge.
+- Cleanup contract deliverables (owned by the `dual-boot` skill):
+  - `Gemfile.next` and `Gemfile.next.lock` removed.
+  - `next_rails` gem removed from `Gemfile`.
+  - All remaining `NextRails.next?` call sites collapsed to the target-version branch (the `else` or `!NextRails.next?` branch is deleted along with the conditional).
+  - CI consolidated back to a single bundle; dual-boot matrix jobs removed.
+- **Do not** attempt any of this inline here. The cleanup lives in the `dual-boot` skill so both ends of the upgrade (setup in Step 5, removal in Step 9) stay in one place.
+- **DEPENDENCY:** [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill).
 
 ### Step 10: Align `load_defaults` (OPTIONAL, post-upgrade)
 - **Optional and separate from the upgrade.** The upgrade is complete at Step 9. Users may run this later once the target version is stable in production.
