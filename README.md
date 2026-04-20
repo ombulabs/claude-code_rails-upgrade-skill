@@ -6,7 +6,6 @@ A Claude Code skill that helps you upgrade Ruby on Rails applications from versi
 
 The Rails Upgrade Assistant analyzes your Rails application and generates:
 
-- **Detection Scripts** - Bash scripts that scan your codebase for breaking changes specific to your target Rails version
 - **Comprehensive Upgrade Reports** - Detailed migration guides with OLD vs NEW code examples from your actual codebase
 - **app:update Previews** - Shows exactly what configuration files will change when you run `rails app:update`
 
@@ -71,13 +70,11 @@ In Claude Code, navigate to your Rails application directory and use natural lan
 "Upgrade my Rails app to 7.2"
 "Help me upgrade from Rails 6.1 to 7.0"
 "What breaking changes are in Rails 8.0?"
-"Create a detection script for Rails 7.1"
 ```
 
 ### Workflow
 
-1. **Ask for an upgrade** → Claude generates a detection script
-2. **Run the script** → Script outputs `rails_{version}_upgrade_findings.txt`
+1. **Ask for an upgrade** → Claude generates a `rails_{version}_upgrade_findings.txt` file using the Direct Detection workflow
 3. **Share the findings** → Claude generates detailed reports based on your actual code
 4. **Implement the changes** → Follow the step-by-step migration plan
 
@@ -86,8 +83,7 @@ In Claude Code, navigate to your Rails application directory and use natural lan
 | Command | Description |
 |---------|-------------|
 | `/rails-upgrade` | Start the upgrade assistant |
-| "Upgrade to Rails X.Y" | Generate detection script for target version |
-| "Here's my findings.txt" | Generate reports from detection results |
+| "Upgrade to Rails X.Y" | Generate reports from detection results |
 | "Show app:update changes" | Preview configuration file changes |
 | "Plan upgrade from X to Y" | Get multi-hop upgrade strategy |
 
