@@ -80,10 +80,11 @@ For gem-origin warnings, follow the gem path in the strategies file, do not pape
 
 ### 6. Gate
 
-Rerun the full suite and recapture:
+Rerun the full suite (use the same `tee test_output.log` pattern as step 1 so the artefact is the single source of truth) and recapture:
 
 ```bash
-bundle exec rspec 2>&1 | grep "DEPRECATION WARNING" | sort -u
+bundle exec rspec 2>&1 | tee test_output.log
+grep "DEPRECATION WARNING" test_output.log | sort -u
 ```
 
 **Exit criteria:** the list is empty, or down to known, justified exceptions. Document each remaining exception inline (comment on the callsite or a note in the upgrade report) with:
@@ -96,6 +97,12 @@ For each resolved pattern, add it to `disallowed_warnings` so reintroduction fai
 
 ```ruby
 # config/environments/test.rb
+
+# `disallowed_behavior` = [:raise] only raises on patterns in
+# `disallowed_warnings`; other (unknown) deprecations still log per the
+# global `config.active_support.deprecation` setting. Pairing the two:
+# known patterns are locked; everything else is discovered via the
+# global setting flipped to :raise below.
 ActiveSupport::Deprecation.disallowed_behavior = [:raise]
 ActiveSupport::Deprecation.disallowed_warnings += [
   /update_attributes/,

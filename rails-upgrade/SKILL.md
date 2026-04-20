@@ -105,7 +105,7 @@ Every step writes a short progress report to `upgrade_reports/<current>-to-<targ
 - Claude runs detection directly using Grep/Glob/Read — no script generation.
 - Load `detection-scripts/patterns/rails-{VERSION}-patterns.yml` and `version-guides/upgrade-{FROM}-to-{TO}.md` for context.
 - Collect findings with file:line references. See `workflows/direct-detection-workflow.md`.
-- Generate the Comprehensive Upgrade Report and `app:update` Preview from actual findings (templates in `templates/`).
+- Generate the Comprehensive Upgrade Report and `app:update` Preview from actual findings (templates in `templates/`). **Preview only**, the defaults hunk of `bin/rails app:update` is deferred to Step 10 and is never applied as part of the upgrade itself.
 
 ### Step 7: Fix Broken Build
 Fix-order discipline:
@@ -142,14 +142,8 @@ Failures in any of these are Step 7 work that tests missed, return to Step 7.
 Document the smoke pass in the Step 8 transparency report (which commands ran, which returned non-upgrade-caused failures the user is aware of).
 
 ### Step 9: Remove Dual-Boot
-- **DELEGATE** to the `dual-boot` skill's cleanup contract.
-- Preconditions: Step 8 smoke test passed on `Gemfile.next`, target Rails is deployed (or deployable) as the sole Rails version, no pending work still requires the dual-boot bridge.
-- Cleanup contract deliverables (owned by the `dual-boot` skill):
-  - `Gemfile.next` and `Gemfile.next.lock` removed.
-  - `next_rails` gem removed from `Gemfile`.
-  - All remaining `NextRails.next?` call sites collapsed to the target-version branch (the `else` or `!NextRails.next?` branch is deleted along with the conditional).
-  - CI consolidated back to a single bundle; dual-boot matrix jobs removed.
-- **Do not** attempt any of this inline here. The cleanup lives in the `dual-boot` skill so both ends of the upgrade (setup in Step 5, removal in Step 9) stay in one place.
+- **DELEGATE** to the `dual-boot` skill's cleanup contract (`workflows/cleanup-workflow.md` in that skill). The contract owns the deliverables; do not restate them here.
+- Preconditions before invoking cleanup: Step 8 smoke test passed on `Gemfile.next`, target Rails is deployed (or deployable) as the sole Rails version, no pending work still requires the dual-boot bridge.
 - **DEPENDENCY:** [dual-boot skill](https://github.com/ombulabs/claude-code_dual-boot-skill).
 
 ### Step 10: Align `load_defaults` (OPTIONAL, post-upgrade)
@@ -296,36 +290,21 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 
 ---
 
-## Pre-Upgrade Checklist (FastRuby.io Best Practices)
+## Pre-Upgrade Checklist (User-owned)
 
-Before starting ANY upgrade:
+Items the Core Workflow does not cover. Confirm these before Step 1 so the upgrade is recoverable and reviewable.
 
-### 1. Test Coverage Assessment (AUTOMATED - Step 1 of Workflow)
-- [x] Run test suite - all tests passing? **← Claude runs this automatically**
-- [x] Check test coverage (aim for >70%) **← Claude captures this if SimpleCov is configured**
-- [ ] Review critical paths have coverage
-
-**Note:** This step is now automated. Claude will run the test suite and BLOCK the upgrade if any tests fail.
-
-### 2. Dependency Audit
-- [ ] Run `bundle outdated`
-- [ ] Check gem compatibility with target Rails version
-- [ ] Identify gems that need upgrading first
-
-### 3. Database Backup
+### 1. Database Backup
 - [ ] Backup production database
 - [ ] Backup development/staging databases
-- [ ] Verify backup restore process works
+- [ ] Verify the restore process actually works
 
-### 4. Git Branch Strategy
-- [ ] Create upgrade branch from main/master
-- [ ] Set up CI for upgrade branch
-- [ ] Plan merge strategy
+### 2. Git Branch Strategy
+- [ ] Create an upgrade branch from `main`/`master`
+- [ ] Set up CI for the upgrade branch (dual-boot matrix is handled by the `dual-boot` skill in Step 5)
+- [ ] Plan the merge strategy (one PR per hop is the FastRuby.io default)
 
-### 5. Deprecation Warnings
-- [ ] Run app with Rails deprecations turned on (configured in config/environment files)
-- [ ] Address existing deprecation warnings
-- [ ] Enable verbose deprecations in test environment
+Test-suite readiness, dependency audit, and deprecation configuration live inside the Core Workflow (Steps 1, 3, and 4). Do not duplicate them here.
 
 ---
 
@@ -344,7 +323,7 @@ Upgrades must be sequential (see "CRITICAL: Sequential Upgrade Strategy" below).
 ### Pattern 3: Breaking Changes Analysis Only
 **User says:** "What breaking changes affect my app for Rails 8.0?"
 
-Run Steps 1, 2, and 6 to produce the Comprehensive Upgrade Report and `app:update` Preview without executing the upgrade. Offer to continue with Steps 3–9 when ready.
+Run Steps 1, 2, and 6 to produce the Comprehensive Upgrade Report and `app:update` Preview without executing the upgrade. Offer to continue with Steps 3–9, plus optional Step 10, when ready.
 
 ---
 
