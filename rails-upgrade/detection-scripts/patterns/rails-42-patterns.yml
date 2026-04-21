@@ -36,17 +36,17 @@ breaking_changes:
       exclude: ""
       search_paths:
         - "config/application.rb"
-      explanation: "Rails 4.2 still suppresses exceptions in after_commit/after_rollback callbacks but emits a deprecation warning. The application file should opt-in to raising (the Rails 5.0+ default). This match flags config/application.rb — read it and verify the config is present"
+      explanation: "FILE MARKER (manual review required): Rails 4.2 still suppresses exceptions in after_commit/after_rollback callbacks but emits a deprecation warning. The application file should opt-in to raising (the Rails 5.0+ default). Grep cannot detect absence of a setting, so this pattern flags config/application.rb itself — open it and verify the setting is present"
       fix: "If config.active_record.raise_in_transactional_callbacks is NOT present in config/application.rb, add: config.active_record.raise_in_transactional_callbacks = true. If it is already set to true, no action needed"
       variable_name: "TRANSACTIONAL_CALLBACKS"
 
     - name: "RSpec 2.x in Gemfile"
-      pattern: "rspec-rails.*['\"]~>\\s*2\\.|rspec-rails.*['\"]2\\."
+      pattern: "rspec-rails.*['\"\\(][~><=\\s]*2\\."
       exclude: ""
       search_paths:
         - "Gemfile"
         - "Gemfile.lock"
-      explanation: "Rails 4.2 does not support RSpec 2. You must upgrade to RSpec 3 (use 2.99 as an intermediate step to surface deprecations)"
+      explanation: "Rails 4.2 does not support RSpec 2. You must upgrade to RSpec 3 (use 2.99 as an intermediate step to surface deprecations). Matches ~>, >=, >, <=, bare versions, and locked (2.x.y) versions"
       fix: "Upgrade to rspec-rails 2.99 first, fix deprecations, then upgrade to rspec-rails 3.x. Consider Transpec for automation"
       variable_name: "RSPEC_2"
 
@@ -59,6 +59,16 @@ breaking_changes:
       explanation: "assert_tag and the TagAssertions module are deprecated in Rails 4.2. Use assert_select from SelectorAssertions (now in the rails-dom-testing gem)"
       fix: "Replace assert_tag with assert_select equivalents"
       variable_name: "ASSERT_TAG"
+
+    - name: "ActiveJob usage requires queue adapter"
+      pattern: "\\.deliver_later\\b|<\\s*ActiveJob::Base\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.2 introduces ActiveJob. Any use of deliver_later or a class inheriting from ActiveJob::Base requires a configured queue adapter. The default in 4.2 is :inline (runs jobs synchronously in-process), which is rarely what production wants"
+      fix: "Set config.active_job.queue_adapter = :sidekiq (or :resque, :delayed_job, :que, etc.) in config/application.rb or per-environment, and ensure the adapter gem is in the Gemfile. For dev/test without a backend, :inline or :async is acceptable"
+      variable_name: "ACTIVE_JOB_ADAPTER"
 
   medium_priority:
     - name: "find/exists? with possible AR object argument"
@@ -85,7 +95,7 @@ breaking_changes:
       exclude: ""
       search_paths:
         - "config/environments/test.rb"
-      explanation: "Rails 4.2 emits a deprecation warning when config.active_support.test_order is not explicitly set. This match flags config/environments/test.rb — read it and verify the config is present"
+      explanation: "FILE MARKER (manual review required): Rails 4.2 emits a deprecation warning when config.active_support.test_order is not explicitly set. Grep cannot detect absence of a setting, so this pattern flags the config file itself — open config/environments/test.rb and verify the setting is present"
       fix: "If config.active_support.test_order is NOT present in config/environments/test.rb, add: config.active_support.test_order = :random (or :sorted to preserve 4.1 behavior)"
       variable_name: "TEST_ORDER"
 
