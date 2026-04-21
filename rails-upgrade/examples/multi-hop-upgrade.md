@@ -340,5 +340,3 @@ Track your progress through each hop:
 4. **Fix deprecation warnings** as you go
 5. **Update gems incrementally** with each Rails version
 6. **Keep detailed notes** of changes made
-
-Ready to start? Share your detection script results for Hop 1 (5.2 → 6.0)!

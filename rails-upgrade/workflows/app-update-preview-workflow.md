@@ -2,7 +2,7 @@
 
 **Purpose:** Generate a preview of what `rails app:update` will change in configuration files
 
-**When to use:** After detection script findings have been analyzed, as part of the upgrade report
+**When to use:** After the codebase was analyzed and the breaking changes report was generated
 
 ---
 

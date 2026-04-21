@@ -12,7 +12,7 @@
 
 ### Claude Response
 
-I'll help you upgrade from Rails 7.1 to 7.2. Let me run a detection script to find any breaking changes in your codebase.
+I'll help you upgrade from Rails 7.1 to 7.2. Let me find any breaking changes in your codebase.
 
 ## Detection Results
 
