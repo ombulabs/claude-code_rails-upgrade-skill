@@ -8,14 +8,12 @@
 
 ## Why Direct Detection?
 
-Instead of generating a bash script for the user to run, Claude Code can:
+Claude Code can:
 - Search files directly using the Grep tool
 - Find files by pattern using the Glob tool
 - Read file contents using the Read tool
 - Analyze results immediately
 - Generate reports without user round-trip
-
-This is faster and provides a better user experience.
 
 ---
 
@@ -300,5 +298,3 @@ Before proceeding to report generation:
 - [ ] Any search errors noted
 
 ---
-
-**This workflow replaces script generation with direct tool usage.**

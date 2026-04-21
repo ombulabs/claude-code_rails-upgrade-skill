@@ -55,94 +55,231 @@ Before starting, you'll need to upgrade Ruby:
 3. **Quick hops through 6.1 → 7.0** - Focus on Hotwire migration
 4. **Finish with 7.x → 8.0** - Asset pipeline migration
 
-### Let's Start with Hop 1: Rails 5.2 → 6.0
+---
 
-This is the most critical upgrade due to Zeitwerk. Let me generate a detection script for Rails 6.0 changes.
+Hop 1: Rails 5.2 → 6.0 (Hard — ~1–2 weeks)
+
+Breaking Changes Found in Your Code
+
+┌──────────┬───────────────────────────────────┬──────┬───────────────────────────────────────────────────────┬─────────────────────────┐
+│ Priority │               File                │ Line │                         Issue                         │           Fix           │
+├──────────┼───────────────────────────────────┼──────┼───────────────────────────────────────────────────────┼─────────────────────────┤
+│ 🔴 HIGH  │ config/environments/production.rb │ 20   │ config.read_encrypted_secrets = true — removed in 6.0 │ Delete this line        │
+├──────────┼───────────────────────────────────┼──────┼───────────────────────────────────────────────────────┼─────────────────────────┤
+│ 🟡 MED   │ config/application.rb             │ 22   │ config.load_defaults 5.1                              │ Update to 5.2, then 6.0 │
+└──────────┴───────────────────────────────────┴──────┴───────────────────────────────────────────────────────┴─────────────────────────┘
+
+Zeitwerk Check (⚠️  Most Critical)
+
+No require_dependency calls found in your codebase. However, you must run this after updating Rails:
+
+bundle exec rails zeitwerk:check
+
+This will surface any file naming mismatches that the classic autoloader was silently tolerating.
+
+Gem Updates Required
+
+┌─────────────┬───────────┬─────────────────┐
+│     Gem     │  Current  │ Minimum for 6.0 │
+├─────────────┼───────────┼─────────────────┤
+│ rspec-rails │ ~> 3.5.0  │ 4.0.0           │
+├─────────────┼───────────┼─────────────────┤
+│ sidekiq     │ ~> 5.0    │ 6.0.0           │
+├─────────────┼───────────┼─────────────────┤
+│ capybara    │ ~> 2.13.0 │ 3.x             │
+└─────────────┴───────────┴─────────────────┘
+
+Migration Steps
+
+git checkout -b rails-60-upgrade
+# 1. Remove config.read_encrypted_secrets from production.rb
+# 2. Update Gemfile: gem 'rails', '~> 6.0.0'
+# 3. Update gem constraints above
+bundle update rails
+bundle exec rails app:update
+bundle exec rails zeitwerk:check
+bundle exec rspec
 
 ---
 
-## Detection Script for Hop 1 (5.2 → 6.0)
+Hop 2: Rails 6.0 → 6.1 (Medium — ~3–5 days)
 
-```bash
-#!/bin/bash
-# Rails 6.0 Detection Script
+Breaking Changes Found in Your Code
 
-OUTPUT_FILE="rails_60_upgrade_findings.txt"
+┌──────────┬───────────────────────────────────┬──────┬─────────────────────────────────────────────────────────────────┬────────────────────┐
+│ Priority │               File                │ Line │                              Issue                              │        Fix         │
+├──────────┼───────────────────────────────────┼──────┼─────────────────────────────────────────────────────────────────┼────────────────────┤
+│ 🟡 MED   │ app/views/contacts/_form.html.erb │ 1    │ form_with(model: contact, local: true) — local: true deprecated │ Remove local: true │
+└──────────┴───────────────────────────────────┴──────┴─────────────────────────────────────────────────────────────────┴────────────────────┘
 
-echo "================================================"
-echo "Rails 6.0 Upgrade - Breaking Changes Detection"
-echo "Project: $(basename $(pwd))"
-echo "================================================"
-echo ""
+No other issues detected. Minor steps:
 
-echo "🔴 HIGH PRIORITY - BREAKING CHANGES"
-echo "==================================="
+git checkout -b rails-61-upgrade
+# Update Gemfile: gem 'rails', '~> 6.1.0'
+bundle update rails
+bundle exec rails app:update
+# Update config.load_defaults to 6.1
+bundle exec rspec
 
-# Check require_dependency
-echo "🔍 Checking: require_dependency usage"
-REQUIRE_DEP_COUNT=$(grep -r 'require_dependency' app/ lib/ 2>/dev/null | wc -l)
-if [ "$REQUIRE_DEP_COUNT" -gt 0 ]; then
-  echo "   ⚠️  Found: $REQUIRE_DEP_COUNT occurrences"
-  grep -rl 'require_dependency' app/ lib/ 2>/dev/null | sed 's/^/   - /'
-  echo "   Fix: Remove require_dependency - Zeitwerk auto-loads files"
-else
-  echo "   ✅ None found"
-fi
+---
 
-# Check classic autoloader
-echo "🔍 Checking: Classic autoloader config"
-CLASSIC_COUNT=$(grep -r 'config.autoloader.*:classic' config/ 2>/dev/null | wc -l)
-if [ "$CLASSIC_COUNT" -gt 0 ]; then
-  echo "   ⚠️  Found: $CLASSIC_COUNT occurrences"
-  echo "   Fix: Remove or change to :zeitwerk"
-else
-  echo "   ✅ None found"
-fi
+Hop 3: Rails 6.1 → 7.0 (Hard — ~1–2 weeks)
 
-# Check update_attributes
-echo "🔍 Checking: update_attributes (deprecated)"
-UPDATE_ATTR_COUNT=$(grep -r 'update_attributes[^_]' app/ lib/ 2>/dev/null | wc -l)
-if [ "$UPDATE_ATTR_COUNT" -gt 0 ]; then
-  echo "   ⚠️  Found: $UPDATE_ATTR_COUNT occurrences"
-  grep -rl 'update_attributes[^_]' app/ lib/ 2>/dev/null | sed 's/^/   - /'
-  echo "   Fix: Replace with update"
-else
-  echo "   ✅ None found"
-fi
+⚠️  This is the most impactful hop for your frontend
+Breaking Changes Found in Your Code
 
-# Check before_filter
-echo "🔍 Checking: before_filter (removed)"
-BEFORE_FILTER_COUNT=$(grep -r 'before_filter\|after_filter\|skip_before_filter' app/controllers/ 2>/dev/null | wc -l)
-if [ "$BEFORE_FILTER_COUNT" -gt 0 ]; then
-  echo "   ⚠️  Found: $BEFORE_FILTER_COUNT occurrences"
-  grep -rl 'before_filter\|after_filter\|skip_before_filter' app/controllers/ 2>/dev/null | sed 's/^/   - /'
-  echo "   Fix: Replace with before_action, after_action, skip_before_action"
-else
-  echo "   ✅ None found"
-fi
+┌──────────┬────────────────────────────────────────┬──────┬────────────────────────────────────────┬───────────────────────────────────────────┐
+│ Priority │                  File                  │ Line │                 Issue                  │                    Fix                    │
+├──────────┼────────────────────────────────────────┼──────┼────────────────────────────────────────┼───────────────────────────────────────────┤
+│ 🔴 HIGH  │ Gemfile                                │ 31   │ gem 'turbolinks', '~> 5'               │ Replace with gem 'turbo-rails'            │
+├──────────┼────────────────────────────────────────┼──────┼────────────────────────────────────────┼───────────────────────────────────────────┤
+│ 🔴 HIGH  │ app/views/layouts/application.html.erb │ 7, 9 │ 'data-turbolinks-track': 'reload'      │ Keep as-is — still valid with turbo-rails │
+├──────────┼────────────────────────────────────────┼──────┼────────────────────────────────────────┼───────────────────────────────────────────┤
+│ 🔴 HIGH  │ app/assets/javascripts/application.js  │ 14   │ //= require turbolinks                 │ Remove this line                          │
+└──────────┴────────────────────────────────────────┴──────┴────────────────────────────────────────┴───────────────────────────────────────────┘
 
-# Check Ruby version
-echo ""
-echo "📋 RUBY VERSION CHECK"
-if [ -f ".ruby-version" ]; then
-  RUBY_VER=$(cat .ruby-version)
-  echo "Current Ruby: $RUBY_VER"
-  echo "Required for Rails 6.0: 2.5.0+"
-  echo "Recommended: 2.7.0+"
-fi
+Gemfile Changes
 
-echo ""
-echo "📊 PROJECT STATS"
-MODEL_COUNT=$(find app/models -name "*.rb" 2>/dev/null | wc -l)
-CONTROLLER_COUNT=$(find app/controllers -name "*_controller.rb" 2>/dev/null | wc -l)
-echo "Models: $MODEL_COUNT"
-echo "Controllers: $CONTROLLER_COUNT"
+# Remove
+gem 'turbolinks', '~> 5'
 
-echo ""
-echo "Report saved to: $OUTPUT_FILE"
-```
+# Add
+gem 'turbo-rails'
+gem 'stimulus-rails'
+JavaScript Changes
 
-Run this script and share the results. After completing Hop 1 successfully, we'll move to Hop 2.
+Migration Steps
+
+git checkout -b rails-70-upgrade
+# Make all JS changes above
+# Update Gemfile
+bundle update rails
+bundle exec rails app:update
+# Update config.load_defaults to 7.0
+bundle exec rspec
+# Manual test: navigate through the app, verify JS events fire
+
+---
+
+Hop 4: Rails 7.0 → 7.1 (Medium — ~3–5 days)
+
+Breaking Changes Found in Your Code
+
+┌──────────┬───────────────────────────────────┬──────┬───────────────────────────────────────────────┬───────────────────────────────────────────┐
+│ Priority │               File                │ Line │                     Issue                     │                    Fix                    │
+├──────────┼───────────────────────────────────┼──────┼───────────────────────────────────────────────┼───────────────────────────────────────────┤
+│ 🔴 HIGH  │ config/environments/production.rb │ 5    │ config.cache_classes = true — replaced in 7.1 │ Change to config.enable_reloading = false │
+├──────────┼───────────────────────────────────┼──────┼───────────────────────────────────────────────┼───────────────────────────────────────────┤
+│ 🔴 HIGH  │ config/environments/test.rb       │ 8    │ config.cache_classes = true — replaced in 7.1 │ Change to config.enable_reloading = false │
+└──────────┴───────────────────────────────────┴──────┴───────────────────────────────────────────────┴───────────────────────────────────────────┘
+
+▎ Note: enable_reloading is the inverse of cache_classes. cache_classes = true → enable_reloading = false.
+
+Also check config/environments/development.rb for config.cache_classes = false → enable_reloading = true.
+
+Migration Steps
+
+git checkout -b rails-71-upgrade
+# Replace cache_classes with enable_reloading (inverted)
+bundle update rails
+bundle exec rails app:update
+# Update config.load_defaults to 7.1
+bundle exec rspec
+
+---
+
+Hop 5: Rails 7.1 → 7.2 (Medium — ~3–5 days)
+
+Breaking Changes Found in Your Code
+
+┌──────────┬─────────────────────────────┬──────┬────────────────────────────────────────────────┬─────────────────┐
+│ Priority │            File             │ Line │                     Issue                      │       Fix       │
+├──────────┼─────────────────────────────┼──────┼────────────────────────────────────────────────┼─────────────────┤
+│ 🔴 HIGH  │ config/environments/test.rb │ 26   │ config.action_dispatch.show_exceptions = false │ Change to :none │
+└──────────┴─────────────────────────────┴──────┴────────────────────────────────────────────────┴─────────────────┘
+
+Fix
+
+# BEFORE
+config.action_dispatch.show_exceptions = false
+
+# AFTER
+config.action_dispatch.show_exceptions = :none
+
+Migration Steps
+
+git checkout -b rails-72-upgrade
+# Fix show_exceptions
+bundle update rails
+bundle exec rails app:update
+# Update config.load_defaults to 7.2
+bundle exec rspec
+
+---
+
+Hop 6: Rails 7.2 → 8.0 (Very Hard — ~1–2 weeks)
+
+Asset Pipeline Decision Required
+
+Your app uses Sprockets (sprockets/railtie in config/application.rb:12). Rails 8.0 defaults to Propshaft, but Sprockets still works. You have two options:
+
+Option A — Keep Sprockets (recommended for this app):
+
+# Gemfile — explicitly keep it
+gem 'sprockets-rails'
+
+No other asset changes needed. Your config.assets.js_compressor, config.assets.compile, etc. all stay.
+
+Option B — Migrate to Propshaft (more work, cleaner long-term):
+
+- Remove sprockets/railtie from application.rb
+- Remove sprockets-rails, sassc-rails from Gemfile
+- Add gem 'propshaft'
+- Remove Sprockets-specific asset configs from production.rb
+- Add cssbundling-rails if using Sass
+
+Solid Gems Decision
+
+Your app uses Sidekiq for jobs, which still works in Rails 8.0. No migration needed unless you want to switch to Solid Queue.
+
+┌───────────────────────────────────┬───────────────────┬────────────────┐
+│              Current              │ Rails 8.0 Default │ Recommendation │
+├───────────────────────────────────┼───────────────────┼────────────────┤
+│ Sidekiq (jobs)                    │ Solid Queue       │ Keep Sidekiq   │
+├───────────────────────────────────┼───────────────────┼────────────────┤
+│ File caching                      │ Solid Cache       │ Keep existing  │
+├───────────────────────────────────┼───────────────────┼────────────────┤
+│ ActionCable (no Redis configured) │ Solid Cable       │ Evaluate       │
+└───────────────────────────────────┴───────────────────┴────────────────┘
+
+Gem Updates Required
+
+┌─────────────┬────────────────────┬─────────────────┐
+│     Gem     │      Current       │ Minimum for 8.0 │
+├─────────────┼────────────────────┼─────────────────┤
+│ rspec-rails │ (updated in hop 1) │ 6.0.0           │
+├─────────────┼────────────────────┼─────────────────┤
+│ sidekiq     │ (updated in hop 1) │ 7.0.0           │
+├─────────────┼────────────────────┼─────────────────┤
+│ capybara    │ (updated in hop 1) │ 3.39.0          │
+└─────────────┴────────────────────┴─────────────────┘
+
+New Configuration
+
+# config/environments/production.rb — add:
+config.assume_ssl = true  # needed if behind load balancer (Heroku, etc.)
+
+Migration Steps
+
+git checkout -b rails-80-upgrade
+# Decide on Sprockets vs Propshaft
+# Add gem 'sprockets-rails' if keeping Sprockets
+bundle update rails
+bundle exec rails app:update
+# Update config.load_defaults to 8.0
+# Add config.assume_ssl = true to production.rb
+bundle exec rspec
+# Test asset serving manually
 
 ---
 
@@ -203,5 +340,3 @@ Track your progress through each hop:
 4. **Fix deprecation warnings** as you go
 5. **Update gems incrementally** with each Rails version
 6. **Keep detailed notes** of changes made
-
-Ready to start? Share your detection script results for Hop 1 (5.2 → 6.0)!
