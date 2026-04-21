@@ -72,12 +72,12 @@ breaking_changes:
 
   medium_priority:
     - name: "find/exists? with possible AR object argument"
-      pattern: "\\.(find|exists\\?)\\(\\s*@?[a-z_][a-zA-Z_0-9]*\\s*\\)"
-      exclude: "\\.(find|exists\\?)\\(\\s*@?[a-z_][a-zA-Z_0-9]*\\.id\\s*\\)|\\.(find|exists\\?)\\(\\s*\\d+"
+      pattern: "\\.(find|exists\\?)\\(\\s*@?[a-z_][a-zA-Z_0-9.]*\\s*\\)"
+      exclude: "\\.(find|exists\\?)\\([^)]*\\.id\\s*\\)|\\.(find|exists\\?)\\(\\s*\\d+"
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 4.2 deprecates passing AR objects where an id is expected. Manual review needed - numeric ids and symbol params are fine"
+      explanation: "Rails 4.2 deprecates passing AR objects where an id is expected. Manual review needed — numeric ids and expressions ending in .id are already correct and excluded"
       fix: "Pass .id explicitly when the argument is an AR object (e.g., Comment.find(comment.id) instead of Comment.find(comment))"
       variable_name: "FIND_WITH_OBJECT"
 
