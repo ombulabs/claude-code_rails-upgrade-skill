@@ -53,6 +53,15 @@ breaking_changes:
       fix: "Remove config.active_record.disable_implicit_join_references from your config files"
       variable_name: "DISABLE_IMPLICIT_JOIN_REFERENCES"
 
+    - name: "store_accessor on json/hstore column (PG key semantics)"
+      pattern: "^\\s*store_accessor\\s+:"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 returns a string-keyed Hash (not HashWithIndifferentAccess) for PostgreSQL json/hstore columns. Direct symbol-key lookups (profile.preferences[:theme]) silently return nil"
+      fix: "Audit callers that index the column directly with symbols and switch to string keys. store_accessor-generated reader/writer methods are unaffected"
+      variable_name: "PG_JSON_HSTORE_KEYS"
+
   medium_priority:
     - name: "MultiJSON usage"
       pattern: "\\bMultiJSON\\b|require\\s+['\"]multi_json['\"]|gem\\s+['\"]multi_json['\"]"
@@ -105,6 +114,33 @@ breaking_changes:
       fix: "Use string keys: flash.to_hash.except(\"notify\") instead of flash.to_hash.except(:notify)"
       variable_name: "FLASH_SYMBOL_KEYS"
 
+    - name: "Cookies serializer not configured"
+      pattern: "cookies_serializer"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 4.1 introduces a JSON cookies serializer. Apps generated before 4.1 keep Marshal unless they opt in. This is a presence check — ABSENCE is the signal to add config.action_dispatch.cookies_serializer = :hybrid"
+      fix: "If no match: add `Rails.application.config.action_dispatch.cookies_serializer = :hybrid` in a new config/initializers/cookies_serializer.rb. :hybrid reads legacy Marshal cookies and writes new JSON ones"
+      variable_name: "COOKIES_SERIALIZER"
+
+    - name: "I18n enforce_available_locales config"
+      pattern: "enforce_available_locales|available_locales"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 4.1 defaults enforce_available_locales to true. Any locale not in I18n.available_locales raises I18n::InvalidLocale. Presence check — ABSENCE of both settings is the signal to declare available_locales or disable enforcement"
+      fix: "If neither setting is present: declare config.i18n.available_locales = [...] in config/application.rb. Disabling enforcement (config.i18n.enforce_available_locales = false) is an escape hatch; the default exists for a security reason"
+      variable_name: "I18N_ENFORCE_LOCALES"
+
+    - name: "time_precision (as_json millisecond default)"
+      pattern: "time_precision"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 4.1 adds millisecond precision to Time/DateTime/TimeWithZone JSON output by default. Presence check — ABSENCE means the app inherits the new default and clients parsing fixed-length ISO-8601 strings may break"
+      fix: "If clients require second precision: `ActiveSupport::JSON::Encoding.time_precision = 0` in an initializer. Otherwise accept the new default"
+      variable_name: "JSON_TIME_PRECISION"
+
   low_priority:
     - name: "Spring gem in Gemfile (presence check)"
       pattern: "gem\\s+['\"]spring['\"]"
@@ -125,6 +161,64 @@ breaking_changes:
       fix: "Create config/secrets.yml with secret_key_base per environment and migrate readers from Rails.application.config.secret_key_base to Rails.application.secrets.secret_key_base"
       variable_name: "SECRETS_YML"
 
+    - name: "render :text usage"
+      pattern: "\\brender\\s+(:text\\s*=>|text:)"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+      explanation: "render :text was security-adjacent (sent text/html). Rails 4.1 introduces render :plain / :html / :body as precise replacements and signals :text for future deprecation"
+      fix: "Replace with render plain: for text/plain, render html: for explicit HTML, or render body: for no Content-Type header"
+      variable_name: "RENDER_TEXT"
+
+    - name: "encode_json hook override"
+      pattern: "def\\s+encode_json\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1's rewritten JSON encoder no longer calls encode_json. Custom implementations silently become dead code"
+      fix: "Move the logic into as_json, or add gem 'activesupport-json_encoder' to restore the old encoder behavior"
+      variable_name: "ENCODE_JSON_HOOK"
+
+    - name: "encode_big_decimal_as_string (dead setting)"
+      pattern: "encode_big_decimal_as_string"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 4.1's new JSON encoder removed the BigDecimal-as-number option. The setting is a no-op"
+      fix: "Remove the setting. If clients require BigDecimal-as-number, add gem 'activesupport-json_encoder' to restore the old behavior"
+      variable_name: "BIG_DECIMAL_AS_STRING"
+
+    - name: "JSON.generate / JSON.dump on Rails objects"
+      pattern: "\\bJSON\\.(generate|dump)\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 isolated its encoder from the JSON gem. JSON.generate/JSON.dump no longer honor as_json. Output of Rails objects (AR instances, TimeWithZone, etc.) may differ from 4.0"
+      fix: "Use obj.to_json for Rails semantics (honors as_json). Keep JSON.generate only when you explicitly want stdlib behavior — pass obj.as_json first if needed"
+      variable_name: "JSON_GEM_ISOLATION"
+
+    - name: "set_callback around lambda with &block"
+      pattern: "set_callback\\s+.+,\\s*:around\\s*,\\s*->\\([^)]*&block"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 changed the around-callback lambda signature — the block is now a positional argument, not &block"
+      fix: "Drop the ampersand: ->(r, block) { ...; block.call; ... } instead of ->(r, &block) { ...; block.call; ... }"
+      variable_name: "SET_CALLBACK_AROUND"
+
+    - name: "ActiveRecord::Migration.check_pending! in test helper"
+      pattern: "ActiveRecord::Migration\\.check_pending!"
+      exclude: ""
+      search_paths:
+        - "test/"
+        - "spec/"
+      explanation: "require 'test_help' runs the check automatically in Rails 4.1. The explicit call is harmless but redundant"
+      fix: "Optional: remove the line from test_helper.rb / rails_helper.rb"
+      variable_name: "CHECK_PENDING_MIGRATION"
+
 dependencies:
   multi_json:
     check: false
@@ -143,3 +237,9 @@ dependencies:
     gem_name: "spring"
     message: "New Rails 4.1 default — application preloader that keeps the Rails environment in memory between commands"
     url: "https://github.com/rails/spring"
+
+  activesupport-json_encoder:
+    check: false
+    gem_name: "activesupport-json_encoder"
+    message: "Restore pre-4.1 JSON encoder behavior: circular data-structure detection, encode_json hook, BigDecimal-as-number option"
+    url: "https://github.com/rails/activesupport-json_encoder"
