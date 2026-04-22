@@ -1,0 +1,145 @@
+version: "4.1"
+description: "Breaking change patterns for Rails 4.0 → 4.1 upgrade"
+
+breaking_changes:
+  high_priority:
+    - name: "MultiJSON usage"
+      pattern: "\\bMultiJSON\\b|require\\s+['\"]multi_json['\"]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+        - "Gemfile"
+      explanation: "Rails 4.1 no longer depends on MultiJSON. Apps that reference it directly will fail once Rails stops pulling it in transitively"
+      fix: "Either add gem 'multi_json' to the Gemfile, or migrate to core JSON: obj.to_json and JSON.parse(str)"
+      variable_name: "MULTI_JSON"
+
+    - name: "Dynamic finders (find_all_by / find_last_by / scoped_by)"
+      pattern: "\\.(find_all_by_|find_last_by_|scoped_by_)[a-zA-Z_0-9]+"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 removed the activerecord-deprecated_finders dependency. find_all_by_*, find_last_by_*, and scoped_by_* no longer work"
+      fix: "Rewrite as where(col: value). For example: User.find_all_by_email(e) → User.where(email: e); User.find_last_by_email(e) → User.where(email: e).last. As a short-term bridge, add gem 'activerecord-deprecated_finders'"
+      variable_name: "DYNAMIC_FINDERS"
+
+    - name: "Dynamic find_or_initialize_by_* / find_or_create_by_*"
+      pattern: "\\.(find_or_initialize_by_|find_or_create_by_)[a-zA-Z_0-9]+"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 removed the *_by_<col> forms of find_or_initialize_by and find_or_create_by"
+      fix: "Use the hash form: find_or_initialize_by(col: value) / find_or_create_by(col: value)"
+      variable_name: "FIND_OR_X_BY_DYNAMIC"
+
+    - name: "return from a callback block"
+      pattern: "^\\s*(before_|after_|around_)(save|create|update|destroy|validation|commit|rollback|initialize|find|touch)\\b.*\\{[^}]*\\breturn\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+        - "app/controllers/"
+        - "lib/"
+      explanation: "Rails 4.1 no longer supports returning from callbacks (including `return false`) as a way to halt the chain"
+      fix: "Replace `return false` with a bare `false` expression. In Rails 5+ this becomes `throw :abort`"
+      variable_name: "CALLBACK_RETURN"
+
+    - name: "Implicit join reference in includes+where string"
+      pattern: "\\.includes\\([^)]+\\)[^\\n]*\\.where\\(\\s*['\"][a-z_][a-z_0-9]*\\."
+      exclude: "\\.references\\(|\\.eager_load\\("
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 removed the string-parsing heuristic that auto-joined tables referenced inside a where(\"other_table.col = ?\") string after includes(...)"
+      fix: "Replace with explicit joins(:assoc) (no eager load), eager_load(:assoc) (eager loaded), or includes(:assoc).where(...).references(:assoc)"
+      variable_name: "IMPLICIT_JOIN_REFERENCES"
+
+    - name: "disable_implicit_join_references config (dead setting)"
+      pattern: "disable_implicit_join_references"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "config.active_record.disable_implicit_join_references does nothing in Rails 4.1 and emits a deprecation warning"
+      fix: "Remove config.active_record.disable_implicit_join_references from your config files"
+      variable_name: "DISABLE_IMPLICIT_JOIN_REFERENCES"
+
+  medium_priority:
+    - name: "default_scope in models"
+      pattern: "^\\s*default_scope\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 chains default_scope with subsequent scopes (AND) instead of letting them override. Scopes that contradict the default can now return zero rows"
+      fix: "Audit each scope on models with default_scope. Use unscope(where: :col) or rewhere(col: value) where a scope is supposed to override the default"
+      variable_name: "DEFAULT_SCOPE"
+
+    - name: "ActiveRecord::Relation mutator calls"
+      pattern: "\\.where\\([^)]*\\)[^\\n]*\\.(compact!|map!|delete_if|reject!|select!|flatten!|sort!|uniq!)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 removed mutator methods from ActiveRecord::Relation. Calling compact!/map!/delete_if/etc. on a Relation raises"
+      fix: "Call .to_a first, then mutate the array: records = Project.where(...).to_a; records.compact!"
+      variable_name: "RELATION_MUTATORS"
+
+    - name: "Controller test with format: :js (should use xhr)"
+      pattern: "^\\s*(get|post|put|patch|delete)\\s+:[a-z_]+[^\\n]*format:\\s*:js"
+      exclude: "\\bxhr\\b"
+      search_paths:
+        - "test/controllers/"
+        - "test/functional/"
+        - "spec/controllers/"
+      explanation: "Rails 4.1 extends CSRF protection to GET requests with JS responses. Controller tests that hit JS endpoints with the plain verb helpers now fail CSRF or skip the XHR code path"
+      fix: "Use xhr :verb, :action, params instead of verb :action, format: :js"
+      variable_name: "JS_CONTROLLER_TEST"
+
+    - name: "flash.to_hash with symbol key filters"
+      pattern: "flash\\.to_hash\\.(except|slice|values_at)\\(\\s*:"
+      exclude: ""
+      search_paths:
+        - "app/"
+      explanation: "flash.to_hash keys are strings in Rails 4.1. Filtering with symbol keys silently no-ops"
+      fix: "Use string keys: flash.to_hash.except(\"notify\") instead of flash.to_hash.except(:notify)"
+      variable_name: "FLASH_SYMBOL_KEYS"
+
+  low_priority:
+    - name: "Spring not in Gemfile"
+      pattern: "source\\s+['\"]https?://rubygems"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+      explanation: "FILE MARKER (manual review required): Rails 4.1 ships with Spring in the default Gemfile. Apps generated before 4.1 will not have it"
+      fix: "Add gem 'spring' under group :development in the Gemfile, then run `bundle exec spring binstub --all` to generate Spring-aware binstubs. Optional but recommended"
+      variable_name: "SPRING"
+
+    - name: "secrets.yml missing"
+      pattern: "Rails\\.application\\.config\\.secret_(key_base|token)"
+      exclude: ""
+      search_paths:
+        - "config/"
+        - "app/"
+      explanation: "Rails 4.1 introduces config/secrets.yml for centralized secret management via Rails.application.secrets"
+      fix: "Create config/secrets.yml with secret_key_base per environment and migrate readers from Rails.application.config.secret_key_base to Rails.application.secrets.secret_key_base"
+      variable_name: "SECRETS_YML"
+
+dependencies:
+  multi_json:
+    check: false
+    gem_name: "multi_json"
+    message: "Add to Gemfile only if the app still calls MultiJSON.dump / MultiJSON.load directly — Rails 4.1 no longer pulls it in"
+    url: "https://github.com/intridea/multi_json"
+
+  activerecord-deprecated_finders:
+    check: false
+    gem_name: "activerecord-deprecated_finders"
+    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1"
+    url: "https://github.com/rails/activerecord-deprecated_finders"
+
+  spring:
+    check: false
+    gem_name: "spring"
+    message: "New Rails 4.1 default — application preloader that keeps the Rails environment in memory between commands"
+    url: "https://github.com/rails/spring"
