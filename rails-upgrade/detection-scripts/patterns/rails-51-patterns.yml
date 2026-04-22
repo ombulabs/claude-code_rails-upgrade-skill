@@ -1,0 +1,155 @@
+version: "5.1"
+description: "Breaking change patterns for Rails 5.0 → 5.1 upgrade"
+
+breaking_changes:
+  high_priority:
+    - name: "render :text removed"
+      pattern: "\\brender\\s+(:text\\s*=>|text:)"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+      explanation: "Rails 5.1 removes `render text: ...`. Calls raise ArgumentError at runtime"
+      fix: "Use `render plain: 'content'` for text/plain, or `render html: '<p>..'.html_safe` for explicit HTML"
+      variable_name: "RENDER_TEXT"
+
+    - name: "render :nothing removed"
+      pattern: "\\brender\\s+(:nothing\\s*=>|nothing:)"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+      explanation: "Rails 5.1 removes `render nothing: true`. Calls raise ArgumentError at runtime"
+      fix: "Replace with `head :ok` (200 + empty body) or `head :no_content` (204)"
+      variable_name: "RENDER_NOTHING"
+
+    - name: "redirect_to :back removed"
+      pattern: "redirect_to\\s+:back\\b"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+      explanation: "Rails 5.1 removes `redirect_to :back` outright (it was deprecated in 5.0). Callers raise at runtime"
+      fix: "Replace with `redirect_back(fallback_location: root_path)` and pass any flash/notice options as keyword arguments"
+      variable_name: "REDIRECT_TO_BACK"
+
+    - name: "*_filter callback methods removed"
+      pattern: "\\b(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_filter\\b"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+        - "app/"
+        - "lib/"
+      explanation: "Rails 5.1 removes all `*_filter` controller callbacks (deprecated in 4.x, still warning in 5.0). Use `*_action` variants"
+      fix: "Rename: before_filter → before_action, skip_before_filter → skip_before_action, etc. Mechanical rename — behavior is identical"
+      variable_name: "FILTER_METHODS"
+
+    - name: "String conditions in controller filters"
+      pattern: "(before|after|around|skip_before|skip_after|skip_around)_action\\b[^\\n]*\\b(if|unless):\\s*['\"]"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+      explanation: "Rails 5.1 no longer accepts string values for `if:` / `unless:` conditions on filters. They must be symbols (method names) or lambdas"
+      fix: "Replace the string with a symbol: `if: :has_project_guest_id` instead of `if: 'has_project_guest_id'`. For inline expressions, use a lambda: `if: -> { ... }`"
+      variable_name: "FILTER_STRING_CONDITIONS"
+
+    - name: "ActiveRecord::Relation#uniq removed"
+      pattern: "\\.uniq(\\b|\\()"
+      exclude: "\\.(to_a|map|pluck|select|reject|each|values|keys|compact)[^\\n]*\\.uniq"
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 5.1 removes ActiveRecord::Relation#uniq (was deprecated in 5.0). Use #distinct. NOTE: pattern will false-positive on Array#uniq — the exclude filters common array cases but verify receivers are Relations"
+      fix: "Replace .uniq / .uniq! on ActiveRecord relations with .distinct. Plain Array#uniq is unaffected — keep those as-is"
+      variable_name: "RELATION_UNIQ"
+
+    - name: "use_transactional_fixtures removed"
+      pattern: "use_transactional_fixtures"
+      exclude: ""
+      search_paths:
+        - "test/"
+        - "spec/"
+      explanation: "Rails 5.1 removes `use_transactional_fixtures` (renamed to `use_transactional_tests` in Rails 5.0)"
+      fix: "Rename the setting to `self.use_transactional_tests = true` in your test base class / test_helper.rb"
+      variable_name: "USE_TRANSACTIONAL_FIXTURES"
+
+    - name: "Controller test positional arguments"
+      pattern: "^\\s*(get|post|put|patch|delete|head)\\s+[:'\"][^,\\n]+,\\s*\\{"
+      exclude: "params:|session:|flash:|headers:|body:|xhr:|format:"
+      search_paths:
+        - "test/controllers/"
+        - "test/functional/"
+        - "spec/controllers/"
+        - "spec/requests/"
+      explanation: "Rails 5.1 drops support for positional arguments in controller test helpers. All parameters must be keyword-argument form"
+      fix: "Wrap params/session/flash in keyword args: `get :show, params: { id: 1 }, session: { user_id: 1 }, flash: { notice: 'hi' }`"
+      variable_name: "CONTROLLER_TEST_POSITIONAL"
+
+  medium_priority:
+    - name: "render :body default layout change"
+      pattern: "\\brender\\s+(:body\\s*=>|body:)"
+      exclude: "layout:"
+      search_paths:
+        - "app/controllers/"
+      explanation: "Rails 5.1 changes `render body:` to NOT apply the default layout. If your 5.0 code relied on the layout being rendered, output will differ silently"
+      fix: "Pass `layout: true` (or a layout name) explicitly if you need the layout. If you wanted raw body output, no change needed"
+      variable_name: "RENDER_BODY_LAYOUT"
+
+    - name: "raise_in_transactional_callbacks config (dead setting)"
+      pattern: "raise_in_transactional_callbacks"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 5.1 removes the raise_in_transactional_callbacks config option. The 5.0+ behavior (always raise) is now the only behavior"
+      fix: "Remove `config.active_record.raise_in_transactional_callbacks = true` from config/application.rb or environment configs"
+      variable_name: "RAISE_IN_TRANSACTIONAL_CALLBACKS"
+
+    - name: "serve_static_files config renamed"
+      pattern: "config\\.serve_static_files"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 5.1 renames `config.serve_static_files` to `config.public_file_server.enabled`"
+      fix: "Rename: `config.public_file_server.enabled = <value>` (or `= ENV['RAILS_SERVE_STATIC_FILES'].present?` for the production default)"
+      variable_name: "SERVE_STATIC_FILES_RENAME"
+
+    - name: "static_cache_control config renamed"
+      pattern: "config\\.static_cache_control"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 5.1 renames `config.static_cache_control` to `config.public_file_server.headers` (and the value is now a hash, not a string)"
+      fix: "Rename and restructure: `config.public_file_server.headers = { 'Cache-Control' => 'public, max-age=3600' }`"
+      variable_name: "STATIC_CACHE_CONTROL_RENAME"
+
+    - name: "application.secrets nested string-key access"
+      pattern: "Rails\\.application\\.secrets\\[[^\\]]+\\]\\[['\"]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "config/"
+        - "lib/"
+      explanation: "Rails 5.1 loads secrets.yml with all keys (including nested) as symbols. Nested string-key access silently returns nil"
+      fix: "Use symbol keys throughout: `Rails.application.secrets[:smtp_settings][:address]` instead of `[\"address\"]`"
+      variable_name: "SECRETS_STRING_KEYS"
+
+    - name: "Top-level HashWithIndifferentAccess constant"
+      pattern: "(?<!ActiveSupport::)\\bHashWithIndifferentAccess\\b"
+      exclude: "ActiveSupport::HashWithIndifferentAccess"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+      explanation: "Rails 5.1 soft-deprecates the top-level HashWithIndifferentAccess constant in favor of ActiveSupport::HashWithIndifferentAccess. No warning yet, but the constant will be removed in a future version"
+      fix: "Replace with ActiveSupport::HashWithIndifferentAccess. Re-dump any YAML fixtures that serialize this class so they reference the new constant"
+      variable_name: "TOP_LEVEL_HWIA"
+
+dependencies:
+  webpacker:
+    check: false
+    gem_name: "webpacker"
+    message: "New Rails 5.1 default for JavaScript bundling via Webpack + Yarn. Optional — adopt only if moving off Sprockets for JS"
+    url: "https://github.com/rails/webpacker"
+
+  rails-controller-testing:
+    check: false
+    gem_name: "rails-controller-testing"
+    message: "Still required if tests use assigns() or assert_template (carried over from the 5.0 extraction)"
+    url: "https://github.com/rails/rails-controller-testing"
