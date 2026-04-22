@@ -282,13 +282,26 @@ config.load_defaults 5.1
 render plain: 'content'
 ```
 
-### Issue: redirect_to :back Fails
+### Issue: `redirect_to :back` raises after the upgrade
 
-**Error:** `ActionController::RedirectBackError`
+**Cause:** `redirect_to :back` was deprecated in Rails 5.0 and **removed** in Rails 5.1. Callers raise at runtime.
 
-**Cause:** `redirect_to :back` was removed in 5.1, and `redirect_back` without a `fallback_location:` still raises when `HTTP_REFERER` is missing
+**Fix:** Replace every call site with `redirect_back(fallback_location: ...)`:
+```ruby
+# BEFORE (5.0 — raises on 5.1)
+redirect_to :back
 
-**Fix:**
+# AFTER
+redirect_back(fallback_location: root_path)
+```
+
+### Issue: `redirect_back` itself raises on a request with no referer
+
+**Error:** `ActionController::RedirectBackError` (or `ActionController::ActionControllerError` on newer versions)
+
+**Cause:** `redirect_back` still needs a fallback when `HTTP_REFERER` is missing (direct navigation, bookmarked POSTs, some crawlers).
+
+**Fix:** Always pass `fallback_location:`:
 ```ruby
 redirect_back(fallback_location: root_path)
 ```
