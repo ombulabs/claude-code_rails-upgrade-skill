@@ -24,37 +24,7 @@ The breaking changes are smaller than 3.2 → 4.0 but several silently change be
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. MultiJSON Removed from Rails
-
-**What Changed:**
-Rails 4.1 no longer depends on [`MultiJSON`](https://github.com/intridea/multi_json). Apps that still reference it directly will fail to boot once Rails stops pulling it in transitively.
-
-**Detection Pattern:**
-```ruby
-require 'multi_json'
-MultiJSON.dump(obj)
-MultiJSON.load(str)
-```
-
-**Fix:**
-```ruby
-# Option A — keep MultiJSON
-# Gemfile
-gem 'multi_json'
-
-# Option B — migrate to core JSON
-# BEFORE
-MultiJSON.dump(obj)
-MultiJSON.load(str)
-
-# AFTER
-obj.to_json
-JSON.parse(str)
-```
-
----
-
-#### 2. Dynamic Finders Removed
+#### 1. Dynamic Finders Removed
 
 **What Changed:**
 `activerecord-deprecated_finders` was removed as a Rails dependency. `find_all_by_*`, `find_last_by_*`, `scoped_by_*`, `find_or_initialize_by_*`, and `find_or_create_by_*` no longer work out of the box.
@@ -93,19 +63,16 @@ gem 'activerecord-deprecated_finders'
 
 ---
 
-#### 3. `return` from Callbacks No Longer Allowed
+#### 2. `return` Inside Inline Callback Blocks
 
 **What Changed:**
-Returning from a callback block (including `return false`) no longer halts the callback chain as before — the behavior is deprecated and removed. Use a plain `false` expression (and note that Rails 5 replaces this with `throw :abort`).
+Using `return` inside an **inline callback block** now raises `LocalJumpError` at callback-execution time. This was never officially supported; a rewrite of `ActiveSupport::Callbacks` in 4.1 closed the accidental support.
+
+**Scope:** this affects *inline blocks only* (`before_save { return false }`). Method-form callbacks (`before_save :guard` where `guard` contains `return false`) are unaffected — `return` there behaves normally and `false` still halts the chain on 4.1.
 
 **Detection Pattern:**
 ```ruby
 before_save { return false if invalid_state? }
-before_save :maybe_halt
-
-def maybe_halt
-  return false unless ready?
-end
 ```
 
 **Fix:**
@@ -113,15 +80,24 @@ end
 # BEFORE
 before_save { return false if invalid_state? }
 
-# AFTER (Rails 4.1)
+# AFTER — evaluate to the value
 before_save { false if invalid_state? }
+
+# OR — extract to a method where `return` is fine
+before_save :halt_if_invalid
+
+def halt_if_invalid
+  return false if invalid_state?
+end
 ```
+
+Note: in Rails 5+ the halt mechanism changes again — `false` no longer halts, use `throw :abort`.
 
 See [rails/rails#13271](https://github.com/rails/rails/pull/13271).
 
 ---
 
-#### 4. Implicit Join References Removed
+#### 3. Implicit Join References Removed
 
 **What Changed:**
 `includes(...).where("other_table.col = ...")` no longer auto-joins the referenced table. The string-parsing heuristic was removed because it produced incorrect SQL in edge cases.
@@ -157,6 +133,38 @@ See [rails/rails#9712](https://github.com/rails/rails/issues/9712) for backgroun
 ---
 
 ### 🟡 MEDIUM PRIORITY
+
+#### 4. MultiJSON Removed from Rails
+
+**What Changed:**
+Rails 4.1 no longer depends on [`MultiJSON`](https://github.com/intridea/multi_json). Apps that reference `MultiJSON` directly will raise `NameError` once the transitive dependency goes away.
+
+**Detection Pattern:**
+```ruby
+require 'multi_json'
+MultiJSON.dump(obj)
+MultiJSON.load(str)
+```
+
+**Fix:**
+```ruby
+# Option A — keep MultiJSON explicitly
+# Gemfile
+gem 'multi_json'
+
+# Option B — migrate to core JSON
+# BEFORE
+MultiJSON.dump(obj)
+MultiJSON.load(str)
+
+# AFTER
+obj.to_json
+JSON.parse(str)
+```
+
+**Do not** blindly substitute `JSON.dump` / `JSON.load` — those are the `JSON` gem's arbitrary-object (de)serializers and are unsafe on untrusted input.
+
+---
 
 #### 5. `default_scope` Chains with Other Scopes
 

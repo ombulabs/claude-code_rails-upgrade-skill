@@ -3,18 +3,6 @@ description: "Breaking change patterns for Rails 4.0 → 4.1 upgrade"
 
 breaking_changes:
   high_priority:
-    - name: "MultiJSON usage"
-      pattern: "\\bMultiJSON\\b|require\\s+['\"]multi_json['\"]"
-      exclude: ""
-      search_paths:
-        - "app/"
-        - "lib/"
-        - "config/"
-        - "Gemfile"
-      explanation: "Rails 4.1 no longer depends on MultiJSON. Apps that reference it directly will fail once Rails stops pulling it in transitively"
-      fix: "Either add gem 'multi_json' to the Gemfile, or migrate to core JSON: obj.to_json and JSON.parse(str)"
-      variable_name: "MULTI_JSON"
-
     - name: "Dynamic finders (find_all_by / find_last_by / scoped_by)"
       pattern: "\\.(find_all_by_|find_last_by_|scoped_by_)[a-zA-Z_0-9]+"
       exclude: ""
@@ -66,6 +54,18 @@ breaking_changes:
       variable_name: "DISABLE_IMPLICIT_JOIN_REFERENCES"
 
   medium_priority:
+    - name: "MultiJSON usage"
+      pattern: "\\bMultiJSON\\b|require\\s+['\"]multi_json['\"]|gem\\s+['\"]multi_json['\"]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+        - "Gemfile"
+      explanation: "Rails 4.1 no longer depends on MultiJSON. Apps that reference it directly will hit NameError once Rails stops pulling it in transitively"
+      fix: "Either keep gem 'multi_json' in the Gemfile, or migrate callers to core JSON: obj.to_json and JSON.parse(str). Do NOT blindly replace with JSON.dump/JSON.load — those are unsafe for arbitrary objects"
+      variable_name: "MULTI_JSON"
+
     - name: "default_scope in models"
       pattern: "^\\s*default_scope\\b"
       exclude: ""
@@ -76,12 +76,12 @@ breaking_changes:
       variable_name: "DEFAULT_SCOPE"
 
     - name: "ActiveRecord::Relation mutator calls"
-      pattern: "\\.where\\([^)]*\\)[^\\n]*\\.(compact!|map!|delete_if|reject!|select!|flatten!|sort!|uniq!)"
+      pattern: "\\.(compact!|map!|delete_if|reject!|select!|flatten!|sort!|uniq!|collect!)\\b"
       exclude: ""
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 4.1 removed mutator methods from ActiveRecord::Relation. Calling compact!/map!/delete_if/etc. on a Relation raises"
+      explanation: "Rails 4.1 removed mutator methods from ActiveRecord::Relation. Calling compact!/map!/delete_if/etc. on a Relation raises NoMethodError. Some hits will be false positives on plain arrays — verify the receiver"
       fix: "Call .to_a first, then mutate the array: records = Project.where(...).to_a; records.compact!"
       variable_name: "RELATION_MUTATORS"
 
@@ -106,13 +106,13 @@ breaking_changes:
       variable_name: "FLASH_SYMBOL_KEYS"
 
   low_priority:
-    - name: "Spring not in Gemfile"
-      pattern: "source\\s+['\"]https?://rubygems"
+    - name: "Spring gem in Gemfile (presence check)"
+      pattern: "gem\\s+['\"]spring['\"]"
       exclude: ""
       search_paths:
         - "Gemfile"
-      explanation: "FILE MARKER (manual review required): Rails 4.1 ships with Spring in the default Gemfile. Apps generated before 4.1 will not have it"
-      fix: "Add gem 'spring' under group :development in the Gemfile, then run `bundle exec spring binstub --all` to generate Spring-aware binstubs. Optional but recommended"
+      explanation: "Rails 4.1 ships with Spring as a new preloader default. This is a presence check — a HIT means Spring is already configured; ABSENCE is the signal to add it. Grep cannot detect absence, so review the Gemfile manually when this pattern does not match"
+      fix: "If no match: add `gem 'spring'` under group :development in the Gemfile, then run `bundle exec spring binstub --all` to generate Spring-aware binstubs. Optional but recommended"
       variable_name: "SPRING"
 
     - name: "secrets.yml missing"
