@@ -290,6 +290,8 @@ xhr :post, :create, format: :js
 
 If you legitimately want to serve JS to remote `<script>` tags, skip CSRF on that specific action.
 
+Forward-compat note: the `xhr :verb, :action, ...` syntax is itself removed in Rails 5.0. The 5.0 replacement is `verb :action, params: {...}, xhr: true` (or `process :action, method: :verb, xhr: true`). You will revisit these test calls in the 4.2 → 5.0 hop.
+
 See [rails/rails#13345](https://github.com/rails/rails/pull/13345).
 
 ---
@@ -580,7 +582,7 @@ ruby -v  # 1.9.3+ (2.0+ recommended)
 ### Phase 3: Gemfile Updates
 ```ruby
 # Gemfile
-gem 'rails', '~> 4.1.0'
+gem 'rails', '~> 4.1.16'  # pin to the last 4.1 patch
 
 # Only if you rely on it directly
 # gem 'multi_json'
