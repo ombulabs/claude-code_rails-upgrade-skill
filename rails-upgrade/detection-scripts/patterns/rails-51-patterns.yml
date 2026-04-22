@@ -42,7 +42,7 @@ breaking_changes:
       variable_name: "FILTER_METHODS"
 
     - name: "String conditions in controller filters"
-      pattern: "(before|after|around|skip_before|skip_after|skip_around)_action\\b[^\\n]*\\b(if|unless):\\s*['\"]"
+      pattern: "(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_(action|filter)\\b[^\\n]*\\b(if|unless):\\s*['\"]"
       exclude: ""
       search_paths:
         - "app/controllers/"
@@ -54,8 +54,8 @@ breaking_changes:
       pattern: "\\.uniq(\\b|\\()"
       exclude: "\\.(to_a|map|pluck|select|reject|each|values|keys|compact)[^\\n]*\\.uniq"
       search_paths:
-        - "app/"
-        - "lib/"
+        - "app/models/"
+        - "app/controllers/"
       explanation: "Rails 5.1 removes ActiveRecord::Relation#uniq (was deprecated in 5.0). Use #distinct. NOTE: pattern will false-positive on Array#uniq — the exclude filters common array cases but verify receivers are Relations"
       fix: "Replace .uniq / .uniq! on ActiveRecord relations with .distinct. Plain Array#uniq is unaffected — keep those as-is"
       variable_name: "RELATION_UNIQ"
@@ -71,7 +71,7 @@ breaking_changes:
       variable_name: "USE_TRANSACTIONAL_FIXTURES"
 
     - name: "Controller test positional arguments"
-      pattern: "^\\s*(get|post|put|patch|delete|head)\\s+[:'\"][^,\\n]+,\\s*\\{"
+      pattern: "^\\s*(get|post|put|patch|delete|head)\\s+[:'\"][^,\\n]+,\\s*(\\{|[a-z_]+:)"
       exclude: "params:|session:|flash:|headers:|body:|xhr:|format:"
       search_paths:
         - "test/controllers/"
@@ -132,7 +132,7 @@ breaking_changes:
 
     - name: "Top-level HashWithIndifferentAccess constant"
       pattern: "(?<!ActiveSupport::)\\bHashWithIndifferentAccess\\b"
-      exclude: "ActiveSupport::HashWithIndifferentAccess"
+      exclude: ""
       search_paths:
         - "app/"
         - "lib/"
@@ -149,7 +149,7 @@ dependencies:
     url: "https://github.com/rails/webpacker"
 
   rails-controller-testing:
-    check: false
+    check: true
     gem_name: "rails-controller-testing"
     message: "Still required if tests use assigns() or assert_template (carried over from the 5.0 extraction)"
     url: "https://github.com/rails/rails-controller-testing"
