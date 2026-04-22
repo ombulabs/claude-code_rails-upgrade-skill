@@ -103,12 +103,10 @@ render body: 'raw content', layout: true
 
 ---
 
-### 🟡 MEDIUM PRIORITY
-
-#### 5. redirect_to :back Deprecated
+#### 5. redirect_to :back Removed
 
 **What Changed:**
-`redirect_to :back` is deprecated.
+`redirect_to :back` was deprecated in Rails 5.0 and **removed** in Rails 5.1. Callers raise at runtime.
 
 **Detection Pattern:**
 ```ruby
@@ -126,7 +124,11 @@ redirect_back(fallback_location: root_path)
 redirect_back(fallback_location: root_path, notice: 'Done!')
 ```
 
+`redirect_back` accepts a `fallback_location:` used when `HTTP_REFERER` is missing — without it, requests with no referer raise `ActionController::RedirectBackError`.
+
 ---
+
+### 🟡 MEDIUM PRIORITY
 
 #### 6. Positional Arguments in Process Methods
 
@@ -284,7 +286,7 @@ render plain: 'content'
 
 **Error:** `ActionController::RedirectBackError`
 
-**Cause:** No referer and using deprecated syntax
+**Cause:** `redirect_to :back` was removed in 5.1, and `redirect_back` without a `fallback_location:` still raises when `HTTP_REFERER` is missing
 
 **Fix:**
 ```ruby
