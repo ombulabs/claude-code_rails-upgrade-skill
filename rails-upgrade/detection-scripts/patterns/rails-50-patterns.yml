@@ -100,6 +100,15 @@ breaking_changes:
       fix: "Replace with Rack::Test::UploadedFile.new(file_path, content_type)"
       variable_name: "UPLOAD_FILE_TEST"
 
+    - name: "redirect_to :back deprecated"
+      pattern: "redirect_to\\s+:back\\b"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+      explanation: "Rails 5.0 deprecates redirect_to :back (emits a deprecation warning). It is removed outright in Rails 5.1, so fix all call sites now to avoid a runtime break on the next hop"
+      fix: "Replace with redirect_back(fallback_location: root_path). Pass any flash/notice options as keyword args: redirect_back(fallback_location: root_path, notice: 'Done!')"
+      variable_name: "REDIRECT_TO_BACK_DEPRECATED"
+
     - name: "rake commands in scripts or docs"
       pattern: "\\brake\\s+(db:|test|routes|assets:|secret)"
       exclude: ""
