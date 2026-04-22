@@ -23,15 +23,15 @@ breaking_changes:
       fix: "Use the hash form: find_or_initialize_by(col: value) / find_or_create_by(col: value)"
       variable_name: "FIND_OR_X_BY_DYNAMIC"
 
-    - name: "return from a callback block"
+    - name: "return inside inline callback block"
       pattern: "^\\s*(before_|after_|around_)(save|create|update|destroy|validation|commit|rollback|initialize|find|touch)\\b.*\\{[^}]*\\breturn\\b"
       exclude: ""
       search_paths:
         - "app/models/"
         - "app/controllers/"
         - "lib/"
-      explanation: "Rails 4.1 no longer supports returning from callbacks (including `return false`) as a way to halt the chain"
-      fix: "Replace `return false` with a bare `false` expression. In Rails 5+ this becomes `throw :abort`"
+      explanation: "Rails 4.1 raises LocalJumpError when an inline callback block uses `return`. LIMITATION: this regex only catches single-line `{ ... }` inline blocks on the same line as the callback declaration. Multi-line `{ ... }` blocks, all `do..end` blocks, and method-form callbacks (which are unaffected anyway) are not detected. A clean run does not prove the app is safe — spot-check manually"
+      fix: "Evaluate to the value instead: before_save { false if invalid_state? }. Or extract to a method where `return` is fine. In Rails 5+ the halt mechanism becomes `throw :abort`"
       variable_name: "CALLBACK_RETURN"
 
     - name: "Implicit join reference in includes+where string"
@@ -44,15 +44,6 @@ breaking_changes:
       fix: "Replace with explicit joins(:assoc) (no eager load), eager_load(:assoc) (eager loaded), or includes(:assoc).where(...).references(:assoc)"
       variable_name: "IMPLICIT_JOIN_REFERENCES"
 
-    - name: "disable_implicit_join_references config (dead setting)"
-      pattern: "disable_implicit_join_references"
-      exclude: ""
-      search_paths:
-        - "config/"
-      explanation: "config.active_record.disable_implicit_join_references does nothing in Rails 4.1 and emits a deprecation warning"
-      fix: "Remove config.active_record.disable_implicit_join_references from your config files"
-      variable_name: "DISABLE_IMPLICIT_JOIN_REFERENCES"
-
     - name: "store_accessor on json/hstore column (PG key semantics)"
       pattern: "^\\s*store_accessor\\s+:"
       exclude: ""
@@ -64,14 +55,13 @@ breaking_changes:
 
   medium_priority:
     - name: "MultiJSON usage"
-      pattern: "\\bMultiJSON\\b|require\\s+['\"]multi_json['\"]|gem\\s+['\"]multi_json['\"]"
+      pattern: "\\bMultiJSON\\b|require\\s+['\"]multi_json['\"]"
       exclude: ""
       search_paths:
         - "app/"
         - "lib/"
         - "config/"
-        - "Gemfile"
-      explanation: "Rails 4.1 no longer depends on MultiJSON. Apps that reference it directly will hit NameError once Rails stops pulling it in transitively"
+      explanation: "Rails 4.1 no longer depends on MultiJSON. Apps that reference it directly will hit NameError once Rails stops pulling it in transitively. Gemfile is intentionally excluded — `gem 'multi_json'` IS the fix, not a breaking-change signal"
       fix: "Either keep gem 'multi_json' in the Gemfile, or migrate callers to core JSON: obj.to_json and JSON.parse(str). Do NOT blindly replace with JSON.dump/JSON.load — those are unsafe for arbitrary objects"
       variable_name: "MULTI_JSON"
 
@@ -151,15 +141,15 @@ breaking_changes:
       fix: "If no match: add `gem 'spring'` under group :development in the Gemfile, then run `bundle exec spring binstub --all` to generate Spring-aware binstubs. Optional but recommended"
       variable_name: "SPRING"
 
-    - name: "secrets.yml missing"
+    - name: "Legacy secret_key_base / secret_token reads"
       pattern: "Rails\\.application\\.config\\.secret_(key_base|token)"
       exclude: ""
       search_paths:
         - "config/"
         - "app/"
-      explanation: "Rails 4.1 introduces config/secrets.yml for centralized secret management via Rails.application.secrets"
-      fix: "Create config/secrets.yml with secret_key_base per environment and migrate readers from Rails.application.config.secret_key_base to Rails.application.secrets.secret_key_base"
-      variable_name: "SECRETS_YML"
+      explanation: "Matches callers of the old Rails.application.config.secret_key_base / secret_token API. Rails 4.1 introduces config/secrets.yml exposed via Rails.application.secrets. NOTE: this is a migration-work signal based on hits; absence does NOT confirm secrets.yml is configured — grep cannot detect absence of a file"
+      fix: "Create config/secrets.yml with secret_key_base per environment, then migrate readers to Rails.application.secrets.secret_key_base. Delete the old config/initializers/secret_token.rb"
+      variable_name: "SECRET_KEY_BASE_READS"
 
     - name: "render :text usage"
       pattern: "\\brender\\s+(:text\\s*=>|text:)"
@@ -208,6 +198,15 @@ breaking_changes:
       explanation: "Rails 4.1 changed the around-callback lambda signature — the block is now a positional argument, not &block"
       fix: "Drop the ampersand: ->(r, block) { ...; block.call; ... } instead of ->(r, &block) { ...; block.call; ... }"
       variable_name: "SET_CALLBACK_AROUND"
+
+    - name: "disable_implicit_join_references config (dead setting)"
+      pattern: "disable_implicit_join_references"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "config.active_record.disable_implicit_join_references is a no-op in Rails 4.1 and emits a deprecation warning. Cosmetic cleanup only"
+      fix: "Remove config.active_record.disable_implicit_join_references from your config files"
+      variable_name: "DISABLE_IMPLICIT_JOIN_REFERENCES"
 
     - name: "ActiveRecord::Migration.check_pending! in test helper"
       pattern: "ActiveRecord::Migration\\.check_pending!"
