@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.2 — April 2026
+- Added a **CI config check** at the end of Step 5, before opening the upgrade PR. New workflow file: `workflows/ci-sync-workflow.md`. Claude now lists every CI file in the repo, compares Ruby / Rails / service versions against the upgraded Gemfile, and stops to fix any mismatches. Addresses a real incident where a 7.1 → 7.2 upgrade PR opened with stale CI config. (Closes #41)
+- Wired the check into SKILL.md Core Workflow Step 5, High-Level Workflow, Pattern 1, Quality Checklist, Key Principles, and Success Criteria so it is enforced, not just mentioned.
+
 ## v3.1 — March 2026
 - Added mandatory Step 0: Verify Latest Patch Version — ensures app is on latest patch of current series before any minor/major hop
 - Added latest patch versions reference table in `reference/multi-hop-strategy.md`
