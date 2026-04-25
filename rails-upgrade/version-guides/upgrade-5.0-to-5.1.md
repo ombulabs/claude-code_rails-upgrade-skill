@@ -103,12 +103,10 @@ render body: 'raw content', layout: true
 
 ---
 
-### 🟡 MEDIUM PRIORITY
-
-#### 5. redirect_to :back Deprecated
+#### 5. redirect_to :back Removed
 
 **What Changed:**
-`redirect_to :back` is deprecated.
+`redirect_to :back` was deprecated in Rails 5.0 and **removed** in Rails 5.1. Callers raise at runtime.
 
 **Detection Pattern:**
 ```ruby
@@ -126,7 +124,11 @@ redirect_back(fallback_location: root_path)
 redirect_back(fallback_location: root_path, notice: 'Done!')
 ```
 
+`redirect_back` accepts a `fallback_location:` used when `HTTP_REFERER` is missing — without it, requests with no referer raise `ActionController::RedirectBackError`.
+
 ---
+
+### 🟡 MEDIUM PRIORITY
 
 #### 6. Positional Arguments in Process Methods
 
@@ -280,13 +282,26 @@ config.load_defaults 5.1
 render plain: 'content'
 ```
 
-### Issue: redirect_to :back Fails
+### Issue: `redirect_to :back` raises after the upgrade
 
-**Error:** `ActionController::RedirectBackError`
+**Cause:** `redirect_to :back` was deprecated in Rails 5.0 and **removed** in Rails 5.1. Callers raise at runtime.
 
-**Cause:** No referer and using deprecated syntax
+**Fix:** Replace every call site with `redirect_back(fallback_location: ...)`:
+```ruby
+# BEFORE (5.0 — raises on 5.1)
+redirect_to :back
 
-**Fix:**
+# AFTER
+redirect_back(fallback_location: root_path)
+```
+
+### Issue: `redirect_back` itself raises on a request with no referer
+
+**Error:** `ActionController::RedirectBackError` (or `ActionController::ActionControllerError` on newer versions)
+
+**Cause:** `redirect_back` still needs a fallback when `HTTP_REFERER` is missing (direct navigation, bookmarked POSTs, some crawlers).
+
+**Fix:** Always pass `fallback_location:`:
 ```ruby
 redirect_back(fallback_location: root_path)
 ```
