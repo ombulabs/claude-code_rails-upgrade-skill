@@ -3,7 +3,15 @@ name: Validate detection patterns
 on:
   push:
     branches: [main]
+    paths:
+      - "rails-upgrade/detection-scripts/patterns/**"
+      - "bin/validate-patterns"
+      - ".github/workflows/validate-patterns.yml"
   pull_request:
+    paths:
+      - "rails-upgrade/detection-scripts/patterns/**"
+      - "bin/validate-patterns"
+      - ".github/workflows/validate-patterns.yml"
 
 jobs:
   validate:
