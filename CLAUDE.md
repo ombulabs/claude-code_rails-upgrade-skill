@@ -24,7 +24,7 @@ This file captures project-specific conventions Claude should follow when workin
 - Organize patterns under `high_priority`, `medium_priority`, and `low_priority`.
 - Each pattern needs: `name`, `pattern` (regex), `exclude` (regex, empty string if none), `search_paths`, `explanation`, `fix`, `variable_name`.
 - Include a `dependencies` section for any bridge/compatibility gems mentioned in the guide.
-- Verify the file before committing with `bin/validate-patterns` (validates every pattern file) or `bin/validate-patterns path/to/file.yml` (single file). The script checks YAML parses, the seven required pattern keys are present, and each `pattern` / `exclude` regex compiles.
+- **Required before committing any change to a detection pattern file:** run `bin/validate-patterns` (or `bin/validate-patterns path/to/file.yml` for the file you touched). Do not commit a pattern change without a clean run; broken YAML or schema drift in this directory breaks the skill at runtime. See the `## Repository tooling` section above for what the script checks.
 
 ## Assigning priority (🔴 HIGH / 🟡 MEDIUM / 🟢 LOW)
 
