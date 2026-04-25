@@ -2,6 +2,14 @@
 
 This file captures project-specific conventions Claude should follow when working in this repo.
 
+## Repository tooling
+
+- `bin/validate-patterns` validates every detection pattern YAML file under `rails-upgrade/detection-scripts/patterns/`. Run it before committing any change to a pattern file. Pure-stdlib Ruby, no Bundler or Gemfile required.
+  - `bin/validate-patterns` validates every file
+  - `bin/validate-patterns path/to/file.yml` validates one or more specific files
+  - Checks: YAML parses, required top-level keys present, the seven required pattern keys present on each entry, and every `pattern` / `exclude` regex compiles
+  - Exits 0 on success, 1 on any failure with a per-file error report
+
 ## Version guides (`rails-upgrade/version-guides/*.md`)
 
 - **Do NOT include "Difficulty" or "Estimated Time" in the header.** These are subjective, application-dependent, and drift out of date. Keep the header minimal: title, Ruby requirement, and the attribution line.
