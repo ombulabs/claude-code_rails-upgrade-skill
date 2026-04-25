@@ -1,0 +1,94 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Validates Rails upgrade detection-pattern YAML files.
+#
+# Usage:
+#   bin/validate-patterns                # validate every patterns file
+#   bin/validate-patterns path/to/file   # validate a specific file (one or more)
+#
+# Exits 0 if all files pass, 1 otherwise.
+
+require "yaml"
+
+PATTERNS_DIR = File.expand_path("../rails-upgrade/detection-scripts/patterns", __dir__)
+TOP_LEVEL_KEYS = %w[version description breaking_changes].freeze
+PATTERN_KEYS = %w[name pattern exclude search_paths explanation fix variable_name].freeze
+PRIORITY_KEYS = %w[high_priority medium_priority low_priority].freeze
+
+def validate(path)
+  errors = []
+  doc =
+    begin
+      YAML.safe_load_file(path)
+    rescue Psych::SyntaxError => e
+      return ["YAML parse error: #{e.message}"]
+    end
+
+  return ["top level is not a Hash"] unless doc.is_a?(Hash)
+
+  TOP_LEVEL_KEYS.each do |k|
+    errors << "missing top-level key: #{k}" unless doc.key?(k)
+  end
+
+  bc = doc["breaking_changes"]
+  return errors unless bc.is_a?(Hash)
+
+  bc.each do |priority, patterns|
+    next unless PRIORITY_KEYS.include?(priority)
+    next unless patterns.is_a?(Array)
+
+    patterns.each_with_index do |entry, i|
+      label = "#{priority}[#{i}]" + (entry.is_a?(Hash) && entry["name"] ? " (#{entry["name"]})" : "")
+
+      unless entry.is_a?(Hash)
+        errors << "#{label}: not a Hash"
+        next
+      end
+
+      PATTERN_KEYS.each do |k|
+        errors << "#{label}: missing key: #{k}" unless entry.key?(k)
+      end
+
+      %w[pattern exclude].each do |key|
+        val = entry[key]
+        next if key == "exclude" && (val.nil? || val.to_s.empty?)
+        next if val.nil?
+
+        begin
+          Regexp.new(val)
+        rescue RegexpError => e
+          errors << "#{label}: #{key} regex does not compile: #{e.message}"
+        end
+      end
+    end
+  end
+
+  errors
+end
+
+paths =
+  if ARGV.empty?
+    Dir.glob(File.join(PATTERNS_DIR, "*.yml")).sort
+  else
+    ARGV
+  end
+
+if paths.empty?
+  warn "No YAML files to validate"
+  exit 1
+end
+
+failed = false
+paths.each do |path|
+  errors = validate(path)
+  if errors.empty?
+    puts "OK   #{path}"
+  else
+    failed = true
+    puts "FAIL #{path}"
+    errors.each { |e| puts "     - #{e}" }
+  end
+end
+
+exit(failed ? 1 : 0)
