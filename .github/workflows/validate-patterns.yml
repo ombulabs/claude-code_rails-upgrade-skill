@@ -4,14 +4,17 @@ on:
   push:
     branches: [main]
     paths:
-      - "rails-upgrade/detection-scripts/patterns/**"
+      - "rails-upgrade/detection-scripts/patterns/*.yml"
       - "bin/validate-patterns"
       - ".github/workflows/validate-patterns.yml"
   pull_request:
     paths:
-      - "rails-upgrade/detection-scripts/patterns/**"
+      - "rails-upgrade/detection-scripts/patterns/*.yml"
       - "bin/validate-patterns"
       - ".github/workflows/validate-patterns.yml"
+
+permissions:
+  contents: read
 
 jobs:
   validate:
