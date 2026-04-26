@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.2.1 — 25 April 2026
+- Added `bin/validate-patterns`: a small Ruby script (stdlib only) that validates every detection pattern YAML file under `rails-upgrade/detection-scripts/patterns/`. Checks that YAML parses, the top-level keys (`version`, `description`, `breaking_changes`) are present, every pattern entry has the seven required keys (`name`, `pattern`, `exclude`, `search_paths`, `explanation`, `fix`, `variable_name`), and each `pattern` / `exclude` regex compiles under Ruby Onigmo.
+- Updated `CLAUDE.md` to point contributors at the script instead of the previous inline-Ruby YAML check.
+
 ## v3.2 — April 2026
 - Added a **CI config check** at the end of Step 5, before opening the upgrade PR. New workflow file: `workflows/ci-sync-workflow.md`. Claude now lists every CI file in the repo, compares Ruby / Rails / service versions against the upgraded Gemfile, and stops to fix any mismatches. Addresses a real incident where a 7.1 → 7.2 upgrade PR opened with stale CI config. (Closes #41)
 - Wired the check into SKILL.md Core Workflow Step 5, High-Level Workflow, Pattern 1, Quality Checklist, Key Principles, and Success Criteria so it is enforced, not just mentioned.
