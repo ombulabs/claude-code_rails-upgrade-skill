@@ -132,10 +132,10 @@ See [rails/rails#9712](https://github.com/rails/rails/issues/9712) for backgroun
 
 ---
 
-#### 4. PostgreSQL `json` / `hstore` Columns Return String-Keyed Hashes
+#### 4. PostgreSQL `json` / `hstore` / `array` Columns Return String-Keyed Data
 
 **What Changed:**
-In 4.0, PostgreSQL `json` and `hstore` columns (and any `store_accessor` built on top of them) returned a `HashWithIndifferentAccess` — symbol and string access both worked. In 4.1 they return a plain `Hash` with **string keys only**. Symbol access silently returns `nil`.
+In 4.0, PostgreSQL `json`, `hstore`, and `array` columns (and any `store_accessor` built on top of them) returned a `HashWithIndifferentAccess` or `ArrayWithIndifferentAccess` — symbol and string access both worked. In 4.1 they return plain `Hash` or `Array` with **string keys only**. Symbol access silently returns `nil`.
 
 **Detection Pattern:**
 ```ruby
