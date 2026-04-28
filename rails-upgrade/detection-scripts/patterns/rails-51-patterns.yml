@@ -35,7 +35,6 @@ breaking_changes:
       exclude: ""
       search_paths:
         - "app/controllers/"
-        - "app/"
         - "lib/"
       explanation: "Rails 5.1 removes all `*_filter` controller callbacks (deprecated in 4.x, still warning in 5.0). Use `*_action` variants"
       fix: "Rename: before_filter → before_action, skip_before_filter → skip_before_action, etc. Mechanical rename — behavior is identical"
