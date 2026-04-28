@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.3.0 — 28 April 2026
+- Added `/upgrade-cleanup` slash command for finishing a Rails upgrade before starting the next hop. Removes dual-boot scaffolding, drops `NextRails.next?` branches, retires stale monkey-patches and version-conditional code, aligns migrations / schema / Dockerfile / CI to the new version baseline, and triages deprecation warnings. New workflow file: `workflows/upgrade-cleanup-workflow.md`. Delegates `NextRails.next?` removal to the `dual-boot` skill's cleanup workflow and `load_defaults` alignment to the `rails-load-defaults` skill. Based on FastRuby.io's "Finishing an Upgrade" methodology. (Closes #1)
+- Wired cleanup into SKILL.md as Step 7 / Step 8, with new Trigger Patterns, Key Principle #16, and Success Criteria entries. Resources index updated.
+
 ## v3.2.1 — 25 April 2026
 - Added `bin/validate-patterns`: a small Ruby script (stdlib only) that validates every detection pattern YAML file under `rails-upgrade/detection-scripts/patterns/`. Checks that YAML parses, the top-level keys (`version`, `description`, `breaking_changes`) are present, every pattern entry has the seven required keys (`name`, `pattern`, `exclude`, `search_paths`, `explanation`, `fix`, `variable_name`), and each `pattern` / `exclude` regex compiles under Ruby Onigmo.
 - Updated `CLAUDE.md` to point contributors at the script instead of the previous inline-Ruby YAML check.
