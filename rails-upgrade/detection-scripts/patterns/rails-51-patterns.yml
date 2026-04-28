@@ -131,17 +131,6 @@ breaking_changes:
       fix: "Use symbol keys: `Rails.application.secrets.smtp_settings[:address]` instead of `[\"address\"]`"
       variable_name: "SECRETS_METHOD_ACCESSOR_STRING_KEYS"
 
-    - name: "Top-level HashWithIndifferentAccess constant"
-      pattern: "(?<!ActiveSupport::)\\bHashWithIndifferentAccess\\b"
-      exclude: ""
-      search_paths:
-        - "app/"
-        - "lib/"
-        - "config/"
-      explanation: "Rails 5.1 soft-deprecates the top-level HashWithIndifferentAccess constant in favor of ActiveSupport::HashWithIndifferentAccess. No warning yet, but the constant will be removed in a future version"
-      fix: "Replace with ActiveSupport::HashWithIndifferentAccess. Re-dump any YAML fixtures that serialize this class so they reference the new constant"
-      variable_name: "TOP_LEVEL_HWIA"
-
 dependencies:
   webpacker:
     check: false
