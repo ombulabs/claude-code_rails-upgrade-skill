@@ -3,14 +3,14 @@ description: "Breaking change patterns for Rails 4.0 → 4.1 upgrade"
 
 breaking_changes:
   high_priority:
-    - name: "Dynamic finders (find_all_by / find_last_by / scoped_by)"
-      pattern: "\\.(find_all_by_|find_last_by_|scoped_by_)[a-zA-Z_0-9]+"
-      exclude: ""
+    - name: "Dynamic finders (find_all_by / find_last_by / scoped_by / find_by)"
+      pattern: "\\.(find_all_by_|find_last_by_|scoped_by_|find_by_)[a-zA-Z_0-9]+!?"
+      exclude: "\\.find_by\\s*\\("
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 4.1 removed the activerecord-deprecated_finders dependency. find_all_by_*, find_last_by_*, and scoped_by_* no longer work"
-      fix: "Rewrite as where(col: value). For example: User.find_all_by_email(e) → User.where(email: e); User.find_last_by_email(e) → User.where(email: e).last. As a short-term bridge, add gem 'activerecord-deprecated_finders'"
+      explanation: "Rails 4.1 removed the activerecord-deprecated_finders dependency. find_all_by_*, find_last_by_*, scoped_by_*, and find_by_* (including find_by_*!) no longer work"
+      fix: "Rewrite: find_all_by_* → where(col: value); find_last_by_* → where(col: value).last; scoped_by_* → where(col: value); find_by_<col> → find_by(col: value); find_by_<col>! → find_by!(col: value). As a short-term bridge, add gem 'activerecord-deprecated_finders'"
       variable_name: "DYNAMIC_FINDERS"
 
     - name: "Dynamic find_or_initialize_by_* / find_or_create_by_*"
@@ -49,9 +49,18 @@ breaking_changes:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.1 returns a string-keyed Hash (not HashWithIndifferentAccess) for PostgreSQL json/hstore columns. Direct symbol-key lookups (profile.preferences[:theme]) silently return nil"
-      fix: "Audit callers that index the column directly with symbols and switch to string keys. store_accessor-generated reader/writer methods are unaffected"
+      explanation: "Rails 4.1 returns a string-keyed Hash (not HashWithIndifferentAccess) for PostgreSQL json/hstore columns. This pattern flags models using store_accessor. It cannot detect the break directly — that requires manual audit of callers that index the underlying json/hstore column with symbol keys (e.g., record.preferences[:theme] will silently return nil instead of the value)"
+      fix: "Audit models returned by this pattern. Identify any code that indexes the json/hstore column directly with symbol keys and switch to string keys. store_accessor-generated reader/writer methods are unaffected"
       variable_name: "PG_JSON_HSTORE_KEYS"
+
+    - name: "default_scope in models"
+      pattern: "^\\s*default_scope\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 chains default_scope with subsequent scopes (AND) instead of letting them override. Scopes that contradict the default can now return zero rows, silently returning no results where 4.0 would have returned data"
+      fix: "Audit each scope on models with default_scope. Use unscope(where: :col) or rewhere(col: value) where a scope is supposed to override the default"
+      variable_name: "DEFAULT_SCOPE"
 
   medium_priority:
     - name: "MultiJSON usage"
@@ -64,15 +73,6 @@ breaking_changes:
       explanation: "Rails 4.1 no longer depends on MultiJSON. Apps that reference it directly will hit NameError once Rails stops pulling it in transitively. Gemfile is intentionally excluded — `gem 'multi_json'` IS the fix, not a breaking-change signal"
       fix: "Either keep gem 'multi_json' in the Gemfile, or migrate callers to core JSON: obj.to_json and JSON.parse(str). Do NOT blindly replace with JSON.dump/JSON.load — those are unsafe for arbitrary objects"
       variable_name: "MULTI_JSON"
-
-    - name: "default_scope in models"
-      pattern: "^\\s*default_scope\\b"
-      exclude: ""
-      search_paths:
-        - "app/models/"
-      explanation: "Rails 4.1 chains default_scope with subsequent scopes (AND) instead of letting them override. Scopes that contradict the default can now return zero rows"
-      fix: "Audit each scope on models with default_scope. Use unscope(where: :col) or rewhere(col: value) where a scope is supposed to override the default"
-      variable_name: "DEFAULT_SCOPE"
 
     - name: "ActiveRecord::Relation mutator calls"
       pattern: "\\.(compact!|map!|delete_if|reject!|select!|flatten!|sort!|uniq!|collect!)\\b"
@@ -119,7 +119,7 @@ breaking_changes:
       search_paths:
         - "config/"
       explanation: "Rails 4.1 defaults enforce_available_locales to true. Any locale not in I18n.available_locales raises I18n::InvalidLocale. Presence check — ABSENCE of both settings is the signal to declare available_locales or disable enforcement"
-      fix: "If neither setting is present: declare config.i18n.available_locales = [...] in config/application.rb. Disabling enforcement (config.i18n.enforce_available_locales = false) is an escape hatch; the default exists for a security reason"
+      fix: "Audit request paths that accept a locale param from user input and validate it against an allow-list. Then declare config.i18n.available_locales = [...] in config/application.rb. Disabling enforcement (config.i18n.enforce_available_locales = false) is an escape hatch; the default exists for a security reason"
       variable_name: "I18N_ENFORCE_LOCALES"
 
     - name: "time_precision (as_json millisecond default)"
@@ -149,10 +149,10 @@ breaking_changes:
         - "app/"
       explanation: "Matches callers of the old Rails.application.config.secret_key_base / secret_token API. Rails 4.1 introduces config/secrets.yml exposed via Rails.application.secrets. NOTE: this is a migration-work signal based on hits; absence does NOT confirm secrets.yml is configured — grep cannot detect absence of a file"
       fix: "Create config/secrets.yml with secret_key_base per environment, then migrate readers to Rails.application.secrets.secret_key_base. Delete the old config/initializers/secret_token.rb"
-      variable_name: "SECRET_KEY_BASE_READS"
+      variable_name: "SECRETS_CONFIG_READS"
 
     - name: "render :text usage"
-      pattern: "\\brender\\s+(:text\\s*=>|text:)"
+      pattern: "\\brender\\s*[\\(\\s]\\s*(?:.*,\\s*)?(?:text:\\s*|:text\\s*=>)"
       exclude: ""
       search_paths:
         - "app/controllers/"
