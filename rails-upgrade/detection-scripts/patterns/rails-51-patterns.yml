@@ -120,6 +120,17 @@ breaking_changes:
       fix: "Use symbol keys throughout: `Rails.application.secrets[:smtp_settings][:address]` instead of `[\"address\"]`"
       variable_name: "SECRETS_STRING_KEYS"
 
+    - name: "application.secrets method-accessor string-key access"
+      pattern: "Rails\\.application\\.secrets\\.\\w+\\[['\"]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "config/"
+        - "lib/"
+      explanation: "Rails 5.1 loads secrets.yml with all keys as symbols. Method-accessor style followed by string-key lookup silently returns nil"
+      fix: "Use symbol keys: `Rails.application.secrets.smtp_settings[:address]` instead of `[\"address\"]`"
+      variable_name: "SECRETS_METHOD_ACCESSOR_STRING_KEYS"
+
     - name: "Top-level HashWithIndifferentAccess constant"
       pattern: "(?<!ActiveSupport::)\\bHashWithIndifferentAccess\\b"
       exclude: ""
