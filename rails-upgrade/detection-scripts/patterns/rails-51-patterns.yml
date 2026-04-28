@@ -82,15 +82,6 @@ breaking_changes:
       variable_name: "CONTROLLER_TEST_POSITIONAL"
 
   medium_priority:
-    - name: "render :body default layout change"
-      pattern: "\\brender\\s+(:body\\s*=>|body:)"
-      exclude: "layout:"
-      search_paths:
-        - "app/controllers/"
-      explanation: "Rails 5.1 changes `render body:` to NOT apply the default layout. If your 5.0 code relied on the layout being rendered, output will differ silently"
-      fix: "Pass `layout: true` (or a layout name) explicitly if you need the layout. If you wanted raw body output, no change needed"
-      variable_name: "RENDER_BODY_LAYOUT"
-
     - name: "raise_in_transactional_callbacks config (dead setting)"
       pattern: "raise_in_transactional_callbacks"
       exclude: ""
