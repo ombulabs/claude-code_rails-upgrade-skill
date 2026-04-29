@@ -114,13 +114,13 @@ When proposing code fixes that must work with both the current and target Rails 
 - This is done AFTER the Rails version upgrade is complete
 - **DEPENDENCY:** Requires the [rails-load-defaults skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
 
-### Step 7: Finish the Upgrade — Cleanup (BEFORE THE NEXT HOP)
-- **CRITICAL:** Once the upgrade is in production, run cleanup BEFORE starting the next version hop
-- Removes dual-boot scaffolding, `NextRails.next?` branches, stale monkey-patches, and stale CI/Docker references
-- Triages deprecation warnings emitted by the new Rails version (these become breaking changes in the next hop)
-- Invoked via the `/upgrade-cleanup` slash command or by following `workflows/upgrade-cleanup-workflow.md`
-- **Why:** `NextRails.next?` branches accumulate across hops, lose context, and make the next dual-boot impossible to reason about. Henrique's rule: never start the next hop with old branches still in the tree.
-- See `workflows/upgrade-cleanup-workflow.md` for the full process
+### Step 7: Suggest Cleanup (USER-TRIGGERED)
+- After the upgrade is shipped, **mention** the cleanup option. Do not run it automatically.
+- Example wording:
+
+  > Rails X.Y is in. When you're ready to remove dual-boot scaffolding (drop `NextRails.next?` / `NextRails.current?` branches, retire `Gemfile.next`, triage deprecations), ask me to clean up. If you're heading straight to the next hop, keeping dual-boot in place is also fine.
+
+- The cleanup itself lives in the `upgrade-cleanup` companion plugin. Delegate to it when the user explicitly asks (e.g. "finish the upgrade", "clean up dual-boot", "drop the NextRails branches").
 
 ---
 
@@ -144,13 +144,12 @@ Claude should activate this skill when user says:
 - "Generate the upgrade report"
 - "What will change if I upgrade?"
 
-**Upgrade Cleanup Requests (post-upgrade, pre-next-hop):**
+**Upgrade Cleanup Requests (delegate to the `upgrade-cleanup` plugin):**
 - "Finish the upgrade"
 - "Clean up after my Rails upgrade"
 - "Remove the dual-boot setup"
-- "We're done upgrading to Rails [version], what's next?"
-- "Prep for the next Rails hop"
-- `/upgrade-cleanup` (slash command)
+- "Drop the NextRails branches"
+- "We're done upgrading to Rails [version]"
 
 ---
 
@@ -241,7 +240,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
 - `workflows/ci-sync-workflow.md` - **MANDATORY before opening the upgrade PR** - How to verify CI config matches the upgraded Gemfile
 - `workflows/app-update-preview-workflow.md` - How to generate app:update previews
-- `workflows/upgrade-cleanup-workflow.md` - **POST-UPGRADE, PRE-NEXT-HOP** - Remove dual-boot, drop `NextRails.next?` branches, triage deprecations. Invoked by `/upgrade-cleanup`.
+- **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding, drops `NextRails.next?` / `NextRails.current?` branches, triages deprecations on the new Rails version.
 
 ### Examples (Load when user needs clarification)
 - `examples/simple-upgrade.md` - Single-hop upgrade example
@@ -376,19 +375,15 @@ Claude runs detection directly using tools - NO script generation needed
 4. Consolidates into config/application.rb when done
 ```
 
-### Step 8: Upgrade Cleanup (BEFORE THE NEXT HOP)
+### Step 8: Mention Cleanup (USER-TRIGGERED)
 ```
-⚠️  RUN BEFORE STARTING THE NEXT VERSION HOP
+⚠️  DO NOT AUTO-RUN. Mention it; let the user decide.
 
-1. Confirm upgrade is in production and previous version no longer needed
-2. Read: workflows/upgrade-cleanup-workflow.md
-3. DELEGATE to the dual-boot skill for `NextRails.next?` removal and Gemfile cleanup
-4. Retire stale monkey-patches, gem pins, and version-conditional code
-5. Update migrations / schema / Dockerfile / CI for the new version baseline
-6. Triage deprecation warnings — fix the new ones now while context is fresh
-7. Open a dedicated cleanup PR (do not fold into a feature branch)
-
-Invoked by `/upgrade-cleanup` or "finish my upgrade" / "clean up after Rails X.Y upgrade".
+1. Tell the user the cleanup option exists
+2. Delegate to the upgrade-cleanup plugin only when the user explicitly asks
+   ("finish the upgrade", "clean up dual-boot", "drop the NextRails branches")
+3. The cleanup plugin removes NextRails.next? / NextRails.current? branches,
+   retires dual-boot scaffolding, and triages deprecations on the new version.
 ```
 
 ---
@@ -566,7 +561,7 @@ Before delivering, verify:
 13. **Always Use `NextRails.next?` for Dual-Boot Code** (NEVER use `respond_to?` for version branching. DELEGATE to the `dual-boot` skill for patterns and setup.)
 14. **Check CI Config Before Opening the PR** (run `workflows/ci-sync-workflow.md` to make sure every CI file matches the upgraded Gemfile — stale CI is the most common cause of red builds on upgrade PRs)
 15. **Align load_defaults After the Version Bump** (load_defaults update happens AFTER the Rails version upgrade is complete)
-16. **Finish the Upgrade Before the Next Hop** (run `/upgrade-cleanup` once shipped to production: drop `NextRails.next?` branches, remove dual-boot, triage deprecations. Starting the next hop with stale `NextRails.next?` branches makes the next dual-boot impossible to reason about.)
+16. **Mention, Don't Auto-Run, Cleanup** (after the upgrade ships, mention the `upgrade-cleanup` plugin. Delegate to it only when the user explicitly asks: "finish the upgrade", "clean up dual-boot", "drop the NextRails branches". Cleanup removes `NextRails.next?` / `NextRails.current?` branches, retires dual-boot scaffolding, and triages deprecations on the new version.)
 
 ---
 
@@ -588,7 +583,7 @@ A successful upgrade assistance session:
 ✅ **Implemented changes and upgraded Rails version**
 ✅ **Verified CI config matches the upgraded Gemfile** (Ruby, Rails matrix, services — all mismatches fixed before opening the PR)
 ✅ **Aligned load_defaults** (after upgrade is complete)
-✅ **Ran upgrade cleanup before the next hop** (`NextRails.next?` branches removed, dual-boot retired, deprecations triaged)
+✅ **Mentioned cleanup after the upgrade shipped** (pointed to the `upgrade-cleanup` plugin without auto-running it; delegated only when the user explicitly asked)
 ✅ Provided clear next steps
 ✅ Offered to help implement changes
 

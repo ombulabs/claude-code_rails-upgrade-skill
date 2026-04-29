@@ -82,7 +82,7 @@ In Claude Code, navigate to your Rails application directory and use natural lan
 | Command | Description |
 |---------|-------------|
 | `/rails-upgrade` | Start the upgrade assistant |
-| `/upgrade-cleanup` | Finish a shipped upgrade before the next hop — drop `NextRails.next?` branches, remove dual-boot, triage deprecations |
+| `/upgrade-cleanup` | Finish a shipped upgrade before the next hop. Drops `NextRails.next?` branches, removes dual-boot, triages deprecations. |
 | "Upgrade to Rails X.Y" | Generate reports from detection results |
 | "Show app:update changes" | Preview configuration file changes |
 | "Plan upgrade from X to Y" | Get multi-hop upgrade strategy |
