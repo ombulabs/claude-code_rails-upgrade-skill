@@ -1,22 +1,22 @@
 ---
 name: upgrade-cleanup
-description: Clean up after a Rails upgrade. Drop NextRails.next? and NextRails.current? branches and retire dual-boot scaffolding (Gemfile.next, Gemfile.next.lock, conditional Gemfile groups). Trigger when the user says they are done with the upgrade, want to clean up dual-boot, want to drop NextRails branches, or want to finish the upgrade. Based on FastRuby.io's "Finishing an Upgrade" methodology.
+description: Clean up after (or abandon) a Rails upgrade. Drop NextRails.next? and NextRails.current? branches and retire dual-boot scaffolding (Gemfile.next, Gemfile.next.lock, conditional Gemfile groups), keeping either the next or the current version. Trigger when the user says they are done with the upgrade, want to clean up dual-boot, want to drop NextRails branches, want to finish the upgrade, want to abandon or revert the upgrade attempt, want to roll back to the current Rails version, or want to pause this upgrade hop. Based on FastRuby.io's "Finishing an Upgrade" methodology, extended with an abandon/pause path.
 ---
 
 # Upgrade Cleanup Skill
 
 Companion to the `rails-upgrade` plugin. Runs the cleanup pass that removes dual-boot scaffolding and aligns the codebase to the new version baseline.
 
-When activated, follow the workflow in `workflows/upgrade-cleanup-workflow.md` end-to-end. To detect the version that was upgraded to, read the `Gemfile` (look for the `if NextRails.next?` / `else` block; the `next?` branch holds the upgraded version) or `Gemfile.next.lock`. Do NOT rely on `Gemfile.lock` alone, since during dual-boot it still pins the old version.
+When activated, follow the workflow in `workflows/upgrade-cleanup-workflow.md` end-to-end. **Before any destructive step, confirm direction with the user** (Phase 0 Step 1): are they keeping the **next** version (finishing the upgrade) or keeping the **current** version (abandoning or pausing this hop)? Every subsequent step branches on that answer. To detect the next version, read the `Gemfile` (look for the `if NextRails.next?` / `else` block; the `next?` branch holds the upgraded-to version) or `Gemfile.next.lock`. Do NOT rely on `Gemfile.lock` alone, since during dual-boot it still pins the current version.
 
 ## When to Run
 
-Run when both are true:
+Run when the user has explicitly decided to **end the dual-boot phase** in one of two directions:
 
-- The user has explicitly decided to **stop the upgrade campaign** (final hop, or pausing for now).
-- The previous Rails version is no longer needed (no rollback window, no parallel branch).
+- **Keep next**: upgrade is done (final hop or stopping point), drop the `else` / current branches.
+- **Keep current**: abandoning or pausing this hop, drop the `if NextRails.next?` / next branches and `Gemfile.next*`.
 
-Deployment to production is not a hard prerequisite. If the user wants to remove dual-boot before deploying, that is their call.
+Either way the previous parallel branch must no longer be needed (no rollback window). Deployment to production is not a hard prerequisite.
 
 ## Ownership and Delegations
 
@@ -28,6 +28,7 @@ This skill **owns** the cleanup. Phase 1 below is the step list to follow. The `
 ## Critical Rules
 
 - **Do NOT leave `NextRails.next?` or `NextRails.current?` branches in the tree.** That is the failure mode this skill exists to prevent.
+- **Do NOT start removing branches before confirming direction.** Keeping the wrong side throws away the work the user wants to keep. If the user has not stated next vs current, ask.
 
 ## Workflow
 
