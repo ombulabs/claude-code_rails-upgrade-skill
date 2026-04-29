@@ -118,7 +118,7 @@ When proposing code fixes that must work with both the current and target Rails 
 - After the upgrade is shipped, **mention** the cleanup option. Do not run it automatically.
 - Example wording:
 
-  > Rails X.Y is in. When you're ready to remove dual-boot scaffolding (drop `NextRails.next?` / `NextRails.current?` branches, retire `Gemfile.next`, triage deprecations), ask me to clean up. If you're heading straight to the next hop, keeping dual-boot in place is also fine.
+  > Rails X.Y is in. When you're ready to remove dual-boot scaffolding (drop `NextRails.next?` / `NextRails.current?` branches, retire `Gemfile.next`), ask me to clean up. If you're heading straight to the next hop, keeping dual-boot in place is also fine.
 
 - The cleanup itself lives in the `upgrade-cleanup` companion plugin. Delegate to it when the user explicitly asks (e.g. "finish the upgrade", "clean up dual-boot", "drop the NextRails branches").
 
@@ -240,7 +240,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
 - `workflows/ci-sync-workflow.md` - **MANDATORY before opening the upgrade PR** - How to verify CI config matches the upgraded Gemfile
 - `workflows/app-update-preview-workflow.md` - How to generate app:update previews
-- **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding, drops `NextRails.next?` / `NextRails.current?` branches, triages deprecations on the new Rails version.
+- **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding and drops `NextRails.next?` / `NextRails.current?` branches. Deprecation triage stays with this skill for the next hop.
 
 ### Examples (Load when user needs clarification)
 - `examples/simple-upgrade.md` - Single-hop upgrade example
@@ -382,8 +382,9 @@ Claude runs detection directly using tools - NO script generation needed
 1. Tell the user the cleanup option exists
 2. Delegate to the upgrade-cleanup plugin only when the user explicitly asks
    ("finish the upgrade", "clean up dual-boot", "drop the NextRails branches")
-3. The cleanup plugin removes NextRails.next? / NextRails.current? branches,
-   retires dual-boot scaffolding, and triages deprecations on the new version.
+3. The cleanup plugin removes NextRails.next? / NextRails.current? branches
+   and retires dual-boot scaffolding. Deprecation triage stays with this
+   skill for the next hop, not with cleanup.
 ```
 
 ---
@@ -561,7 +562,7 @@ Before delivering, verify:
 13. **Always Use `NextRails.next?` for Dual-Boot Code** (NEVER use `respond_to?` for version branching. DELEGATE to the `dual-boot` skill for patterns and setup.)
 14. **Check CI Config Before Opening the PR** (run `workflows/ci-sync-workflow.md` to make sure every CI file matches the upgraded Gemfile — stale CI is the most common cause of red builds on upgrade PRs)
 15. **Align load_defaults After the Version Bump** (load_defaults update happens AFTER the Rails version upgrade is complete)
-16. **Mention, Don't Auto-Run, Cleanup** (after the upgrade ships, mention the `upgrade-cleanup` plugin. Delegate to it only when the user explicitly asks: "finish the upgrade", "clean up dual-boot", "drop the NextRails branches". Cleanup removes `NextRails.next?` / `NextRails.current?` branches, retires dual-boot scaffolding, and triages deprecations on the new version.)
+16. **Mention, Don't Auto-Run, Cleanup** (after the upgrade ships, mention the `upgrade-cleanup` plugin. Delegate to it only when the user explicitly asks: "finish the upgrade", "clean up dual-boot", "drop the NextRails branches". Cleanup removes `NextRails.next?` / `NextRails.current?` branches and retires dual-boot scaffolding. Deprecation triage stays with this skill for the next hop.)
 
 ---
 

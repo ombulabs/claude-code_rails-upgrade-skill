@@ -44,7 +44,7 @@ If unsure after inspection, ask: *"Should I run the pre-flight checks via Docker
 
 ### Step 2: Smoke-check both sides
 
-The commands below are shown for a local Ruby setup. If the project runs in Docker, prefix each command with the appropriate container runner (e.g. `docker compose run --rm web ...`). Try local first; fall back to Docker if local can't resolve the gems or boot the app.
+The commands below are shown for a local Ruby setup. If Step 1 settled on Docker, prefix each command with the appropriate container runner (e.g. `docker compose run --rm web ...`). If Step 1 was inconclusive and the user said "just try", run local first and fall back to Docker only if local can't resolve gems or boot the app.
 
 1. **Current side bundles:**
    ```sh
@@ -66,7 +66,7 @@ The commands below are shown for a local Ruby setup. If the project runs in Dock
 
 - **Next-side bundle fails:** `Gemfile.next` is stale or never validated. Cleanup is premature. Tell the user the upgrade campaign needs to finish first.
 - **Next-side rails runner fails but bundle succeeds:** boot regression on the new version. Tell the user; don't tear down the rollback path until it's fixed.
-- **Current-side bundle fails:** environment problem unrelated to the upgrade. Resolve before continuing — you don't want a half-broken environment during cleanup.
+- **Current-side bundle fails:** environment problem unrelated to the upgrade. Resolve before continuing, you don't want a half-broken environment during cleanup.
 
 If the user explicitly says *"skip the pre-flight, I know it works"*, record their override and continue. Their call.
 
@@ -74,7 +74,7 @@ If the user explicitly says *"skip the pre-flight, I know it works"*, record the
 
 ## Phase 1: Remove `NextRails.next?` / `NextRails.current?` Branches and Dual-Boot Scaffolding
 
-This skill owns these steps. The `dual-boot` skill's `workflows/cleanup-workflow.md` is older background reference.
+This skill owns these steps. The `dual-boot` skill's `workflows/cleanup-workflow.md` is older optional reading; if it conflicts, follow the steps below.
 
 1. Find all `NextRails.next?` and `NextRails.current?` references:
    ```sh
@@ -156,4 +156,4 @@ Keep them as separate commits so reviewers can see each cleanup pass in isolatio
 - If `Gemfile.next.lock` does not exist, dual-boot was never set up or is already cleaned. Skip Phase 1 and tell the user.
 - If `NextRails.next?` or `NextRails.current?` references appear inside vendored gems or `vendor/bundle/`, ignore them. Only application code matters.
 - Detect the target version from the `Gemfile`'s `if NextRails.next?` block or `Gemfile.next.lock`, not `Gemfile.lock`, which still holds the old version during dual-boot.
-- If the user wants to keep `next_rails` installed for the next hop, skip "Remove `next_rails` gem" in Phase 1 but still drop the `Gemfile.next` symlink and the `if next?` conditionals.
+- If the user wants to keep `next_rails` installed for the next hop, skip "Remove `next_rails` gem" in Phase 1 but still delete `Gemfile.next` and the `if next?` conditionals.
