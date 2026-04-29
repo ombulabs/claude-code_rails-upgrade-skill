@@ -38,9 +38,10 @@ This skill owns these steps. The `dual-boot` skill's `workflows/cleanup-workflow
 3. Remove the `next?` / `current?` method definitions from the `Gemfile`.
 4. Remove all `if next?` / `if current?` / `else` Gemfile conditionals (keep new-version gems).
 5. Remove the `next_rails` gem from the `Gemfile`.
-6. Replace `Gemfile.lock` with `Gemfile.next.lock` (`mv Gemfile.next.lock Gemfile.lock`), then delete `Gemfile.next`. This is the standard step. It preserves the exact gem versions tested during the upgrade. Do not run `bundle install` from scratch, since resolution drift can change versions you already validated.
-7. Run the test suite (project's detected runner; see dual-boot SKILL.md Key Principle #4).
-8. Update CI to drop the dual-boot job/matrix entry.
+6. Replace `Gemfile.lock` with `Gemfile.next.lock` (`mv Gemfile.next.lock Gemfile.lock`), then delete `Gemfile.next`. This is the standard step. It preserves the exact gem versions tested during the upgrade. Do not run `bundle update` or delete the lockfile to re-resolve from scratch — that risks drift on versions you already validated.
+7. Run `bundle install` (NOT `bundle update`). The swapped lockfile still pins `next_rails` and any other dual-boot-only gems because `Gemfile.next` listed them. `bundle install` is incremental: it removes references to gems no longer in the `Gemfile` without re-resolving the rest. `rails` and friends stay pinned.
+8. Run the test suite (project's detected runner; see dual-boot SKILL.md Key Principle #4).
+9. Update CI to drop the dual-boot job/matrix entry.
 
 **Sanity check after lockfile swap:** `git diff Gemfile.lock` to confirm the new Rails version is actually pinned. If `Gemfile.next.lock` was never regenerated during the upgrade, it can be byte-identical to the old `Gemfile.lock`. In that case the lock is stale. Flag it to the user and run `bundle install` to resolve.
 
@@ -62,9 +63,9 @@ Beyond `NextRails` branches, hunt for other version-conditional code that has go
 After upgrading to the target Rails version, certain artifacts gain a version suffix:
 
 1. **Migrations.** New migrations should subclass `ActiveRecord::Migration[X.Y]` where `X.Y` is the version that was upgraded *to*. Existing migrations keep their original suffix; do not rewrite history.
-2. **`db/schema.rb`.** Rails regenerates the schema header on the next `db:migrate` or `db:schema:dump`. Run it once and commit so the suffix matches the new version.
+2. **`db/schema.rb`.** Rails regenerates the schema header on the next `db:migrate` or `db:schema:dump`. Run it once and commit so the suffix matches the new version. If the local environment cannot reach a database (sandboxed shell, no DB service), defer the schema dump to a follow-up commit and flag it for the user. Do NOT hand-edit `ActiveRecord::Schema[X.Y]` in place — Rails regenerates the whole file, so a manual edit risks masking a real diff if any pending migration would alter the dump.
 3. **CI matrix.** Drop the old Rails version from any test matrix; you're not testing against it anymore.
-4. **`Dockerfile` / `Gemfile` Ruby pin.** If the upgrade required a Ruby bump, confirm the Dockerfile, `.tool-versions`, `.ruby-version`, and CI all agree.
+4. **`Dockerfile` / `Gemfile` Ruby pin.** If the upgrade required a Ruby bump, confirm the Dockerfile, `.tool-versions`, `.ruby-version`, and CI all agree. Distinguish drift introduced by this upgrade (fix in cleanup) from pre-existing drift that predates the upgrade (flag it for the user, but leave it out of scope — fixing unrelated infra in a cleanup PR muddies the diff).
 
 ---
 
@@ -99,6 +100,8 @@ Before declaring cleanup done:
 - [ ] `Gemfile.next` and `Gemfile.next.lock` are gone
 - [ ] No leftover `next_rails` gem in `Gemfile`
 - [ ] Deprecation warnings have been triaged
+
+If the local environment cannot run the test suite (no DB, sandboxed shell), CI on the cleanup branch is the validating environment. Commit and push the cleanup PR, then track Phase 6 as in-progress until CI is green. Do not block the commit/PR step on a local test run that cannot happen.
 
 ---
 
