@@ -101,7 +101,7 @@ Beyond `NextRails` branches, hunt for other version-conditional code that has go
 1. **Temporary monkey-patches and backports.** Search for files in `config/initializers/` named like `rails_X_Y_backport.rb`, `monkey_patches/`, or comments referencing the previous Rails version. Confirm with user before deleting.
 2. **Gem version pins tied to the old Rails.** Run `bundle outdated` and check for gems that were held back for compatibility. Loosen pins now that the constraint is gone.
 3. **Conditional `Gemfile` groups.** Anything keyed off the old Ruby/Rails version.
-4. **Dead config/initializers.** `new_framework_defaults_X_Y.rb` from a previous hop is fine to leave until Phase 4; older ones should already be gone.
+4. **Dead config/initializers.** Leave `new_framework_defaults_X_Y.rb` for the new version alone, the rails-upgrade skill's `load_defaults` step (via the `rails-load-defaults` skill) handles it. Older `new_framework_defaults_*.rb` files from prior hops should already be gone.
 5. **Documentation drift.** Sweep `README.md`, `CONTRIBUTING.md`, `bin/setup`, setup scripts, `.tool-versions`, and `Dockerfile` for stale Ruby/Rails version references. Update to the new baseline.
 
 ---
@@ -117,15 +117,7 @@ After upgrading to the target Rails version, certain artifacts gain a version su
 
 ---
 
-## Phase 4: Align `load_defaults`
-
-DELEGATE to the `rails-load-defaults` skill. That skill walks through each new framework default one at a time, runs tests between changes, and consolidates into `config/application.rb` when complete. Do NOT bump `load_defaults` to the new version in one shot, since the per-config tiered approach exists because some defaults silently change behavior.
-
-If the user says "skip load_defaults for now" or "we'll do it later," record it as a follow-up and continue. The cleanup is still useful without it.
-
----
-
-## Phase 5: Address Deprecation Warnings
+## Phase 4: Address Deprecation Warnings
 
 The new Rails version emits deprecation warnings for things that will break on the *next* hop. Fix them now while the context is fresh.
 
@@ -138,7 +130,7 @@ This is the single highest-leverage step before the next upgrade. A clean deprec
 
 ---
 
-## Phase 6: Final Verification
+## Phase 5: Final Verification
 
 Before declaring cleanup done:
 
@@ -150,11 +142,11 @@ Before declaring cleanup done:
 - [ ] Documentation reflects the new Ruby/Rails versions
 - [ ] Deprecation warnings have been triaged
 
-If the local environment cannot run the test suite (no DB, sandboxed shell), CI on the cleanup branch is the validating environment. Commit and push the cleanup PR, then track Phase 6 as in-progress until CI is green. Do not block the commit/PR step on a local test run that cannot happen.
+If the local environment cannot run the test suite (no DB, sandboxed shell), CI on the cleanup branch is the validating environment. Commit and push the cleanup PR, then track Phase 5 as in-progress until CI is green. Do not block the commit/PR step on a local test run that cannot happen.
 
 ---
 
-## Phase 7: Commit and Open the PR
+## Phase 6: Commit and Open the PR
 
 A dedicated cleanup PR is the recommended default. The diff reads as "remove scaffolding," nothing else, which makes review fast. If the user prefers to fold it into another branch, that is their call.
 
@@ -162,7 +154,6 @@ Suggested commit messages:
 
 - `Remove dual-boot setup after Rails X.Y upgrade`
 - `Drop NextRails.next? / NextRails.current? branches`
-- `Bump load_defaults to X.Y`
 - `Fix Rails X.Y deprecation warnings`
 
 Keep them as separate commits so reviewers can see each cleanup pass in isolation.

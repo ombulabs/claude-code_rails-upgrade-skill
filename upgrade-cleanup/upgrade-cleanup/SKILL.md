@@ -23,11 +23,11 @@ Deployment to production is not a hard prerequisite. If the user wants to remove
 This skill **owns** the cleanup. Phase 1 below is the canonical step list. The `dual-boot` skill's `workflows/cleanup-workflow.md` is older background reference; if it drifts from this workflow, this workflow wins.
 
 - **Dual-boot scaffolding removal**: performed here in Phase 1.
-- **`load_defaults` alignment**: DELEGATE to the `rails-load-defaults` skill, which walks each new framework default one at a time with tests in between.
+- **`load_defaults` alignment**: out of scope. The `rails-upgrade` skill handles this via its `rails-load-defaults` step before cleanup runs.
 
 ## Critical Rules
 
-- **Do NOT silence deprecation warnings.** Phase 5 fixes them, not hides them. They become breaking changes on the next hop.
+- **Do NOT silence deprecation warnings.** Phase 4 fixes them, not hides them. They become breaking changes on the next hop.
 - **Do NOT leave `NextRails.next?` or `NextRails.current?` branches in the tree.** That is the failure mode this skill exists to prevent.
 
 ## Workflow
@@ -38,14 +38,12 @@ See `workflows/upgrade-cleanup-workflow.md` for the full process:
 1. Remove `NextRails.next?` / `NextRails.current?` branches and dual-boot scaffolding
 2. Retire old-version code (monkey-patches, gem pins, conditional Gemfile groups)
 3. Version-specific housekeeping (migration class suffix, schema dump, CI matrix, Ruby pin)
-4. Align `load_defaults` (delegated to `rails-load-defaults`)
-5. Address deprecation warnings emitted by the new Rails version
-6. Final verification (test suite, CI green, no `NextRails.next?` / `NextRails.current?` left)
-7. Commit and open the cleanup PR
+4. Address deprecation warnings emitted by the new Rails version
+5. Final verification (test suite, CI green, no `NextRails.next?` / `NextRails.current?` left)
+6. Commit and open the cleanup PR
 
 ## Reference
 
 - [Finishing an Upgrade, FastRuby.io](https://www.fastruby.io/blog/finishing-an-upgrade.html)
 - `workflows/upgrade-cleanup-workflow.md`, full workflow
 - The `dual-boot` plugin's `workflows/cleanup-workflow.md`, background only
-- The `rails-load-defaults` plugin, Phase 4
