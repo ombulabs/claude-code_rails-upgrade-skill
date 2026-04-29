@@ -2,7 +2,7 @@
 
 Run when the user is done with the upgrade campaign and wants to remove dual-boot scaffolding. Aligns the codebase to the new version baseline.
 
-Based on FastRuby.io's [Finishing an Upgrade](https://www.fastruby.io/blog/finishing-an-upgrade.html) methodology.
+Based on FastRuby.io's [Finishing an Upgrade](https://www.fastruby.io/blog/finishing-an-upgrade.html) methodology. Henrique's rule of thumb: **never start the next hop with `NextRails.next?` branches still in the tree.** They accumulate, lose context, and make the next dual-boot impossible to reason about.
 
 ---
 
@@ -102,6 +102,7 @@ Beyond `NextRails` branches, hunt for other version-conditional code that has go
 2. **Gem version pins tied to the old Rails.** Run `bundle outdated` and check for gems that were held back for compatibility. Loosen pins now that the constraint is gone.
 3. **Conditional `Gemfile` groups.** Anything keyed off the old Ruby/Rails version.
 4. **Dead config/initializers.** `new_framework_defaults_X_Y.rb` from a previous hop is fine to leave until Phase 4; older ones should already be gone.
+5. **Documentation drift.** Sweep `README.md`, `CONTRIBUTING.md`, `bin/setup`, setup scripts, `.tool-versions`, and `Dockerfile` for stale Ruby/Rails version references. Update to the new baseline.
 
 ---
 
@@ -145,7 +146,8 @@ Before declaring cleanup done:
 - [ ] CI is green on the cleanup branch
 - [ ] `grep -rE "NextRails\.(next|current)\?" . --include="*.rb"` returns nothing
 - [ ] `Gemfile.next` and `Gemfile.next.lock` are gone
-- [ ] No leftover `next_rails` gem in `Gemfile`
+- [ ] No leftover `next_rails` gem in `Gemfile` (unless explicitly kept for the next hop)
+- [ ] Documentation reflects the new Ruby/Rails versions
 - [ ] Deprecation warnings have been triaged
 
 If the local environment cannot run the test suite (no DB, sandboxed shell), CI on the cleanup branch is the validating environment. Commit and push the cleanup PR, then track Phase 6 as in-progress until CI is green. Do not block the commit/PR step on a local test run that cannot happen.
@@ -177,6 +179,8 @@ Keep them as separate commits so reviewers can see each cleanup pass in isolatio
 
 ## Notes for Claude
 
+- Treat every destructive step (`rm`, lockfile replacement, gem removal, CI edits) as needing user confirmation. The workflow is reversible only via git, so move slowly.
 - If `Gemfile.next.lock` does not exist, dual-boot was never set up or is already cleaned. Skip Phase 1 and tell the user.
 - If `NextRails.next?` or `NextRails.current?` references appear inside vendored gems or `vendor/bundle/`, ignore them. Only application code matters.
 - Detect the target version from the `Gemfile`'s `if NextRails.next?` block or `Gemfile.next.lock`, not `Gemfile.lock`, which still holds the old version during dual-boot.
+- If the user wants to keep `next_rails` installed for the next hop, skip "Remove `next_rails` gem" in Phase 1 but still drop the `Gemfile.next` symlink and the `if next?` conditionals.
