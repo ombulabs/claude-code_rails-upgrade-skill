@@ -105,7 +105,7 @@ Beyond `NextRails` branches, hunt for other version-conditional code that has go
 
 ---
 
-## Phase 3: Version-Specific Housekeeping
+## Phase 3: CI and Ruby Pin Alignment
 
 Tighten the build/test surface around the new version:
 

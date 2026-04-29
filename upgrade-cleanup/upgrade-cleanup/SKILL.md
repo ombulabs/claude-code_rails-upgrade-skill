@@ -31,7 +31,7 @@ This skill **owns** the cleanup. Phase 1 below is the step list to follow. The `
 
 ## Workflow
 
-See `workflows/upgrade-cleanup-workflow.md` for the full process: a pre-flight check, dual-boot scaffolding removal, old-version code retirement, version housekeeping, final verification, and the cleanup PR.
+See `workflows/upgrade-cleanup-workflow.md` for the full process: a pre-flight check, dual-boot scaffolding removal, old-version code retirement, CI and Ruby pin alignment, final verification, and the cleanup PR.
 
 ## Reference
 
