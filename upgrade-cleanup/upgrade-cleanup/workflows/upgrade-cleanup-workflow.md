@@ -142,12 +142,6 @@ Keep them as separate commits so reviewers can see each cleanup pass in isolatio
 
 ---
 
-## Next Steps (Out of Scope)
-
-After cleanup ships, the next Rails version on this app will emit deprecation warnings for APIs that break in the version after that. Triaging them is cheapest while the context is fresh, but it lives in the rails-upgrade skill's next-hop workflow, not here. Flag it as a follow-up so the user does not lose track.
-
----
-
 ## What This Workflow Does NOT Do
 
 - It does not roll back the upgrade. There is no rollback path here.
