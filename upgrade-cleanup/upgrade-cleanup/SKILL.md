@@ -31,17 +31,10 @@ This skill **owns** the cleanup. Phase 1 below is the canonical step list. The `
 
 ## Workflow
 
-See `workflows/upgrade-cleanup-workflow.md` for the full process:
-
-0. Pre-flight: detect run environment (Docker vs local), smoke-check that both sides bundle and the app boots on each. Stop if the next side has rotted.
-1. Remove `NextRails.next?` / `NextRails.current?` branches and dual-boot scaffolding
-2. Retire old-version code (monkey-patches, gem pins, conditional Gemfile groups, doc drift)
-3. Version-specific housekeeping (CI matrix, Dockerfile / Ruby pin)
-4. Final verification (test suite, CI green, no `NextRails.next?` / `NextRails.current?` left)
-5. Commit and open the cleanup PR
+See `workflows/upgrade-cleanup-workflow.md` for the full process: a pre-flight check, dual-boot scaffolding removal, old-version code retirement, version housekeeping, final verification, and the cleanup PR.
 
 ## Reference
 
 - [Finishing an Upgrade, FastRuby.io](https://www.fastruby.io/blog/finishing-an-upgrade.html)
 - `workflows/upgrade-cleanup-workflow.md`, full workflow
-- The `dual-boot` plugin's `workflows/cleanup-workflow.md`, background only
+- The `dual-boot` plugin's `workflows/cleanup-workflow.md`, optional reading for context. This skill's Phase 1 is the canonical step list, do not follow dual-boot's version when it conflicts.
