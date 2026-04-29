@@ -2,7 +2,7 @@
 
 Run when the user is done with the upgrade campaign and wants to remove dual-boot scaffolding. Aligns the codebase to the new version baseline.
 
-Based on FastRuby.io's [Finishing an Upgrade](https://www.fastruby.io/blog/finishing-an-upgrade.html) methodology. Henrique's rule of thumb: **never start the next hop with `NextRails.next?` branches still in the tree.** They accumulate, lose context, and make the next dual-boot impossible to reason about.
+Based on FastRuby.io's [Finishing an Upgrade](https://www.fastruby.io/blog/finishing-an-upgrade.html) methodology. Rule of thumb: **never start the next hop with `NextRails.next?` branches still in the tree.** They accumulate, lose context, and make the next dual-boot impossible to reason about.
 
 ---
 
