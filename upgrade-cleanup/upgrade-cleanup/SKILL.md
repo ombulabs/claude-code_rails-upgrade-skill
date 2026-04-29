@@ -20,7 +20,7 @@ Deployment to production is not a hard prerequisite. If the user wants to remove
 
 ## Ownership and Delegations
 
-This skill **owns** the cleanup. Phase 1 below is the canonical step list. The `dual-boot` skill's `workflows/cleanup-workflow.md` is older background reference; if it drifts from this workflow, this workflow wins.
+This skill **owns** the cleanup. Phase 1 below is the step list to follow. The `dual-boot` skill's `workflows/cleanup-workflow.md` is older optional reading; if it drifts from this workflow, this workflow wins.
 
 - **Dual-boot scaffolding removal**: performed here in Phase 1.
 - **`load_defaults` alignment**: out of scope. The `rails-upgrade` skill handles this via its `rails-load-defaults` step before cleanup runs.
@@ -37,4 +37,4 @@ See `workflows/upgrade-cleanup-workflow.md` for the full process: a pre-flight c
 
 - [Finishing an Upgrade, FastRuby.io](https://www.fastruby.io/blog/finishing-an-upgrade.html)
 - `workflows/upgrade-cleanup-workflow.md`, full workflow
-- The `dual-boot` plugin's `workflows/cleanup-workflow.md`, optional reading for context. This skill's Phase 1 is the canonical step list, do not follow dual-boot's version when it conflicts.
+- The `dual-boot` plugin's `workflows/cleanup-workflow.md`, optional reading for context. This skill's Phase 1 is the step list to follow, do not use dual-boot's version when it conflicts.
