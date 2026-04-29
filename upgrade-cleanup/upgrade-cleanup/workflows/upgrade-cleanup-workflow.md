@@ -81,13 +81,13 @@ This skill owns these steps. The `dual-boot` skill's `workflows/cleanup-workflow
    grep -rE "NextRails\.(next|current)\?" . --include="*.rb" -l
    ```
    Both helpers ship with the `next_rails` gem and need to be removed.
-2. Keep only the `if NextRails.next?` (true) branch and drop the `else`. Ternaries collapse to the true value too. For example, `config.load_defaults NextRails.next? ? 8.0 : 7.0` becomes `config.load_defaults 8.0`. For `NextRails.current?`, drop the `if current?` block entirely (it was the old-version branch).
-3. Remove the `next?` / `current?` method definitions from the `Gemfile`.
-4. Remove all `if next?` / `if current?` / `else` Gemfile conditionals (keep new-version gems).
+2. Keep only the `if NextRails.next?` (true) branch and drop the `else`. Ternaries collapse to the true value too. For example, `config.load_defaults NextRails.next? ? 8.0 : 7.0` becomes `config.load_defaults 8.0`. For `NextRails.current?`, drop the `if NextRails.current?` block entirely (it was the old-version branch).
+3. Remove the `next?` method definition from the `Gemfile`. (Only `next?` is defined locally in the Gemfile, application code uses `NextRails.next?` / `NextRails.current?` from the gem.)
+4. Remove all `if next?` / `else` conditionals from the `Gemfile` (keep new-version gems).
 5. Remove the `next_rails` gem from the `Gemfile`.
-6. Replace `Gemfile.lock` with `Gemfile.next.lock` (`mv Gemfile.next.lock Gemfile.lock`), then delete `Gemfile.next`. This is the standard step. It preserves the exact gem versions tested during the upgrade. Do not run `bundle update` or delete the lockfile to re-resolve from scratch — that risks drift on versions you already validated.
+6. Replace `Gemfile.lock` with `Gemfile.next.lock` (`mv Gemfile.next.lock Gemfile.lock`), then delete `Gemfile.next`. This is the standard step. It preserves the exact gem versions tested during the upgrade. Do not run `bundle update` or delete the lockfile to re-resolve from scratch, that risks drift on versions you already validated.
 7. Run `bundle install` (NOT `bundle update`). The swapped lockfile still pins `next_rails` and any other dual-boot-only gems because `Gemfile.next` listed them. `bundle install` is incremental: it removes references to gems no longer in the `Gemfile` without re-resolving the rest. `rails` and friends stay pinned.
-8. Run the test suite (project's detected runner; see dual-boot SKILL.md Key Principle #4).
+8. Run the project's test suite (detect the runner from the `Gemfile`: `rspec-rails` means `bundle exec rspec`, otherwise `bundle exec rake test` or `bin/rails test`).
 9. Update CI to drop the dual-boot job/matrix entry.
 
 **Sanity check after lockfile swap:** `git diff Gemfile.lock` to confirm the new Rails version is actually pinned. If `Gemfile.next.lock` was never regenerated during the upgrade, it can be byte-identical to the old `Gemfile.lock`. In that case the lock is stale. Flag it to the user and run `bundle install` to resolve.
@@ -101,36 +101,20 @@ Beyond `NextRails` branches, hunt for other version-conditional code that has go
 1. **Temporary monkey-patches and backports.** Search for files in `config/initializers/` named like `rails_X_Y_backport.rb`, `monkey_patches/`, or comments referencing the previous Rails version. Confirm with user before deleting.
 2. **Gem version pins tied to the old Rails.** Run `bundle outdated` and check for gems that were held back for compatibility. Loosen pins now that the constraint is gone.
 3. **Conditional `Gemfile` groups.** Anything keyed off the old Ruby/Rails version.
-4. **Dead config/initializers.** Leave `new_framework_defaults_X_Y.rb` for the new version alone, the rails-upgrade skill's `load_defaults` step (via the `rails-load-defaults` skill) handles it. Older `new_framework_defaults_*.rb` files from prior hops should already be gone.
-5. **Documentation drift.** Sweep `README.md`, `CONTRIBUTING.md`, `bin/setup`, setup scripts, `.tool-versions`, and `Dockerfile` for stale Ruby/Rails version references. Update to the new baseline.
+4. **Documentation drift.** Sweep `README.md`, `CONTRIBUTING.md`, `bin/setup`, setup scripts, `.tool-versions`, and `Dockerfile` for stale Ruby/Rails version references. Update to the new baseline.
 
 ---
 
 ## Phase 3: Version-Specific Housekeeping
 
-After upgrading to the target Rails version, certain artifacts gain a version suffix:
+Tighten the build/test surface around the new version:
 
-1. **Migrations.** New migrations should subclass `ActiveRecord::Migration[X.Y]` where `X.Y` is the version that was upgraded *to*. Existing migrations keep their original suffix; do not rewrite history.
-2. **`db/schema.rb`.** Rails regenerates the schema header on the next `db:migrate` or `db:schema:dump`. Run it once and commit so the suffix matches the new version. If the local environment cannot reach a database (sandboxed shell, no DB service), defer the schema dump to a follow-up commit and flag it for the user. Do NOT hand-edit `ActiveRecord::Schema[X.Y]` in place — Rails regenerates the whole file, so a manual edit risks masking a real diff if any pending migration would alter the dump.
-3. **CI matrix.** Drop the old Rails version from any test matrix; you're not testing against it anymore.
-4. **`Dockerfile` / `Gemfile` Ruby pin.** If the upgrade required a Ruby bump, confirm the Dockerfile, `.tool-versions`, `.ruby-version`, and CI all agree. Distinguish drift introduced by this upgrade (fix in cleanup) from pre-existing drift that predates the upgrade (flag it for the user, but leave it out of scope — fixing unrelated infra in a cleanup PR muddies the diff).
+1. **CI matrix.** Drop the old Rails version from any test matrix; you're not testing against it anymore.
+2. **`Dockerfile` / `Gemfile` Ruby pin.** If the upgrade required a Ruby bump, confirm the Dockerfile, `.tool-versions`, `.ruby-version`, and CI all agree. Distinguish drift introduced by this upgrade (fix in cleanup) from pre-existing drift that predates the upgrade (flag it for the user, but leave it out of scope, fixing unrelated infra in a cleanup PR muddies the diff).
 
 ---
 
-## Phase 4: Address Deprecation Warnings
-
-The new Rails version emits deprecation warnings for things that will break on the *next* hop. Fix them now while the context is fresh.
-
-1. Confirm deprecations are visible (see `dual-boot` skill's `references/deprecation-tracking.md` for the config knobs).
-2. Run the test suite and capture deprecation output.
-3. Fix call sites directly **without** wrapping them in `NextRails.next?`. The new API works on the current version, so a plain migration is correct. (See `dual-boot/references/code-patterns.md` "When NOT to Branch: Deprecations".)
-4. Re-run tests. Repeat until the deprecation noise is gone or down to a known list the user accepts.
-
-This is the single highest-leverage step before the next upgrade. A clean deprecation log on version X is the prerequisite for a sane dual-boot to version X+1.
-
----
-
-## Phase 5: Final Verification
+## Phase 4: Final Verification
 
 Before declaring cleanup done:
 
@@ -140,13 +124,12 @@ Before declaring cleanup done:
 - [ ] `Gemfile.next` and `Gemfile.next.lock` are gone
 - [ ] No leftover `next_rails` gem in `Gemfile` (unless explicitly kept for the next hop)
 - [ ] Documentation reflects the new Ruby/Rails versions
-- [ ] Deprecation warnings have been triaged
 
-If the local environment cannot run the test suite (no DB, sandboxed shell), CI on the cleanup branch is the validating environment. Commit and push the cleanup PR, then track Phase 5 as in-progress until CI is green. Do not block the commit/PR step on a local test run that cannot happen.
+If the local environment cannot run the test suite (no DB, sandboxed shell), CI on the cleanup branch is the validating environment. Commit and push the cleanup PR, then track Phase 4 as in-progress until CI is green. Do not block the commit/PR step on a local test run that cannot happen.
 
 ---
 
-## Phase 6: Commit and Open the PR
+## Phase 5: Commit and Open the PR
 
 A dedicated cleanup PR is the recommended default. The diff reads as "remove scaffolding," nothing else, which makes review fast. If the user prefers to fold it into another branch, that is their call.
 
@@ -154,17 +137,22 @@ Suggested commit messages:
 
 - `Remove dual-boot setup after Rails X.Y upgrade`
 - `Drop NextRails.next? / NextRails.current? branches`
-- `Fix Rails X.Y deprecation warnings`
 
 Keep them as separate commits so reviewers can see each cleanup pass in isolation.
+
+---
+
+## Next Steps (Out of Scope)
+
+After cleanup ships, the next Rails version on this app will emit deprecation warnings for APIs that break in the version after that. Triaging them is cheapest while the context is fresh, but it lives in the rails-upgrade skill's next-hop workflow, not here. Flag it as a follow-up so the user does not lose track.
 
 ---
 
 ## What This Workflow Does NOT Do
 
 - It does not roll back the upgrade. There is no rollback path here.
-- It does not start the next version hop. After cleanup, the user invokes the upgrade flow again for the next version.
-- It does not silence deprecations. If the user wants to defer them, that is a project decision, not a cleanup decision.
+- It does not start the next version hop. After cleanup, the user invokes the rails-upgrade skill again for the next version.
+- It does not triage deprecation warnings. Those belong to the rails-upgrade skill's next-hop workflow.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: upgrade-cleanup
-description: Clean up after a Rails upgrade. Drop NextRails.next? and NextRails.current? branches, retire dual-boot scaffolding (Gemfile.next, Gemfile.next.lock, conditional Gemfile groups), and triage deprecations on the upgraded version. Trigger when the user says they are done with the upgrade, want to clean up dual-boot, want to drop NextRails branches, or want to finish the upgrade. Based on FastRuby.io's "Finishing an Upgrade" methodology.
+description: Clean up after a Rails upgrade. Drop NextRails.next? and NextRails.current? branches and retire dual-boot scaffolding (Gemfile.next, Gemfile.next.lock, conditional Gemfile groups). Trigger when the user says they are done with the upgrade, want to clean up dual-boot, want to drop NextRails branches, or want to finish the upgrade. Based on FastRuby.io's "Finishing an Upgrade" methodology.
 ---
 
 # Upgrade Cleanup Skill
@@ -27,7 +27,6 @@ This skill **owns** the cleanup. Phase 1 below is the canonical step list. The `
 
 ## Critical Rules
 
-- **Do NOT silence deprecation warnings.** Phase 4 fixes them, not hides them. They become breaking changes on the next hop.
 - **Do NOT leave `NextRails.next?` or `NextRails.current?` branches in the tree.** That is the failure mode this skill exists to prevent.
 
 ## Workflow
@@ -36,11 +35,10 @@ See `workflows/upgrade-cleanup-workflow.md` for the full process:
 
 0. Pre-flight: detect run environment (Docker vs local), smoke-check that both sides bundle and the app boots on each. Stop if the next side has rotted.
 1. Remove `NextRails.next?` / `NextRails.current?` branches and dual-boot scaffolding
-2. Retire old-version code (monkey-patches, gem pins, conditional Gemfile groups)
-3. Version-specific housekeeping (migration class suffix, schema dump, CI matrix, Ruby pin)
-4. Address deprecation warnings emitted by the new Rails version
-5. Final verification (test suite, CI green, no `NextRails.next?` / `NextRails.current?` left)
-6. Commit and open the cleanup PR
+2. Retire old-version code (monkey-patches, gem pins, conditional Gemfile groups, doc drift)
+3. Version-specific housekeeping (CI matrix, Dockerfile / Ruby pin)
+4. Final verification (test suite, CI green, no `NextRails.next?` / `NextRails.current?` left)
+5. Commit and open the cleanup PR
 
 ## Reference
 
