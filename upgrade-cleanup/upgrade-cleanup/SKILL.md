@@ -34,6 +34,7 @@ This skill **owns** the cleanup. Phase 1 below is the canonical step list. The `
 
 See `workflows/upgrade-cleanup-workflow.md` for the full process:
 
+0. Pre-flight: detect run environment (Docker vs local), smoke-check that both sides bundle and the app boots on each. Stop if the next side has rotted.
 1. Remove `NextRails.next?` / `NextRails.current?` branches and dual-boot scaffolding
 2. Retire old-version code (monkey-patches, gem pins, conditional Gemfile groups)
 3. Version-specific housekeeping (migration class suffix, schema dump, CI matrix, Ruby pin)

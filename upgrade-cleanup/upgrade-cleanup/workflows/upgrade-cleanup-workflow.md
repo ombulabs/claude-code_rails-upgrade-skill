@@ -25,6 +25,53 @@ Deployment to production is not required. If the user wants to clean up before d
 
 ---
 
+## Phase 0: Pre-flight
+
+Tearing down `Gemfile.next` is destructive. Before starting, confirm the dual-boot setup is *currently* functional. If the next side has rotted (bundle fails, app won't boot), the upgrade campaign isn't actually done and cleanup is premature. Stop and tell the user.
+
+### Step 1: Detect how the app runs
+
+Inspect the repo to infer the run environment, then **ask the user** if anything is ambiguous. Do not guess.
+
+| Signal | Implication |
+|---|---|
+| `Dockerfile` + `docker-compose.yml` (or `compose.yaml`) with a Rails service | App likely runs in Docker. Smoke checks should run via `docker compose run --rm <service> <cmd>`. |
+| `bin/dev` or `Procfile.dev` | Local dev with foreman/overmind. Bundler runs locally. |
+| `.tool-versions` / `.ruby-version` matches local Ruby, no Docker rails service | Local. Run commands directly. |
+| Multiple options present (e.g. Dockerfile for prod, local for dev) | ASK the user which path to validate against. |
+
+If unsure after inspection, ask: *"Should I run the pre-flight checks via Docker (`docker compose run --rm <svc> ...`) or locally (`bundle ...` directly)?"* Do not pick one silently.
+
+### Step 2: Smoke-check both sides
+
+Run on the chosen execution path. Replace `<run>` with the prefix from Step 1 (empty for local, `docker compose run --rm web` for Docker, etc.).
+
+1. **Current side bundles:**
+   ```sh
+   <run> bundle check || <run> bundle install
+   ```
+2. **Next side bundles:**
+   ```sh
+   <run> env BUNDLE_GEMFILE=Gemfile.next bundle check \
+     || <run> env BUNDLE_GEMFILE=Gemfile.next bundle install
+   ```
+3. **App boots on both sides** (catches initializer / autoload / gem-API regressions that bundle alone misses). Skip only if a database is genuinely unreachable from the run environment:
+   ```sh
+   <run> bin/rails runner "puts Rails.version"
+   <run> env BUNDLE_GEMFILE=Gemfile.next bin/rails runner "puts Rails.version"
+   ```
+   The next-side output should match the upgraded-to version.
+
+### Stop conditions
+
+- **Next-side bundle fails:** `Gemfile.next` is stale or never validated. Cleanup is premature. Tell the user the upgrade campaign needs to finish first.
+- **Next-side rails runner fails but bundle succeeds:** boot regression on the new version. Tell the user; don't tear down the rollback path until it's fixed.
+- **Current-side bundle fails:** environment problem unrelated to the upgrade. Resolve before continuing — you don't want a half-broken environment during cleanup.
+
+If the user explicitly says *"skip the pre-flight, I know it works"*, record their override and continue. Their call.
+
+---
+
 ## Phase 1: Remove `NextRails.next?` / `NextRails.current?` Branches and Dual-Boot Scaffolding
 
 This skill owns these steps. The `dual-boot` skill's `workflows/cleanup-workflow.md` is older background reference.
