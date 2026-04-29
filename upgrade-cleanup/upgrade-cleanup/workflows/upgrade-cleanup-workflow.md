@@ -44,21 +44,21 @@ If unsure after inspection, ask: *"Should I run the pre-flight checks via Docker
 
 ### Step 2: Smoke-check both sides
 
-Run on the chosen execution path. Replace `<run>` with the prefix from Step 1 (empty for local, `docker compose run --rm web` for Docker, etc.).
+The commands below are shown for a local Ruby setup. If the project runs in Docker, prefix each command with the appropriate container runner (e.g. `docker compose run --rm web ...`). Try local first; fall back to Docker if local can't resolve the gems or boot the app.
 
 1. **Current side bundles:**
    ```sh
-   <run> bundle check || <run> bundle install
+   bundle check || bundle install
    ```
 2. **Next side bundles:**
    ```sh
-   <run> env BUNDLE_GEMFILE=Gemfile.next bundle check \
-     || <run> env BUNDLE_GEMFILE=Gemfile.next bundle install
+   BUNDLE_GEMFILE=Gemfile.next bundle check \
+     || BUNDLE_GEMFILE=Gemfile.next bundle install
    ```
 3. **App boots on both sides** (catches initializer / autoload / gem-API regressions that bundle alone misses). Skip only if a database is genuinely unreachable from the run environment:
    ```sh
-   <run> bin/rails runner "puts Rails.version"
-   <run> env BUNDLE_GEMFILE=Gemfile.next bin/rails runner "puts Rails.version"
+   bin/rails runner "puts Rails.version"
+   BUNDLE_GEMFILE=Gemfile.next bin/rails runner "puts Rails.version"
    ```
    The next-side output should match the upgraded-to version.
 
