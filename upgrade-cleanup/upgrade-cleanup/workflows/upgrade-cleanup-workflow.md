@@ -107,13 +107,18 @@ Each step indicates the action for **keep next** vs **keep current**, per Phase 
 4. Collapse `if next?` / `else` conditionals in the `Gemfile` (remove the wrapper, keep one side's gems unconditional):
    - **Keep next:** keep the next-version gems (the `if next?` branch).
    - **Keep current:** keep the current-version gems (the `else` branch).
-5. Remove the `next_rails` gem from the `Gemfile` (both directions). If the user wants to keep `next_rails` for the next hop, skip this step and tell them.
-6. Reconcile lockfiles based on direction. Either path leaves both `Gemfile.next` and `Gemfile.next.lock` gone from the tree:
+5. **Before removing `next_rails`, sweep for `deprecation_tracker` residue.** The gem ships a `DeprecationTracker` library that projects often wire into RSpec setup. If you remove the gem first, the test boot blows up with `LoadError: cannot load such file -- deprecation_tracker` and you discover the residue by failure. Cheaper to detect it up front and tear it down alongside the gem:
+   ```sh
+   grep -rnE "deprecation_tracker|DeprecationTracker|DEPRECATION_TRACKER" spec/ test/ 2>/dev/null
+   ```
+   Drop any `require "deprecation_tracker"`, `DeprecationTracker.track_rspec(...)` (often gated on `ENV["DEPRECATION_TRACKER"]`), and the associated `spec/support/deprecation_warning.shitlist.json` if it exists. Skip this sweep if the user opted to keep `next_rails`.
+6. Remove the `next_rails` gem from the `Gemfile` (both directions). If the user wants to keep `next_rails` for the next hop, skip this step and tell them.
+7. Reconcile lockfiles based on direction. Either path leaves both `Gemfile.next` and `Gemfile.next.lock` gone from the tree:
    - **Keep next:** replace `Gemfile.lock` with `Gemfile.next.lock` (`mv Gemfile.next.lock Gemfile.lock`, which also removes `Gemfile.next.lock` from its old path), then delete `Gemfile.next`. This preserves the exact gem versions tested during the upgrade. Do not run `bundle update` or delete the lockfile to re-resolve from scratch, that risks drift on versions you already validated.
    - **Keep current:** delete `Gemfile.next` and `Gemfile.next.lock`. Leave `Gemfile.lock` alone, it already pins the current version.
-7. Run `bundle install` (NOT `bundle update`). `bundle install` is incremental: it removes references to gems no longer in the `Gemfile` (such as `next_rails` and any dual-boot-only gems) without re-resolving the rest. Rails and friends stay pinned.
-8. Run the project's test suite (detect the runner from the `Gemfile`: `rspec-rails` means `bundle exec rspec`, otherwise `bundle exec rake test` or `bin/rails test`).
-9. Update CI to drop the dual-boot job/matrix entry.
+8. Run `bundle install` (NOT `bundle update`). `bundle install` is incremental: it removes references to gems no longer in the `Gemfile` (such as `next_rails` and any dual-boot-only gems) without re-resolving the rest. Rails and friends stay pinned.
+9. Run the project's test suite (detect the runner from the `Gemfile`: `rspec-rails` means `bundle exec rspec`, otherwise `bundle exec rake test` or `bin/rails test`).
+10. Update CI to drop the dual-boot job/matrix entry.
 
 **Sanity check (keep next only):** after the lockfile swap, run `git diff Gemfile.lock` to confirm the new Rails version is actually pinned. If `Gemfile.next.lock` was never regenerated during the upgrade, it can be byte-identical to the old `Gemfile.lock`. In that case the lock is stale. Flag it to the user and run `bundle install` to resolve.
 
@@ -130,7 +135,13 @@ Beyond `NextRails` branches, hunt for version-conditional code that no longer ap
    - **Keep next:** loosen pins held back for current-version compatibility, the constraint is gone.
    - **Keep current:** revert any pins that were bumped in anticipation of the next version, if they break the current version.
 3. **Conditional `Gemfile` groups.** Drop groups keyed off the version being dropped (direction-symmetric: keep next → drop current-version groups; keep current → drop next-version groups).
-4. **Documentation drift.** Sweep `README.md`, `CONTRIBUTING.md`, `bin/setup`, setup scripts, `.tool-versions`, and `Dockerfile` for stale Ruby/Rails references.
+4. **`docker-compose.yml` / `compose.yaml` sister services.** Dual-boot setups commonly add a parallel service (e.g. `web-next`, `worker-next`) that sets `BUNDLE_GEMFILE: Gemfile.next` and reuses the primary service via YAML anchors. These break once `Gemfile.next` is gone. Grep both compose files:
+   ```sh
+   grep -nE "BUNDLE_GEMFILE.*Gemfile\.next|-next:" docker-compose.yml compose.yaml 2>/dev/null
+   ```
+   - **Keep next:** drop the `*-next` service definitions; if the *primary* service was the one carrying `BUNDLE_GEMFILE: Gemfile.next`, unset that env var instead of deleting the service.
+   - **Keep current:** drop the `*-next` service definitions outright.
+5. **Documentation drift.** Sweep `README.md`, `CONTRIBUTING.md`, `bin/setup`, setup scripts, `.tool-versions`, and `Dockerfile` for stale Ruby/Rails references.
    - **Keep next:** update to the new baseline.
    - **Keep current:** revert any docs that were updated to the next version prematurely.
 
