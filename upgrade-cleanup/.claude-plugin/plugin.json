@@ -1,0 +1,21 @@
+{
+  "name": "upgrade-cleanup",
+  "version": "0.1.0",
+  "description": "Clean up after a Rails upgrade. Drops NextRails.next? / NextRails.current? branches and retires dual-boot scaffolding (Gemfile.next, conditional Gemfile groups, dual-boot CI job).",
+  "skills": "./upgrade-cleanup/",
+  "author": {
+    "name": "OmbuLabs",
+    "url": "https://github.com/ombulabs"
+  },
+  "repository": "https://github.com/ombulabs/claude-code_rails-upgrade-skill",
+  "license": "MIT",
+  "keywords": [
+    "ruby",
+    "rails",
+    "upgrade",
+    "cleanup",
+    "next_rails",
+    "dual-boot",
+    "fastruby"
+  ]
+}
