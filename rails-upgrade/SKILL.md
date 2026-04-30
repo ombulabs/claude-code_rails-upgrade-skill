@@ -179,7 +179,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 
 ### External Dependencies
 - **dual-boot skill** - Dual-boot setup and management with next_rails (Step 2) (https://github.com/ombulabs/claude-code_dual-boot-skill)
-- **rails-load-defaults skill** - Incremental load_defaults alignment (Step 6, final step) (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
+- **rails-load-defaults skill** - Incremental load_defaults alignment (Step 7, final step) (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
 
 ### Reference Materials
 - `references/deprecation-warnings.md` - Finding and fixing deprecations
@@ -464,7 +464,7 @@ Before delivering, verify:
 - [ ] Code examples use user's actual code from affected files
 - [ ] Next steps clearly outlined
 
-**For CI Config Check (Step 5, before opening the PR):**
+**For CI Config Check (Step 6, before opening the PR):**
 - [ ] Every CI file in the repo enumerated (GitHub Actions, CircleCI, Jenkins, GitLab, etc.)
 - [ ] Ruby version, Rails matrix, and service versions diffed against the upgraded Gemfile
 - [ ] CI sync report produced with per-file verdict
