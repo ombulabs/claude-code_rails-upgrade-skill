@@ -375,28 +375,30 @@ Before starting ANY upgrade:
 1. DELEGATE to the `dual-boot` skill for setup
 2. Set up next_rails, Gemfile.next, and dual-boot CI
 
-**Action - Step 3 (Run Detection Directly):**
-1. Validate upgrade path
-2. Load: `workflows/direct-detection-workflow.md`
-3. Load: `detection-scripts/patterns/rails-{VERSION}-patterns.yml`
-4. Use Grep/Glob/Read tools to search for each pattern
-5. Collect findings with file:line references
+**Action - Step 3 (Validate Upgrade Path):**
+1. Validate upgrade path (single-hop vs multi-hop)
 
-**Action - Step 4 (Generate Reports):**
+**Action - Step 4 (Run Detection Directly):**
+1. Load: `workflows/direct-detection-workflow.md`
+2. Load: `detection-scripts/patterns/rails-{VERSION}-patterns.yml`
+3. Use Grep/Glob/Read tools to search for each pattern
+4. Collect findings with file:line references
+
+**Action - Step 5 (Generate Reports):**
 1. Load: `workflows/upgrade-report-workflow.md`
 2. Load: `workflows/app-update-preview-workflow.md`
 3. Generate Comprehensive Upgrade Report (using direct findings)
 4. Generate app:update Preview (using actual config files)
 5. Present both reports to user
 
-**Action - Step 5 (Implement & Upgrade):**
+**Action - Step 6 (Implement & Upgrade):**
 1. Fix breaking changes using `NextRails.next?` for dual-boot code
 2. Update Gemfile to target Rails version
 3. Run tests against both versions
-4. **Check CI config matches the upgraded Gemfile** (`workflows/ci-sync-workflow.md`) — fix any mismatches before declaring Step 5 complete
+4. **Check CI config matches the upgraded Gemfile** (`workflows/ci-sync-workflow.md`) — fix any mismatches before declaring Step 6 complete
 5. Deploy and verify
 
-**Action - Step 6 (Align load_defaults - FINAL):**
+**Action - Step 7 (Align load_defaults - FINAL):**
 1. DELEGATE to the `rails-load-defaults` skill
 2. Walk through each config incrementally after the upgrade is complete
 
@@ -421,7 +423,7 @@ Before starting ANY upgrade:
 1. Explain sequential requirement
 2. Calculate hops: 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1
 3. Reference: `references/multi-hop-strategy.md`
-4. Follow Pattern 1 Steps 3-5 for FIRST hop (5.2 → 6.0)
+4. Follow Pattern 1 Steps 4-6 for FIRST hop (5.2 → 6.0)
 5. After first hop complete, repeat for next hops
 6. **IMPORTANT:** After each hop, align load_defaults to the new version before starting the next hop
 
@@ -436,7 +438,7 @@ Before starting ANY upgrade:
 2. If tests fail → Warn user and recommend fixing first
 3. If tests pass → Proceed with analysis
 
-**Action - Step 2 (Run Detection):**
+**Action - Step 4 (Run Detection):**
 1. Load: `workflows/direct-detection-workflow.md`
 2. Run detection directly using tools
 3. Present findings summary
