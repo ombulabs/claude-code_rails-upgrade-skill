@@ -2,7 +2,7 @@
 
 **When to read this:** Step 4.5's compatibility check returned at least one blocker (a gem with no released version that supports the target Rails). This file is the playbook for resolving those.
 
-For the compatibility check itself, see `SKILL.md` Step 4.5 (primary: `next_rails` `bundle_report compatibility`; secondary: `workflows/railsbump-compatibility-workflow.md`). Don't load this file unless you're already past the check and have blockers to work through.
+For the compatibility check itself, see `SKILL.md` Step 4.5 (primary: `next_rails` `bundle_report compatibility`; secondary: `workflows/gem-compatibility-workflow.md`). Don't load this file unless you're already past the check and have blockers to work through.
 
 This file used to carry static `gem × Rails-version` lookup tables. They drifted out of date and ignored the user's actual lockfile, so they were removed in favor of the live checks.
 
