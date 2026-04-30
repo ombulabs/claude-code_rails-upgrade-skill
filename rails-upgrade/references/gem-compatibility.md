@@ -34,4 +34,10 @@ When `bundle_report` lists a gem under "with no new compatible versions" or "wit
 
 Surface the choice to the user — do not silently swap gems. Each option has a different long-term cost.
 
-A common false-blocker pattern: pre-extraction gems. `strong_parameters`, `turbo-sprockets-rails3`, `protected_attributes`, etc. were merged into Rails core in a later version. If `bundle_report` flags one of these with "new version not found", check the version guide for the target Rails — odds are the gem just needs to be removed.
+A common false-blocker pattern: gems that became unnecessary in a specific Rails release. They show up under "with no new versions" in `bundle_report`, but the fix is to remove them, not to find a compatible version.
+
+- **Merged into Rails core**: `strong_parameters` was extracted from Rails 3.x as a backport, and is built into Rails ≥ 4.0 (`ActionController::Parameters`). Just remove the gem when targeting Rails 4 or newer.
+- **Replaced by core / a successor gem**: `turbo-sprockets-rails3` is replaced by `sprockets-rails` in Rails 4. `paperclip` is unmaintained and replaced by Active Storage / Shrine.
+- **Extracted as a back-compat shim**: `protected_attributes` is the *opposite* shape — it was extracted from Rails 4.0 specifically as a transitional shim for the old mass-assignment API and was never re-merged. It still exists as a separate gem, but if your code is moving to `strong_parameters` you can remove it once the controllers are converted.
+
+If `bundle_report` flags one of these, check the target version guide before assuming you need a fork.
