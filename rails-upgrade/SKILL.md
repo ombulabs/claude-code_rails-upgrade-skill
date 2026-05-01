@@ -220,6 +220,8 @@ When user requests an upgrade, follow this workflow:
    - Proceed to Step 1
 ```
 
+**Why patch first:** Patch releases contain security fixes, bug fixes, and additional deprecation warnings. Starting the version hop on the latest patch is safer (the security fixes are already in production) and easier to debug (the new deprecation warnings surface issues that would otherwise show up mid-upgrade).
+
 ### Step 1: Run Test Suite (MANDATORY FIRST STEP)
 ```
 ⚠️  THIS STEP IS REQUIRED BEFORE ANY OTHER WORK
@@ -279,11 +281,11 @@ Claude runs detection directly using tools - NO script generation needed
 
 **Deliverable #1: Comprehensive Upgrade Report**
 - **Input:** Direct detection findings + version guide data
-- **Output:** Report with real code examples from user's project
+- **Output:** A report covering breaking changes (with OLD vs NEW code examples taken from the user's actual files), custom-code warnings flagged with ⚠️, a step-by-step migration plan, a testing checklist, and a rollback plan.
 
 **Deliverable #2: app:update Preview**
 - **Input:** Actual config files + findings
-- **Output:** Preview with real file paths and changes
+- **Output:** A preview showing exact configuration file changes (OLD vs NEW), a list of new files that will be created, and a per-file impact assessment (HIGH / MEDIUM / LOW).
 
 ### Step 6: Present Reports & Implement Changes
 ```
@@ -295,6 +297,8 @@ Claude runs detection directly using tools - NO script generation needed
 6. **Check CI config matches the upgraded Gemfile** — load `workflows/ci-sync-workflow.md`, fix any mismatches before proceeding
 7. Deploy and verify
 ```
+
+**Do not fix deprecations printed by the next version during this hop.** Those belong to the *next* upgrade cycle and will be addressed before the next version bump. Triaging them now expands the scope of the current hop and risks shipping a half-finished change.
 
 ### Step 7: Align load_defaults
 ```
@@ -317,6 +321,10 @@ Claude runs detection directly using tools - NO script generation needed
    and retires dual-boot scaffolding. Deprecation triage stays with this
    skill for the next hop, not with cleanup.
 ```
+
+**Sample wording the agent can crib from when prompting the user:**
+
+> Rails X.Y is in. When you're ready to remove dual-boot scaffolding (drop `NextRails.next?` / `NextRails.current?` branches, retire `Gemfile.next`), ask me to clean up. If you're heading straight to the next hop, keeping dual-boot in place is also fine.
 
 ---
 
