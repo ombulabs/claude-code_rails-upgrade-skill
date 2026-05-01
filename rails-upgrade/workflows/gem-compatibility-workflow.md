@@ -65,7 +65,7 @@ turbo-sprockets-rails3 0.3.14 - new version not found
 | "with no new versions" | blockers | Vendor / fork / replace — gem is abandoned or pre-extraction |
 | (gem not listed in any section) | already compatible | Note the locked version; no action |
 
-If the command produces no output at all, treat it as `bundle_report` failing — escalate to the secondary check.
+If the command produces no output at all, or if the output contains no `=> incompatible with rails X` headers despite an exit code of 0, treat it as `bundle_report` failing or producing an unparseable result — escalate to the secondary check rather than assuming "all gems compatible." A future `next_rails` release that reformats the output would otherwise silently produce empty buckets.
 
 ---
 
@@ -188,3 +188,4 @@ When the agent later runs the actual `bundle update`, prefer one gem at a time (
 - **Slugs expire.** Don't store railsbump slugs across sessions. Re-POST the lockfile if the user comes back later.
 - **Compatibility ≠ green tests.** A `compatible` result means "the gem's gemspec accepts the target Rails" (and for railsbump, "the lockfile resolves"). Tests are still the ground truth.
 - **Submit each lockfile once per session.** Cache the slug in conversation context.
+- **Re-POST when the lockfile changes.** Any time the agent runs `bundle install`, `bundle update`, or otherwise modifies `Gemfile.lock` mid-session, discard the cached slug and POST again. The prior result was for a different lockfile and will mislead the gem-update plan.
