@@ -29,7 +29,9 @@ When `bundle_report` lists a gem under "with no new compatible versions" or "wit
 1. **Look for a maintained fork** that adds Rails support — search GitHub for "fork of <gem>" with the target Rails in recent commits.
 2. **Check the gem's open PRs / issues** for in-flight Rails support. If a PR is close to merging, ask the user whether to vendor the branch as a temporary `git:` source.
 3. **Wait for an upstream release** if the gem is actively maintained and the next release is imminent.
-4. **Switch to an alternative** if the gem is abandoned (e.g., `paperclip` → `shrine` / Active Storage; `strong_parameters` is built into Rails ≥ 4 so just remove it).
+4. **Switch to an alternative** when the gem is abandoned, OR when a Rails-removed API has a back-compat gem and you'd rather use it than refactor. Examples:
+   - `paperclip` → `shrine` / Active Storage (paperclip is abandoned).
+   - When moving Rails 3 → 4, `attr_accessible` was removed from core. Two paths: refactor controllers to strong parameters, OR add `protected_attributes` to keep `attr_accessible` working. The shim is a valid choice when the controller surface is large and the upgrade timeline is tight; refactoring later is still possible.
 5. **Fork and patch** as a last resort. Document the fork in the Gemfile and open an upstream PR.
 
 Surface the choice to the user — do not silently swap gems. Each option has a different long-term cost.

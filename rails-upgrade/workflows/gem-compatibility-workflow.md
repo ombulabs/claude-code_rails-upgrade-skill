@@ -65,7 +65,7 @@ turbo-sprockets-rails3 0.3.14 - new version not found
 | "with no new versions" | blockers | Vendor / fork / replace — gem is abandoned or pre-extraction |
 | (gem not listed in any section) | already compatible | Note the locked version; no action |
 
-If the command produces no output at all, treat it as `bundle_report` failing — escalate to the secondary check.
+If the command produces no output at all, or if the output contains no `=> incompatible with rails X` headers despite an exit code of 0, treat it as `bundle_report` failing or producing an unparseable result — escalate to the secondary check rather than assuming "all gems compatible." A future `next_rails` release that reformats the output would otherwise silently produce empty buckets.
 
 ---
 
@@ -141,7 +141,7 @@ Top-level `status`: `pending` | `complete` | `failed`. Per-`gem_check` `result`:
 
 Wait `retry_after_seconds` (clamped 30-600 by the server). Then GET `status_url`. Loop until top-level `status` is `complete` or `failed`.
 
-**Cap: 10 polls OR 30 minutes total elapsed, whichever comes first.** Track elapsed time across the polls (the server's `retry_after_seconds` can grow). At the cap, give up — report the slug to the user, note that the secondary check stalled, and proceed with whatever the primary produced.
+**Cap: 10 polls OR 30 minutes total elapsed, whichever comes first.** Track elapsed time across the polls so the 30-minute ceiling kicks in regardless of the per-poll wait. (The server returns a `retry_after_seconds` derived from gem count and worker concurrency — both fixed for a given lockfile — so the value is constant across polls, not growing. The 30-minute cap bounds the *total* check; the 10-poll cap protects against a stuck pending state.) At the cap, give up — report the slug to the user, note that the secondary check stalled, and proceed with whatever the primary produced.
 
 Do not poll faster than the server's `retry_after_seconds`. The check is per-gem CPU work; hammering the endpoint will not return results sooner.
 
@@ -154,7 +154,7 @@ The API may return multiple `lockfile_checks` (one per Rails release it tested a
 | `result: "incompatible"`, `earliest_compatible_version` set | required bumps | Bump to at least `earliest_compatible_version` |
 | `result: "incompatible"`, `earliest_compatible_version` null | blockers | No compatible version exists — fork / vendor / replace |
 | `result: "compatible"` | already compatible | Note the locked version |
-| `result: "unknown"` or non-empty `error_message` | unresolved | Surface the error; ask the user how to proceed |
+| `result: "unknown"` or non-empty `error_message` | blockers (pending information) | Surface the error to the user. If `bundle_report` was also run and answered this gem, prefer its verdict (see Reconciliation). If railsbump is the only signal, treat as a blocker until the user can verify manually — do not silently assume compatible. |
 
 ---
 
@@ -174,8 +174,8 @@ When the orchestrator triggered the secondary because of an ambiguous primary re
 
 Whichever check ran, the output handed to Step 5 is the same three buckets:
 
-1. **Blockers** — incompatible gems with no compatible version. The hop cannot complete until each one is resolved (see `references/gem-compatibility.md` for the playbook).
-2. **Required bumps** — incompatible gems with a target version. Order by dependency depth where obvious (e.g., bump `rspec-rails` before `rspec-mocks`).
+1. **Blockers** — incompatible gems with no compatible version, plus any gems where railsbump returned `unknown`/errored and `bundle_report` did not give a clean answer. The hop cannot complete until each one is resolved (see `references/gem-compatibility.md` for the playbook). Mark "pending information" blockers separately so the user knows they may turn into "compatible" or "required bumps" once the missing data lands.
+2. **Required bumps** — incompatible gems with a target version. Order top-level gems before their internal dependencies, so bundler can resolve the graph from the root. Example: bump `rspec-rails` before `rspec-mocks` — `rspec-rails` is the gem your Gemfile names directly, and it pulls `rspec-mocks` (and the rest of the rspec-* family) transitively.
 3. **Already compatible** — no action needed, but note the locked version so the user can see headroom.
 
 When the agent later runs the actual `bundle update`, prefer one gem at a time (`bundle update <gem> --conservative`) so a single bad resolution does not poison the whole graph.
@@ -188,3 +188,4 @@ When the agent later runs the actual `bundle update`, prefer one gem at a time (
 - **Slugs expire.** Don't store railsbump slugs across sessions. Re-POST the lockfile if the user comes back later.
 - **Compatibility ≠ green tests.** A `compatible` result means "the gem's gemspec accepts the target Rails" (and for railsbump, "the lockfile resolves"). Tests are still the ground truth.
 - **Submit each lockfile once per session.** Cache the slug in conversation context.
+- **Re-POST when the lockfile changes.** Any time the agent runs `bundle install`, `bundle update`, or otherwise modifies `Gemfile.lock` mid-session, discard the cached slug and POST again. The prior result was for a different lockfile and will mislead the gem-update plan.
