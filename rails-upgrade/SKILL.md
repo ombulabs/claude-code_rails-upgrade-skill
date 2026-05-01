@@ -438,6 +438,8 @@ Before starting ANY upgrade:
 ### Pattern 3: Breaking Changes Analysis Only
 **User says:** "What breaking changes affect my app for Rails 8.0?"
 
+This pattern is analysis-only — it intentionally skips Step 2 (Dual-Boot setup) and Step 3 (Validate Upgrade Path) because the user is not yet committing to an upgrade.
+
 **Action - Step 0 (MANDATORY: Verify Latest Patch):**
 1. Check if on latest patch — warn if not, recommend patching first
 
@@ -498,7 +500,7 @@ Before delivering, verify:
 8. **Always Use Templates** (for consistency)
 9. **Always Check Quality** (before delivery)
 10. **Load Workflows as Needed** (don't hold everything in memory)
-11. **Sequential Process is Critical** (patch check → tests → dual-boot → detection → reports → implement → load_defaults)
+11. **Sequential Process is Critical** (patch check → tests → dual-boot → validate path → detection → reports → implement → load_defaults)
 12. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
 13. **Always Use `NextRails.next?` for Dual-Boot Code** (NEVER use `respond_to?` for version branching. DELEGATE to the `dual-boot` skill for patterns and setup.)
 14. **Check CI Config Before Opening the PR** (run `workflows/ci-sync-workflow.md` to make sure every CI file matches the upgraded Gemfile — stale CI is the most common cause of red builds on upgrade PRs)
@@ -517,6 +519,7 @@ A successful upgrade assistance session:
 ✅ **Verified all tests pass** (blocked if tests failed)
 ✅ **Recorded baseline metrics** (test count, coverage)
 ✅ **Set up dual-boot** (Step 2 - early, before upgrading)
+✅ **Validated upgrade path** (Step 3 - single-hop vs multi-hop, hops planned)
 ✅ **Ran detection directly** (using Grep/Glob/Read tools - no script)
 ✅ **Generated Comprehensive Upgrade Report** using actual findings
 ✅ **Generated app:update Preview** using actual config files
