@@ -208,8 +208,8 @@ When user requests an upgrade, follow this workflow:
 
 1. Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
 2. Compare against latest patch for that series:
-   - EOL series (≤ 6.1): use static table in references/multi-hop-strategy.md
-   - Active series (≥ 7.0): query RubyGems API (see references/multi-hop-strategy.md for commands)
+   - EOL series (≤ 7.1): use static table in references/multi-hop-strategy.md
+   - Active series (≥ 7.2): query RubyGems API (see references/multi-hop-strategy.md for commands)
 3. If current version < latest patch:
    - INFORM user: "Your app is on Rails X.Y.Z but the latest patch is X.Y.W"
    - Guide through Gemfile update and bundle update rails
