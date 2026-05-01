@@ -141,7 +141,7 @@ Top-level `status`: `pending` | `complete` | `failed`. Per-`gem_check` `result`:
 
 Wait `retry_after_seconds` (clamped 30-600 by the server). Then GET `status_url`. Loop until top-level `status` is `complete` or `failed`.
 
-**Cap: 10 polls OR 30 minutes total elapsed, whichever comes first.** Track elapsed time across the polls (the server's `retry_after_seconds` can grow). At the cap, give up — report the slug to the user, note that the secondary check stalled, and proceed with whatever the primary produced.
+**Cap: 10 polls OR 30 minutes total elapsed, whichever comes first.** Track elapsed time across the polls so the 30-minute ceiling kicks in regardless of the per-poll wait. (The server returns a `retry_after_seconds` derived from gem count and worker concurrency — both fixed for a given lockfile — so the value is constant across polls, not growing. The 30-minute cap bounds the *total* check; the 10-poll cap protects against a stuck pending state.) At the cap, give up — report the slug to the user, note that the secondary check stalled, and proceed with whatever the primary produced.
 
 Do not poll faster than the server's `retry_after_seconds`. The check is per-gem CPU work; hammering the endpoint will not return results sooner.
 
