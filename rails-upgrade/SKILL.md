@@ -238,6 +238,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `workflows/test-suite-verification-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
 - `workflows/direct-detection-workflow.md` - How to run breaking change detection directly
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
+- `workflows/gem-compatibility-workflow.md` - **Load in Step 4.5** - Per-lockfile gem compatibility check against the target Rails version. Documents both the primary (`next_rails` `bundle_report compatibility`) and the secondary (railsbump.org API) and the rules for when to escalate.
 - `workflows/ci-sync-workflow.md` - **MANDATORY before opening the upgrade PR** - How to verify CI config matches the upgraded Gemfile
 - `workflows/app-update-preview-workflow.md` - How to generate app:update previews
 - **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding and drops `NextRails.next?` / `NextRails.current?` branches. Deprecation triage stays with this skill for the next hop.
@@ -256,7 +257,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `references/breaking-changes-by-version.md` - Quick lookup
 - `references/multi-hop-strategy.md` - Multi-version planning
 - `references/testing-checklist.md` - Comprehensive testing
-- `references/gem-compatibility.md` - Common gem version requirements
+- `references/gem-compatibility.md` - Gem update order and the "no compatible version" playbook (fork / vendor / replace). Load only when Step 4.5's compatibility check produced blockers.
 
 ### Detection Pattern Resources
 - `detection-scripts/patterns/rails-*.yml` - Version-specific patterns for direct detection
@@ -336,6 +337,22 @@ Claude runs detection directly using tools - NO script generation needed
    - Store findings with context
 4. Read: version-guides/upgrade-{FROM}-to-{TO}.md for context
 5. Compile all findings into structured data
+```
+
+### Step 4.5: Check Gem Compatibility Against Target Rails
+```
+Determines which gems must be bumped before the Rails version change can resolve.
+
+1. Read: workflows/gem-compatibility-workflow.md and follow it. The
+   workflow documents the primary check (next_rails bundle_report),
+   the conditions for escalating to the secondary (railsbump API),
+   and the bucket mapping for both.
+2. Pass the resulting three buckets — required bumps, blockers,
+   already compatible — into Step 5's report so the gem-update
+   section reflects real per-lockfile data.
+3. If any blockers exist, load references/gem-compatibility.md for
+   the fork/replace/vendor playbook and the gem update order. Skip
+   otherwise.
 ```
 
 ### Step 5: Load Report Resources & Generate Reports
