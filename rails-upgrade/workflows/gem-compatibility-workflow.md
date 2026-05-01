@@ -175,7 +175,7 @@ When the orchestrator triggered the secondary because of an ambiguous primary re
 Whichever check ran, the output handed to Step 5 is the same three buckets:
 
 1. **Blockers** — incompatible gems with no compatible version. The hop cannot complete until each one is resolved (see `references/gem-compatibility.md` for the playbook).
-2. **Required bumps** — incompatible gems with a target version. Order by dependency depth where obvious (e.g., bump `rspec-rails` before `rspec-mocks`).
+2. **Required bumps** — incompatible gems with a target version. Order top-level gems before their internal dependencies, so bundler can resolve the graph from the root. Example: bump `rspec-rails` before `rspec-mocks` — `rspec-rails` is the gem your Gemfile names directly, and it pulls `rspec-mocks` (and the rest of the rspec-* family) transitively.
 3. **Already compatible** — no action needed, but note the locked version so the user can see headroom.
 
 When the agent later runs the actual `bundle update`, prefer one gem at a time (`bundle update <gem> --conservative`) so a single bad resolution does not poison the whole graph.
