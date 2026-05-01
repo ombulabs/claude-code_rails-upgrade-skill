@@ -154,7 +154,7 @@ The API may return multiple `lockfile_checks` (one per Rails release it tested a
 | `result: "incompatible"`, `earliest_compatible_version` set | required bumps | Bump to at least `earliest_compatible_version` |
 | `result: "incompatible"`, `earliest_compatible_version` null | blockers | No compatible version exists — fork / vendor / replace |
 | `result: "compatible"` | already compatible | Note the locked version |
-| `result: "unknown"` or non-empty `error_message` | unresolved | Surface the error; ask the user how to proceed |
+| `result: "unknown"` or non-empty `error_message` | blockers (pending information) | Surface the error to the user. If `bundle_report` was also run and answered this gem, prefer its verdict (see Reconciliation). If railsbump is the only signal, treat as a blocker until the user can verify manually — do not silently assume compatible. |
 
 ---
 
@@ -174,7 +174,7 @@ When the orchestrator triggered the secondary because of an ambiguous primary re
 
 Whichever check ran, the output handed to Step 5 is the same three buckets:
 
-1. **Blockers** — incompatible gems with no compatible version. The hop cannot complete until each one is resolved (see `references/gem-compatibility.md` for the playbook).
+1. **Blockers** — incompatible gems with no compatible version, plus any gems where railsbump returned `unknown`/errored and `bundle_report` did not give a clean answer. The hop cannot complete until each one is resolved (see `references/gem-compatibility.md` for the playbook). Mark "pending information" blockers separately so the user knows they may turn into "compatible" or "required bumps" once the missing data lands.
 2. **Required bumps** — incompatible gems with a target version. Order top-level gems before their internal dependencies, so bundler can resolve the graph from the root. Example: bump `rspec-rails` before `rspec-mocks` — `rspec-rails` is the gem your Gemfile names directly, and it pulls `rspec-mocks` (and the rest of the rspec-* family) transitively.
 3. **Already compatible** — no action needed, but note the locked version so the user can see headroom.
 
