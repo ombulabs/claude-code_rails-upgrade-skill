@@ -101,7 +101,7 @@ breaking_changes:
       variable_name: "EVENT_REDIS_ADAPTER"
 
     - name: "Erubis template handler references"
-      kind: "deprecation"
+      kind: "breaking"
       pattern: "\\bErubis\\b|::Handlers::Erubis"
       exclude: ""
       search_paths:
