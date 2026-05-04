@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 7.2 → 8.0 upgrade"
 breaking_changes:
   high_priority:
     - name: "Sprockets usage"
+      kind: "migration"
       pattern: "sprockets|Sprockets"
       exclude: "propshaft"
       search_paths:
@@ -15,6 +16,7 @@ breaking_changes:
       variable_name: "SPROCKETS"
 
     - name: "Asset pipeline configuration"
+      kind: "migration"
       pattern: "config\\.assets\\."
       exclude: ""
       search_paths:
@@ -25,6 +27,7 @@ breaking_changes:
       variable_name: "ASSET_CONFIG"
 
     - name: "javascript_include_tag (missing importmap)"
+      kind: "migration"
       pattern: "javascript_include_tag"
       exclude: "importmap"
       search_paths:
@@ -34,6 +37,7 @@ breaking_changes:
       variable_name: "JS_INCLUDE"
 
     - name: "assume_ssl configuration"
+      kind: "optional"
       pattern: "force_ssl\\s*="
       exclude: "assume_ssl"
       search_paths:
@@ -43,6 +47,7 @@ breaking_changes:
       variable_name: "ASSUME_SSL"
 
     - name: "sqlite3_deprecated_warning"
+      kind: "breaking"
       pattern: "sqlite3_deprecated_warning"
       exclude: ""
       search_paths:
@@ -53,6 +58,7 @@ breaking_changes:
 
   medium_priority:
     - name: "Redis cache store"
+      kind: "optional"
       pattern: "redis_cache_store|:redis_store"
       exclude: "solid_cache"
       search_paths:
@@ -62,6 +68,7 @@ breaking_changes:
       variable_name: "REDIS_CACHE"
 
     - name: "Sidekiq/Redis queue"
+      kind: "optional"
       pattern: "sidekiq|:sidekiq|:async"
       exclude: "solid_queue"
       search_paths:
@@ -72,6 +79,7 @@ breaking_changes:
       variable_name: "SIDEKIQ_QUEUE"
 
     - name: "ActionCable Redis adapter"
+      kind: "optional"
       pattern: "adapter:\\s*redis|:redis"
       exclude: "solid"
       search_paths:
@@ -81,6 +89,7 @@ breaking_changes:
       variable_name: "CABLE_REDIS"
 
     - name: "Kamal deployment"
+      kind: "optional"
       pattern: "kamal|deploy\\.yml"
       exclude: ""
       search_paths:
@@ -91,6 +100,7 @@ breaking_changes:
       variable_name: "KAMAL_DEPLOY"
 
     - name: "Docker/Thruster"
+      kind: "optional"
       pattern: "thruster"
       exclude: ""
       search_paths:
@@ -101,6 +111,7 @@ breaking_changes:
       variable_name: "THRUSTER"
 
     - name: "Database pool configuration"
+      kind: "migration"
       pattern: "pool:\\s*\\d+"
       exclude: "max_connections"
       search_paths:
