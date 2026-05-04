@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 4.2 → 5.0 upgrade"
 breaking_changes:
   high_priority:
     - name: "Ruby version below 2.2.2"
+      kind: "breaking"
       pattern: "ruby.*['\"]2\\.[01]\\.|ruby.*['\"]1\\."
       exclude: ""
       search_paths:
@@ -14,6 +15,7 @@ breaking_changes:
       variable_name: "RUBY_VERSION"
 
     - name: "Models inheriting from ActiveRecord::Base"
+      kind: "migration"
       pattern: "class\\s+\\w+\\s*<\\s*ActiveRecord::Base"
       exclude: "ApplicationRecord"
       search_paths:
@@ -23,6 +25,7 @@ breaking_changes:
       variable_name: "ACTIVERECORD_BASE"
 
     - name: "belongs_to without optional: true"
+      kind: "migration"
       pattern: "belongs_to\\s+:\\w+"
       exclude: "optional:"
       search_paths:
@@ -32,6 +35,7 @@ breaking_changes:
       variable_name: "BELONGS_TO_REQUIRED"
 
     - name: "protected_attributes gem"
+      kind: "breaking"
       pattern: "gem.*['\"]protected_attributes['\"]"
       exclude: ""
       search_paths:
@@ -41,6 +45,7 @@ breaking_changes:
       variable_name: "PROTECTED_ATTRIBUTES"
 
     - name: "attr_accessible in models"
+      kind: "breaking"
       pattern: "attr_accessible"
       exclude: ""
       search_paths:
@@ -50,6 +55,7 @@ breaking_changes:
       variable_name: "ATTR_ACCESSIBLE"
 
     - name: "Parameters used as hash"
+      kind: "breaking"
       pattern: "params(\\[.*\\])?\\.(slice|except|merge|symbolize_keys|to_hash)\\b"
       exclude: ""
       search_paths:
@@ -61,6 +67,7 @@ breaking_changes:
 
   medium_priority:
     - name: "Callback returning false to halt"
+      kind: "deprecation"
       pattern: "return\\s+false"
       exclude: ""
       search_paths:
@@ -71,6 +78,7 @@ breaking_changes:
       variable_name: "CALLBACK_HALT"
 
     - name: "assigns in tests"
+      kind: "breaking"
       pattern: "assigns\\(:"
       exclude: ""
       search_paths:
@@ -81,6 +89,7 @@ breaking_changes:
       variable_name: "ASSIGNS_IN_TESTS"
 
     - name: "assert_template in tests"
+      kind: "breaking"
       pattern: "assert_template"
       exclude: ""
       search_paths:
@@ -91,6 +100,7 @@ breaking_changes:
       variable_name: "ASSERT_TEMPLATE"
 
     - name: "ActionDispatch::Http::UploadedFile in tests"
+      kind: "migration"
       pattern: "ActionDispatch::Http::UploadedFile"
       exclude: ""
       search_paths:
@@ -101,6 +111,7 @@ breaking_changes:
       variable_name: "UPLOAD_FILE_TEST"
 
     - name: "redirect_to :back deprecated"
+      kind: "deprecation"
       pattern: "redirect_to\\s+:back\\b"
       exclude: ""
       search_paths:
@@ -110,6 +121,7 @@ breaking_changes:
       variable_name: "REDIRECT_TO_BACK_DEPRECATED"
 
     - name: "rake commands in scripts or docs"
+      kind: "migration"
       pattern: "\\brake\\s+(db:|test|routes|assets:|secret)"
       exclude: ""
       search_paths:
