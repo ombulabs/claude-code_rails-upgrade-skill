@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 4.1 → 4.2 upgrade"
 breaking_changes:
   high_priority:
     - name: "ActionMailer .deliver / .deliver! deprecated"
+      kind: "deprecation"
       pattern: "\\.deliver!?\\s*(#|$)"
       exclude: ""
       search_paths:
@@ -14,6 +15,7 @@ breaking_changes:
       variable_name: "MAILER_DELIVER"
 
     - name: "respond_with usage"
+      kind: "breaking"
       pattern: "\\brespond_with\\b"
       exclude: ""
       search_paths:
@@ -23,6 +25,7 @@ breaking_changes:
       variable_name: "RESPOND_WITH"
 
     - name: "Class-level respond_to declaration"
+      kind: "breaking"
       pattern: "^\\s*respond_to\\s+:"
       exclude: ""
       search_paths:
@@ -32,6 +35,7 @@ breaking_changes:
       variable_name: "CLASS_RESPOND_TO"
 
     - name: "Verify raise_in_transactional_callbacks is configured"
+      kind: "deprecation"
       pattern: "class\\s+\\w+\\s*<\\s*Rails::Application"
       exclude: ""
       search_paths:
@@ -41,6 +45,7 @@ breaking_changes:
       variable_name: "TRANSACTIONAL_CALLBACKS"
 
     - name: "RSpec 2.x in Gemfile"
+      kind: "breaking"
       pattern: "rspec-rails.*['\"\\(][~><=\\s]*2\\."
       exclude: ""
       search_paths:
@@ -51,6 +56,7 @@ breaking_changes:
       variable_name: "RSPEC_2"
 
     - name: "assert_tag / TagAssertions"
+      kind: "deprecation"
       pattern: "\\bassert_tag\\b"
       exclude: ""
       search_paths:
@@ -61,6 +67,7 @@ breaking_changes:
       variable_name: "ASSERT_TAG"
 
     - name: "ActiveJob usage requires queue adapter"
+      kind: "migration"
       pattern: "\\.deliver_later\\b|<\\s*ActiveJob::Base\\b"
       exclude: ""
       search_paths:
@@ -72,6 +79,7 @@ breaking_changes:
 
   medium_priority:
     - name: "find/exists? with possible AR object argument"
+      kind: "deprecation"
       pattern: "\\.(find|exists\\?)\\(\\s*@?[a-z_][a-zA-Z_0-9.]*\\s*\\)"
       exclude: "\\.(find|exists\\?)\\([^)]*\\.id\\s*\\)|\\.(find|exists\\?)\\(\\s*\\d+"
       search_paths:
@@ -82,6 +90,7 @@ breaking_changes:
       variable_name: "FIND_WITH_OBJECT"
 
     - name: "HTML sanitizer usage"
+      kind: "breaking"
       pattern: "\\b(sanitize|strip_tags|strip_links|sanitize_css)\\b"
       exclude: ""
       search_paths:
@@ -91,6 +100,7 @@ breaking_changes:
       variable_name: "HTML_SANITIZER"
 
     - name: "Verify test_order is set"
+      kind: "deprecation"
       pattern: "Rails\\.application\\.configure"
       exclude: ""
       search_paths:
@@ -100,6 +110,7 @@ breaking_changes:
       variable_name: "TEST_ORDER"
 
     - name: "Serialized attributes with custom coder"
+      kind: "breaking"
       pattern: "serialize\\s+:\\w+,\\s*(JSON|YAML|\\w+Coder)"
       exclude: ""
       search_paths:
@@ -109,6 +120,7 @@ breaking_changes:
       variable_name: "SERIALIZED_CUSTOM_CODER"
 
     - name: "serve_static_assets config"
+      kind: "deprecation"
       pattern: "serve_static_assets"
       exclude: ""
       search_paths:
@@ -118,6 +130,7 @@ breaking_changes:
       variable_name: "SERVE_STATIC_ASSETS"
 
     - name: "form_authenticity_token in non-Rails forms"
+      kind: "breaking"
       pattern: "form_authenticity_token"
       exclude: ""
       search_paths:
@@ -127,6 +140,7 @@ breaking_changes:
       variable_name: "CSRF_TOKEN_MASKING"
 
     - name: "Foreigner gem"
+      kind: "migration"
       pattern: "gem.*['\"]foreigner['\"]"
       exclude: ""
       search_paths:
@@ -137,6 +151,7 @@ breaking_changes:
 
   low_priority:
     - name: "Procfile rails server without explicit bind"
+      kind: "breaking"
       pattern: "rails\\s+s(erver)?\\s*$|rails\\s+s(erver)?\\s+(?!-b|--binding)"
       exclude: "-b\\s+0\\.0\\.0\\.0|--binding"
       search_paths:
@@ -147,6 +162,7 @@ breaking_changes:
       variable_name: "SERVER_BIND"
 
     - name: "Timecop gem in use"
+      kind: "migration"
       pattern: "gem.*['\"]timecop['\"]|\\bTimecop\\."
       exclude: ""
       search_paths:
