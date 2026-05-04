@@ -113,7 +113,7 @@ breaking_changes:
       variable_name: "ERUBIS_HANDLER"
 
     - name: "Defining quoted_id method"
-      kind: "deprecation"
+      kind: "breaking"
       pattern: "def\\s+quoted_id\\b"
       exclude: ""
       search_paths:
