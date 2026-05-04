@@ -4,7 +4,7 @@ description: "Breaking change patterns for Rails 5.1 → 5.2 upgrade"
 breaking_changes:
   high_priority:
     - name: "ActiveModel::Dirty methods after save"
-      pattern: "\\b\\w+_(changed\\?|was|will_change!)|\\.changes\\b|\\.changed\\?"
+      pattern: "\\b\\w+_(changed\\?|was)|\\.changes\\b|\\.changed\\?"
       exclude: "saved_change_to_|attribute_before_last_save|saved_changes"
       search_paths:
         - "app/models/"
@@ -17,7 +17,7 @@ breaking_changes:
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
       pattern: "\\b(:controller|:action)\\b"
-      exclude: "controller:|action:|action_dispatch|action_view|action_mailer|action_cable|action_pack|action_controller"
+      exclude: "controller:|action:|:controller\\s*=>|:action\\s*=>|action_dispatch|action_view|action_mailer|action_cable|action_pack|action_controller"
       search_paths:
         - "config/routes.rb"
       explanation: "Rails 5.2 deprecates the dynamic :controller(/:action(/:id)) route shape. Routing on user-controllable URL segments to arbitrary controllers/actions has been a long-standing security smell"
@@ -113,17 +113,17 @@ breaking_changes:
       variable_name: "QUOTED_ID_METHOD"
 
     - name: "ConnectionPool#verify with arguments"
-      pattern: "\\.verify\\("
+      pattern: "\\.verify\\(\\s*\\S[^)]*\\)"
       exclude: ""
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 5.2 deprecates passing arguments to ActiveRecord::ConnectionAdapters::ConnectionPool#verify (it ignored them anyway). NOISY REGEX: matches every `.verify(` call site, most of which are unrelated (signed cookies, OpenSSL keys, Devise, JWT, RSpec doubles). Filter results manually for AR connection-pool receivers"
-      fix: "Drop the argument: connection_pool.verify(timeout) → connection_pool.verify"
+      explanation: "Rails 5.2 deprecates passing arguments to ActiveRecord::ConnectionAdapters::ConnectionPool#verify (it ignored them anyway). NOISY REGEX: matches `.verify(...)` call sites with at least one argument expression, many of which are still unrelated (signed cookies, OpenSSL keys, Devise, JWT, RSpec doubles). Filter results manually for AR connection-pool receivers"
+      fix: "If arguments are passed, drop them: connection_pool.verify(timeout) → connection_pool.verify"
       variable_name: "VERIFY_METHOD_DEPRECATION"
 
     - name: "lock! on ActiveRecord object"
-      pattern: "\\.lock!(\\b|\\()"
+      pattern: "\\.lock!(?=\\(|\\s|$)"
       exclude: ""
       search_paths:
         - "app/"
@@ -133,12 +133,12 @@ breaking_changes:
       variable_name: "LOCK_BANG_UNPERSISTED"
 
     - name: "Legacy secret_key_base configuration"
-      pattern: "Rails\\.application\\.config\\.secret_(token|key_base)|secret_token\\.rb"
+      pattern: "Rails\\.application\\.config\\.secret_(token|key_base)"
       exclude: ""
       search_paths:
         - "config/"
         - "app/"
-      explanation: "Rails 5.2 emits a deprecation warning when secret_key_base is missing or read from the legacy Rails.application.config path. NOISY REGEX: this is a presence check for legacy reads; ABSENCE does not prove the app is fine, since secret_key_base may simply be unconfigured (which is itself the deprecation 5.2 warns about). Review config/credentials.yml.enc, config/secrets.yml, and the SECRET_KEY_BASE env var to confirm the value is set somewhere"
+      explanation: "Rails 5.2 emits a deprecation warning when secret_key_base is missing or read from the legacy Rails.application.config path. NOISY REGEX: presence check for legacy reads; ABSENCE does not prove the app is fine, since secret_key_base may simply be unconfigured (which is itself the deprecation 5.2 warns about). Review config/credentials.yml.enc, config/secrets.yml, and the SECRET_KEY_BASE env var to confirm the value is set somewhere. MANUAL: also check for the presence of config/initializers/secret_token.rb directly (grep does not search filenames)"
       fix: "Migrate to credentials: `rails credentials:edit` and store secret_key_base inside. For env-based deploys, ensure the SECRET_KEY_BASE environment variable is set in production. Delete config/initializers/secret_token.rb after migration"
       variable_name: "LEGACY_SECRET_KEY_BASE"
 
