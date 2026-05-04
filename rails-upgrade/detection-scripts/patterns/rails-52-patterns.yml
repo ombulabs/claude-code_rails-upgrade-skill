@@ -47,7 +47,7 @@ breaking_changes:
       variable_name: "ERROR_ON_IGNORED_ORDER_OR_LIMIT"
 
     - name: "halt_callback_chains_on_return_false config (deprecated)"
-      kind: "deprecation"
+      kind: "breaking"
       pattern: "halt_callback_chains_on_return_false"
       exclude: ""
       search_paths:
