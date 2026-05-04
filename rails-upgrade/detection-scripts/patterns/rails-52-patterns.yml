@@ -37,7 +37,7 @@ breaking_changes:
       variable_name: "CLASS_NAME_CONSTANT"
 
     - name: "error_on_ignored_order_or_limit config (renamed)"
-      kind: "deprecation"
+      kind: "breaking"
       pattern: "error_on_ignored_order_or_limit"
       exclude: ""
       search_paths:
