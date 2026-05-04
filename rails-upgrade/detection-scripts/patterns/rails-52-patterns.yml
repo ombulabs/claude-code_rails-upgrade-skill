@@ -108,7 +108,7 @@ breaking_changes:
         - "app/"
         - "config/"
         - "lib/"
-      explanation: "Rails 5.1 replaced the Erubis ERB handler with Erubi. Rails 5.2 still warns when Erubis is referenced. Most apps never touch this directly; explicit references usually come from gems registering custom handlers"
+      explanation: "Rails 5.1 replaced the Erubis ERB handler with Erubi. Rails 5.2 removes the Erubis handler entirely; references to ActionView::Template::Handlers::Erubis raise NameError ('uninitialized constant'). Most apps never touch this directly; explicit references usually come from gems registering custom handlers that have not been updated for 5.2"
       fix: "Replace ActionView::Template::Handlers::Erubis references with ActionView::Template::Handlers::ERB (which is now Erubi-backed). For gems that register Erubis explicitly, check for an updated gem version or open an issue upstream"
       variable_name: "ERUBIS_HANDLER"
 
