@@ -135,7 +135,7 @@ breaking_changes:
       variable_name: "VERIFY_METHOD_DEPRECATION"
 
     - name: "lock! on ActiveRecord object"
-      kind: "deprecation"
+      kind: "breaking"
       pattern: "\\.lock!(?=\\(|\\s|$)"
       exclude: ""
       search_paths:
