@@ -80,14 +80,14 @@ breaking_changes:
       variable_name: "AZURE_STORAGE"
 
   low_priority:
-    - name: "MySQL unsigned types"
-      kind: "deprecation"
-      pattern: "unsigned:\\s*true"
+    - name: "MySQL unsigned_float / unsigned_decimal short-hand"
+      kind: "breaking"
+      pattern: "\\bunsigned_(float|decimal)\\b"
       exclude: ""
       search_paths:
         - "db/migrate/"
-      explanation: "MySQL unsigned integer types deprecation notice in Rails 8.1"
-      fix: "Use check constraints instead of unsigned integers"
+      explanation: "Rails 8.1 removes the t.unsigned_float and t.unsigned_decimal short-hand column methods that were deprecated in 8.0 (activerecord/CHANGELOG.md: 'Remove deprecated `:unsigned_float` and `:unsigned_decimal` column methods for MySQL.'). Migrations using these short-hands raise NoMethodError. Background: as of MySQL 8.0.17, the UNSIGNED attribute is itself deprecated for FLOAT / DOUBLE / DECIMAL columns at the database level, so Rails no longer ships the convenience methods. Note: the pattern was previously matching `unsigned: true`, which is the column-option form on integer / bigint columns and is unrelated and unaffected"
+      fix: "Replace t.unsigned_float :amount with t.float :amount, unsigned: true (still allowed on integer / bigint via the column option) or, for DECIMAL, use a CHECK constraint on the value range. Audit each migration that used the short-hand"
       variable_name: "MYSQL_UNSIGNED"
 
     - name: "gitignore config keys"
