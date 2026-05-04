@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 5.1 → 5.2 upgrade"
 breaking_changes:
   high_priority:
     - name: "ActiveModel::Dirty methods after save"
+      kind: "deprecation"
       pattern: "\\b\\w+_(changed\\?|was)|\\.changes\\b|\\.changed\\?"
       exclude: "saved_change_to_|attribute_before_last_save|saved_changes"
       search_paths:
@@ -16,6 +17,7 @@ breaking_changes:
 
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
+      kind: "deprecation"
       pattern: "\\b(:controller|:action)\\b"
       exclude: "controller:|action:|:controller\\s*=>|:action\\s*=>|action_dispatch|action_view|action_mailer|action_cable|action_pack|action_controller"
       search_paths:
@@ -25,33 +27,37 @@ breaking_changes:
       variable_name: "DYNAMIC_ROUTE_SEGMENTS"
 
     - name: "class_name option with unquoted constant"
+      kind: "breaking"
       pattern: "class_name:\\s*[A-Z][A-Za-z0-9_:]*"
       exclude: "class_name:\\s*['\"]"
       search_paths:
         - "app/models/"
-      explanation: "Rails 5.2 deprecates passing class objects (constants) to the :class_name option on associations. Passing the constant forces autoload of the target class at boot time and breaks Zeitwerk in 6.0+"
+      explanation: "Rails 5.2 removes support for passing class objects (constants) to the :class_name option on associations; doing so now raises ArgumentError ('A class was passed to `:class_name` but we are expecting a string.') when the reflection is built, typically at model class load time. Finishes the deprecation cycle that began in 5.1. Background: passing the constant forces autoload of the target class at boot time and breaks Zeitwerk in 6.0+"
       fix: "Quote the class name: belongs_to :owner, class_name: User → belongs_to :owner, class_name: 'User'. Same applies to has_one, has_many, and has_and_belongs_to_many"
       variable_name: "CLASS_NAME_CONSTANT"
 
     - name: "error_on_ignored_order_or_limit config (renamed)"
+      kind: "breaking"
       pattern: "error_on_ignored_order_or_limit"
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 5.2 deprecates config.active_record.error_on_ignored_order_or_limit in favor of config.active_record.error_on_ignored_order"
+      explanation: "Rails 5.2 removes config.active_record.error_on_ignored_order_or_limit. The setting was renamed to config.active_record.error_on_ignored_order in 5.1 with a deprecated wrapper; the wrapper is gone in 5.2. Existing config lines using the old name raise NoMethodError at boot"
       fix: "Rename the config key: config.active_record.error_on_ignored_order_or_limit = X → config.active_record.error_on_ignored_order = X"
       variable_name: "ERROR_ON_IGNORED_ORDER_OR_LIMIT"
 
     - name: "halt_callback_chains_on_return_false config (deprecated)"
+      kind: "breaking"
       pattern: "halt_callback_chains_on_return_false"
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 5.2 deprecates config.active_support.halt_callback_chains_on_return_false. The `return false` halt mechanism was removed in Rails 5.0; the config has been a no-op since"
+      explanation: "Rails 5.2 removes ActiveSupport.halt_callback_chains_on_return_false entirely. The `return false` halt mechanism was removed in Rails 5.0; the config has been a no-op deprecated shim since 5.1 and is now gone. Assigning the config in config/application.rb or an initializer raises NoMethodError at boot"
       fix: "Remove the line entirely. Code that relied on `return false` to halt callbacks should already be using `throw :abort` after the 4.2 → 5.0 hop"
       variable_name: "HALT_CALLBACK_CHAINS_ON_RETURN_FALSE"
 
     - name: "String if:/unless: conditions on model callbacks"
+      kind: "deprecation"
       pattern: "(before|after|around)_(save|create|update|destroy|validation|commit|rollback|initialize|find|touch)\\b[^\\n]*\\b(if|unless):\\s*['\"]"
       exclude: ""
       search_paths:
@@ -61,6 +67,7 @@ breaking_changes:
       variable_name: "CALLBACK_STRING_CONDITIONS"
 
     - name: "Rails.application.secrets usage"
+      kind: "migration"
       pattern: "Rails\\.application\\.secrets\\b"
       exclude: ""
       search_paths:
@@ -73,6 +80,7 @@ breaking_changes:
 
   low_priority:
     - name: "Bootsnap gem in Gemfile (presence check)"
+      kind: "optional"
       pattern: "gem\\s+['\"]bootsnap['\"]"
       exclude: ""
       search_paths:
@@ -82,6 +90,7 @@ breaking_changes:
       variable_name: "BOOTSNAP_PRESENCE"
 
     - name: "event_redis ActionCable adapter"
+      kind: "deprecation"
       pattern: "event_redis"
       exclude: ""
       search_paths:
@@ -92,27 +101,30 @@ breaking_changes:
       variable_name: "EVENT_REDIS_ADAPTER"
 
     - name: "Erubis template handler references"
+      kind: "breaking"
       pattern: "\\bErubis\\b|::Handlers::Erubis"
       exclude: ""
       search_paths:
         - "app/"
         - "config/"
         - "lib/"
-      explanation: "Rails 5.1 replaced the Erubis ERB handler with Erubi. Rails 5.2 still warns when Erubis is referenced. Most apps never touch this directly; explicit references usually come from gems registering custom handlers"
+      explanation: "Rails 5.1 replaced the Erubis ERB handler with Erubi. Rails 5.2 removes the Erubis handler entirely; references to ActionView::Template::Handlers::Erubis raise NameError ('uninitialized constant'). Most apps never touch this directly; explicit references usually come from gems registering custom handlers that have not been updated for 5.2"
       fix: "Replace ActionView::Template::Handlers::Erubis references with ActionView::Template::Handlers::ERB (which is now Erubi-backed). For gems that register Erubis explicitly, check for an updated gem version or open an issue upstream"
       variable_name: "ERUBIS_HANDLER"
 
     - name: "Defining quoted_id method"
+      kind: "breaking"
       pattern: "def\\s+quoted_id\\b"
       exclude: ""
       search_paths:
         - "app/models/"
         - "lib/"
-      explanation: "Rails 5.2 deprecates overriding ActiveRecord's quoted_id. Custom implementations were used by some legacy gems to coerce non-AR objects into queries; this is now handled via Type::Value#serialize and ActiveModel::Type"
+      explanation: "Rails 5.2 removes the respond_to?(:quoted_id) hook in AR's quoting pipeline (deprecated in 5.1). Defining `def quoted_id` on a model no longer raises and no longer warns -- Rails simply ignores it during query construction, so the custom logic becomes silently dead code with production impact. Custom implementations were used by some legacy gems to coerce non-AR objects into queries; this is now handled via Type::Value#serialize and ActiveModel::Type"
       fix: "Migrate the logic to a custom ActiveModel::Type (define #serialize / #cast) or accept the model's default quoting behavior"
       variable_name: "QUOTED_ID_METHOD"
 
     - name: "ConnectionPool#verify with arguments"
+      kind: "deprecation"
       pattern: "\\.verify\\(\\s*\\S[^)]*\\)"
       exclude: ""
       search_paths:
@@ -123,16 +135,18 @@ breaking_changes:
       variable_name: "VERIFY_METHOD_DEPRECATION"
 
     - name: "lock! on ActiveRecord object"
+      kind: "breaking"
       pattern: "\\.lock!(?=\\(|\\s|$)"
       exclude: ""
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 5.2 emits a deprecation warning when #lock! is called on an AR record with unsaved changes (the lock silently discarded the changes in earlier versions). NOISY REGEX: matches every .lock! call site; most are correct usage on persisted records with no in-memory edits. Audit each match to confirm the receiver has been saved before the lock"
+      explanation: "Rails 5.2 raises a RuntimeError when #lock! is called on an AR record with unsaved changes ('Locking a record with unpersisted changes is not supported.'). Finishes the deprecation cycle that began in 5.1; before that the lock silently discarded the changes. NOISY REGEX: matches every .lock! call site; most are correct usage on persisted records with no in-memory edits. Audit each match to confirm the receiver has been saved before the lock"
       fix: "Save (or reload) before locking: record.save; record.lock!. If you intended to lock and then mutate, the correct order is record.lock! followed by the assignment + save"
       variable_name: "LOCK_BANG_UNPERSISTED"
 
     - name: "Legacy secret_key_base configuration"
+      kind: "deprecation"
       pattern: "Rails\\.application\\.config\\.secret_(token|key_base)"
       exclude: ""
       search_paths:
