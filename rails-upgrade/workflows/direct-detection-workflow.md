@@ -33,15 +33,15 @@ detection-scripts/patterns/rails-80-patterns.yml
 ```
 
 The pattern file contains:
-- `breaking_changes.high_priority` - Critical patterns to search
-- `breaking_changes.medium_priority` - Important patterns to search
+- `upgrade_findings.high_priority` - Critical patterns to search
+- `upgrade_findings.medium_priority` - Important patterns to search
 - Each pattern has: `name`, `pattern`, `search_paths`, `explanation`, `fix`
 
 ---
 
 ### Step 2: Process High Priority Patterns
 
-For each pattern in `breaking_changes.high_priority`:
+For each pattern in `upgrade_findings.high_priority`:
 
 ```yaml
 - name: "Sprockets usage"
@@ -81,7 +81,7 @@ Grep:
 
 ### Step 3: Process Medium Priority Patterns
 
-Same process for `breaking_changes.medium_priority` patterns.
+Same process for `upgrade_findings.medium_priority` patterns.
 
 ---
 
@@ -189,7 +189,7 @@ Read:
 version: "8.0"
 description: "Breaking change patterns for Rails 7.2 → 8.0 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "Human-readable name"
       pattern: "regex pattern"

@@ -1,7 +1,7 @@
 version: "8.0"
 description: "Breaking change patterns for Rails 7.2 → 8.0 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "Sprockets usage"
       kind: "migration"

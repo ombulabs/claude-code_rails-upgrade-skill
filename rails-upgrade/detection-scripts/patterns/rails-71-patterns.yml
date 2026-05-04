@@ -1,7 +1,7 @@
 version: "7.1"
 description: "Breaking change patterns for Rails 7.0 → 7.1 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "cache_classes deprecated"
       kind: "deprecation"

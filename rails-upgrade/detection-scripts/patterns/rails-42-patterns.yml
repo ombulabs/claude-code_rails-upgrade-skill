@@ -1,7 +1,7 @@
 version: "4.2"
 description: "Breaking change patterns for Rails 4.1 → 4.2 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "ActionMailer .deliver / .deliver! deprecated"
       kind: "deprecation"

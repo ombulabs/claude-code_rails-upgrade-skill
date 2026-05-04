@@ -1,7 +1,7 @@
 version: "8.1"
 description: "Breaking change patterns for Rails 8.0 → 8.1 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "SSL configuration commented"
       kind: "optional"

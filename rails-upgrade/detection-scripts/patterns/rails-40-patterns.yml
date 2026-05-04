@@ -1,7 +1,7 @@
 version: "4.0"
 description: "Breaking change patterns for Rails 3.2 → 4.0 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "attr_accessible usage"
       kind: "breaking"
