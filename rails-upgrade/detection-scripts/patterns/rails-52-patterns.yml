@@ -42,7 +42,7 @@ breaking_changes:
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 5.2 deprecates config.active_record.error_on_ignored_order_or_limit in favor of config.active_record.error_on_ignored_order"
+      explanation: "Rails 5.2 removes config.active_record.error_on_ignored_order_or_limit. The setting was renamed to config.active_record.error_on_ignored_order in 5.1 with a deprecated wrapper; the wrapper is gone in 5.2. Existing config lines using the old name raise NoMethodError at boot"
       fix: "Rename the config key: config.active_record.error_on_ignored_order_or_limit = X → config.active_record.error_on_ignored_order = X"
       variable_name: "ERROR_ON_IGNORED_ORDER_OR_LIMIT"
 
