@@ -1,7 +1,7 @@
 version: "5.0"
 description: "Breaking change patterns for Rails 4.2 → 5.0 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "Ruby version below 2.2.2"
       kind: "breaking"

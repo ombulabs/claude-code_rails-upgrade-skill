@@ -1,7 +1,7 @@
 version: "5.2"
 description: "Breaking change patterns for Rails 5.1 → 5.2 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "ActiveModel::Dirty methods after save"
       kind: "deprecation"

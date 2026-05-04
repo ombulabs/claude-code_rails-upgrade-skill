@@ -1,7 +1,7 @@
 version: "7.0"
 description: "Breaking change patterns for Rails 6.1 → 7.0 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "Ruby version requirement"
       kind: "breaking"

@@ -1,7 +1,7 @@
 version: "7.2"
 description: "Breaking change patterns for Rails 7.1 → 7.2 upgrade"
 
-breaking_changes:
+upgrade_findings:
   high_priority:
     - name: "Transaction-aware job enqueuing"
       kind: "migration"
