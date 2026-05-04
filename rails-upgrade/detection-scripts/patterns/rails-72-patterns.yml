@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 7.1 → 7.2 upgrade"
 breaking_changes:
   high_priority:
     - name: "Transaction-aware job enqueuing"
+      kind: "migration"
       pattern: "perform_later|deliver_later"
       exclude: ""
       search_paths:
@@ -15,6 +16,7 @@ breaking_changes:
       variable_name: "TRANSACTION_JOBS"
 
     - name: "show_exceptions configuration"
+      kind: "breaking"
       pattern: "show_exceptions\\s*=\\s*(true|false)"
       exclude: ""
       search_paths:
@@ -24,6 +26,7 @@ breaking_changes:
       variable_name: "SHOW_EXCEPTIONS"
 
     - name: "params comparison removed"
+      kind: "breaking"
       pattern: "params\\s*==|==\\s*params"
       exclude: ""
       search_paths:
@@ -34,6 +37,7 @@ breaking_changes:
       variable_name: "PARAMS_COMPARISON"
 
     - name: "ActiveRecord.connection deprecated"
+      kind: "deprecation"
       pattern: "ActiveRecord::Base\\.connection(?!_pool)"
       exclude: "with_connection"
       search_paths:
@@ -44,6 +48,7 @@ breaking_changes:
       variable_name: "AR_CONNECTION"
 
     - name: "Rails.application.secrets removed"
+      kind: "breaking"
       pattern: "Rails\\.application\\.secrets"
       exclude: ""
       search_paths:
@@ -56,6 +61,7 @@ breaking_changes:
 
   medium_priority:
     - name: "serialize syntax change"
+      kind: "breaking"
       pattern: "serialize\\s+:\\w+(?!.*(?:type:|coder:))"
       exclude: ""
       search_paths:
@@ -65,6 +71,7 @@ breaking_changes:
       variable_name: "SERIALIZE_SYNTAX"
 
     - name: "fixture_path deprecated"
+      kind: "deprecation"
       pattern: "fixture_path[^s]"
       exclude: "fixture_paths"
       search_paths:
@@ -76,6 +83,7 @@ breaking_changes:
       variable_name: "FIXTURE_PATH"
 
     - name: "query_constraints deprecated"
+      kind: "deprecation"
       pattern: "query_constraints"
       exclude: ""
       search_paths:
@@ -85,6 +93,7 @@ breaking_changes:
       variable_name: "QUERY_CONSTRAINTS"
 
     - name: "mailer test args syntax"
+      kind: "deprecation"
       pattern: "args:\\s*\\["
       exclude: ""
       search_paths:
@@ -95,6 +104,7 @@ breaking_changes:
       variable_name: "MAILER_TEST_ARGS"
 
     - name: "autoload_lib syntax"
+      kind: "optional"
       pattern: "autoload_lib.*%w\\("
       exclude: ""
       search_paths:
@@ -104,6 +114,7 @@ breaking_changes:
       variable_name: "AUTOLOAD_LIB_SYNTAX"
 
     - name: "Ruby version"
+      kind: "breaking"
       pattern: "ruby.*['\"]3\\.[0-1]"
       exclude: ""
       search_paths:
