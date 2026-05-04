@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 6.1 → 7.0 upgrade"
 breaking_changes:
   high_priority:
     - name: "Ruby version requirement"
+      kind: "breaking"
       pattern: "ruby.*['\"]2\\.[0-6]"
       exclude: ""
       search_paths:
@@ -14,6 +15,7 @@ breaking_changes:
       variable_name: "RUBY_VERSION"
 
     - name: "Webpacker usage"
+      kind: "migration"
       pattern: "webpacker|javascript_pack_tag"
       exclude: "importmap"
       search_paths:
@@ -25,6 +27,7 @@ breaking_changes:
       variable_name: "WEBPACKER"
 
     - name: "Spring usage"
+      kind: "optional"
       pattern: "gem ['\"]spring['\"]"
       exclude: ""
       search_paths:
@@ -34,6 +37,7 @@ breaking_changes:
       variable_name: "SPRING"
 
     - name: "form_with local option"
+      kind: "migration"
       pattern: "form_with.*local:\\s*(true|false)"
       exclude: ""
       search_paths:
@@ -43,6 +47,7 @@ breaking_changes:
       variable_name: "FORM_WITH_LOCAL"
 
     - name: "ActionController::Base.allow_forgery_protection"
+      kind: "migration"
       pattern: "allow_forgery_protection"
       exclude: ""
       search_paths:
@@ -55,6 +60,7 @@ breaking_changes:
 
   medium_priority:
     - name: "secrets.yml usage"
+      kind: "deprecation"
       pattern: "Rails\\.application\\.secrets"
       exclude: "credentials"
       search_paths:
@@ -66,6 +72,7 @@ breaking_changes:
       variable_name: "SECRETS_YML"
 
     - name: "ActiveRecord enum prefix/suffix"
+      kind: "migration"
       pattern: "enum.*:.*\\{"
       exclude: ""
       search_paths:
@@ -75,6 +82,7 @@ breaking_changes:
       variable_name: "ENUM_SYNTAX"
 
     - name: "image_tag skip_pipeline"
+      kind: "breaking"
       pattern: "image_tag.*skip_pipeline"
       exclude: ""
       search_paths:
@@ -85,6 +93,7 @@ breaking_changes:
       variable_name: "IMAGE_TAG_PIPELINE"
 
     - name: "ActiveStorage variant syntax"
+      kind: "deprecation"
       pattern: "\\.variant\\(.*resize:"
       exclude: ""
       search_paths:
@@ -94,6 +103,7 @@ breaking_changes:
       variable_name: "ACTIVE_STORAGE_VARIANT"
 
     - name: "Turbolinks"
+      kind: "migration"
       pattern: "turbolinks|Turbolinks"
       exclude: ""
       search_paths:
@@ -105,6 +115,7 @@ breaking_changes:
       variable_name: "TURBOLINKS"
 
     - name: "UJS (rails-ujs)"
+      kind: "migration"
       pattern: "rails-ujs|@rails/ujs"
       exclude: ""
       search_paths:
@@ -116,6 +127,7 @@ breaking_changes:
       variable_name: "RAILS_UJS"
 
     - name: "to_s(:format) deprecation"
+      kind: "deprecation"
       pattern: "\\.to_s\\(:"
       exclude: ""
       search_paths:
