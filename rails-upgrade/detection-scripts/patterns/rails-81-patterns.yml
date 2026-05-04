@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 8.0 → 8.1 upgrade"
 breaking_changes:
   high_priority:
     - name: "SSL configuration commented"
+      kind: "optional"
       pattern: "#.*force_ssl|#.*assume_ssl"
       exclude: ""
       search_paths:
@@ -13,6 +14,7 @@ breaking_changes:
       variable_name: "SSL_COMMENTED"
 
     - name: "pool to max_connections"
+      kind: "breaking"
       pattern: "pool:"
       exclude: "max_connections"
       search_paths:
@@ -22,6 +24,7 @@ breaking_changes:
       variable_name: "POOL_RENAME"
 
     - name: "bundler-audit required"
+      kind: "optional"
       pattern: "bundler-audit"
       exclude: ""
       search_paths:
@@ -34,6 +37,7 @@ breaking_changes:
 
   medium_priority:
     - name: "Semicolon query separator"
+      kind: "breaking"
       pattern: "param.*;"
       exclude: ""
       search_paths:
@@ -44,6 +48,7 @@ breaking_changes:
       variable_name: "SEMICOLON_SEPARATOR"
 
     - name: "Sidekiq adapter built-in"
+      kind: "breaking"
       pattern: "sidekiq-rails|activejob-sidekiq"
       exclude: ""
       search_paths:
@@ -53,6 +58,7 @@ breaking_changes:
       variable_name: "SIDEKIQ_ADAPTER"
 
     - name: "SuckerPunch adapter"
+      kind: "breaking"
       pattern: "sucker_punch"
       exclude: ""
       search_paths:
@@ -63,6 +69,7 @@ breaking_changes:
       variable_name: "SUCKER_PUNCH"
 
     - name: "Azure storage service"
+      kind: "breaking"
       pattern: "azure_storage|microsoft_azure"
       exclude: ""
       search_paths:
@@ -74,6 +81,7 @@ breaking_changes:
 
   low_priority:
     - name: "MySQL unsigned types"
+      kind: "deprecation"
       pattern: "unsigned:\\s*true"
       exclude: ""
       search_paths:
@@ -83,6 +91,7 @@ breaking_changes:
       variable_name: "MYSQL_UNSIGNED"
 
     - name: "gitignore config keys"
+      kind: "optional"
       pattern: "\\.key$"
       exclude: "/config/"
       search_paths:
