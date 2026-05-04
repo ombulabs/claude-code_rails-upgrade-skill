@@ -32,7 +32,7 @@ breaking_changes:
       exclude: "class_name:\\s*['\"]"
       search_paths:
         - "app/models/"
-      explanation: "Rails 5.2 deprecates passing class objects (constants) to the :class_name option on associations. Passing the constant forces autoload of the target class at boot time and breaks Zeitwerk in 6.0+"
+      explanation: "Rails 5.2 removes support for passing class objects (constants) to the :class_name option on associations; doing so now raises ArgumentError ('A class was passed to `:class_name` but we are expecting a string.') when the reflection is built, typically at model class load time. Finishes the deprecation cycle that began in 5.1. Background: passing the constant forces autoload of the target class at boot time and breaks Zeitwerk in 6.0+"
       fix: "Quote the class name: belongs_to :owner, class_name: User → belongs_to :owner, class_name: 'User'. Same applies to has_one, has_many, and has_and_belongs_to_many"
       variable_name: "CLASS_NAME_CONSTANT"
 
