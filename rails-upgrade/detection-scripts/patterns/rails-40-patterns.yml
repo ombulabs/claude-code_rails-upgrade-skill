@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 3.2 → 4.0 upgrade"
 breaking_changes:
   high_priority:
     - name: "attr_accessible usage"
+      kind: "breaking"
       pattern: "attr_accessible"
       exclude: ""
       search_paths:
@@ -14,6 +15,7 @@ breaking_changes:
       variable_name: "ATTR_ACCESSIBLE"
 
     - name: "attr_protected usage"
+      kind: "breaking"
       pattern: "attr_protected"
       exclude: ""
       search_paths:
@@ -24,6 +26,7 @@ breaking_changes:
       variable_name: "ATTR_PROTECTED"
 
     - name: "require strong_parameters"
+      kind: "breaking"
       pattern: "require.*strong_parameters"
       exclude: ""
       search_paths:
@@ -35,6 +38,7 @@ breaking_changes:
       variable_name: "REQUIRE_STRONG_PARAMS"
 
     - name: "Scope without lambda"
+      kind: "breaking"
       pattern: "scope\\s+:\\w+\\s*,\\s*where"
       exclude: ""
       search_paths:
@@ -44,6 +48,7 @@ breaking_changes:
       variable_name: "SCOPE_WITHOUT_LAMBDA"
 
     - name: "default_scope without block"
+      kind: "breaking"
       pattern: "default_scope\\s+(where|order|:order)"
       exclude: ""
       search_paths:
@@ -53,6 +58,7 @@ breaking_changes:
       variable_name: "DEFAULT_SCOPE_WITHOUT_BLOCK"
 
     - name: "Association :conditions option"
+      kind: "breaking"
       pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?conditions(:|\\s*=>)"
       exclude: ""
       search_paths:
@@ -62,6 +68,7 @@ breaking_changes:
       variable_name: "ASSOCIATION_CONDITIONS"
 
     - name: "Association :order option"
+      kind: "breaking"
       pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*[^_]:?order(:|\\s*=>)"
       exclude: ""
       search_paths:
@@ -71,6 +78,7 @@ breaking_changes:
       variable_name: "ASSOCIATION_ORDER"
 
     - name: "Association :extend option"
+      kind: "breaking"
       pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?extend(:|\\s*=>)"
       exclude: ""
       search_paths:
@@ -80,6 +88,7 @@ breaking_changes:
       variable_name: "ASSOCIATION_EXTEND"
 
     - name: "Association :uniq option"
+      kind: "breaking"
       pattern: "(has_many|has_and_belongs_to_many).*:?uniq(:|\\s*=>)"
       exclude: ""
       search_paths:
@@ -89,6 +98,7 @@ breaking_changes:
       variable_name: "ASSOCIATION_UNIQ"
 
     - name: "Association :finder_sql option"
+      kind: "deprecation"
       pattern: ":?finder_sql(:|\\s*=>)"
       exclude: ""
       search_paths:
@@ -98,6 +108,7 @@ breaking_changes:
       variable_name: "FINDER_SQL"
 
     - name: "Dynamic finders (find_all_by_*)"
+      kind: "deprecation"
       pattern: "find_all_by_"
       exclude: ""
       search_paths:
@@ -108,6 +119,7 @@ breaking_changes:
       variable_name: "FIND_ALL_BY"
 
     - name: "Dynamic finders (find_or_create_by_*)"
+      kind: "deprecation"
       pattern: "find_or_create_by_"
       exclude: ""
       search_paths:
@@ -118,6 +130,7 @@ breaking_changes:
       variable_name: "FIND_OR_CREATE_BY"
 
     - name: "Dynamic finders (find_or_initialize_by_*)"
+      kind: "deprecation"
       pattern: "find_or_initialize_by_"
       exclude: ""
       search_paths:
@@ -128,6 +141,7 @@ breaking_changes:
       variable_name: "FIND_OR_INITIALIZE_BY"
 
     - name: "Association :readonly option on through"
+      kind: "breaking"
       pattern: "(has_many|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
       exclude: ""
       search_paths:
@@ -137,6 +151,7 @@ breaking_changes:
       variable_name: "ASSOCIATION_READONLY"
 
     - name: "Ruby 1.8 version requirement"
+      kind: "breaking"
       pattern: "ruby.*['\"]1\\.8"
       exclude: ""
       search_paths:
@@ -147,6 +162,7 @@ breaking_changes:
       variable_name: "RUBY_VERSION"
 
     - name: "Route match without HTTP method"
+      kind: "breaking"
       pattern: "^\\s*match\\s+['\"/]"
       exclude: "via:"
       search_paths:
@@ -158,6 +174,7 @@ breaking_changes:
 
   medium_priority:
     - name: "rescue_action method"
+      kind: "breaking"
       pattern: "def rescue_action"
       exclude: ""
       search_paths:
@@ -168,6 +185,7 @@ breaking_changes:
       variable_name: "RESCUE_ACTION"
 
     - name: "ActiveRecord Observers"
+      kind: "breaking"
       pattern: "ActiveRecord::Observer|observer.*:.*\\w+_observer|config\\.active_record\\.observers"
       exclude: ""
       search_paths:
@@ -178,6 +196,7 @@ breaking_changes:
       variable_name: "OBSERVERS"
 
     - name: "ActionController Sweepers"
+      kind: "breaking"
       pattern: "cache_sweeper|ActionController::Caching::Sweeper|< ActionController::Caching::Sweeper"
       exclude: ""
       search_paths:
@@ -187,6 +206,7 @@ breaking_changes:
       variable_name: "SWEEPERS"
 
     - name: "Action caching (caches_page/caches_action)"
+      kind: "breaking"
       pattern: "caches_page|caches_action"
       exclude: ""
       search_paths:
@@ -196,6 +216,7 @@ breaking_changes:
       variable_name: "ACTION_CACHING"
 
     - name: "ActiveResource usage"
+      kind: "breaking"
       pattern: "ActiveResource|< ActiveResource::Base"
       exclude: ""
       search_paths:
@@ -206,6 +227,7 @@ breaking_changes:
       variable_name: "ACTIVE_RESOURCE"
 
     - name: "vendor/plugins directory"
+      kind: "breaking"
       pattern: ""
       exclude: ""
       search_paths:
@@ -215,6 +237,7 @@ breaking_changes:
       variable_name: "VENDOR_PLUGINS"
 
     - name: "cache_timestamp_format or external cache_key storage"
+      kind: "breaking"
       pattern: "cache_timestamp_format|cache_key"
       exclude: ""
       search_paths:
@@ -225,6 +248,7 @@ breaking_changes:
       variable_name: "CACHE_KEY_FORMAT"
 
     - name: "ActiveSupport::BufferedLogger"
+      kind: "deprecation"
       pattern: "ActiveSupport::BufferedLogger"
       exclude: ""
       search_paths:
@@ -236,6 +260,7 @@ breaking_changes:
       variable_name: "BUFFERED_LOGGER"
 
     - name: "config.assets.compress"
+      kind: "breaking"
       pattern: "config\\.assets\\.compress"
       exclude: ""
       search_paths:
@@ -245,6 +270,7 @@ breaking_changes:
       variable_name: "ASSETS_COMPRESS"
 
     - name: "config.paths[\"config/routes\"] (without .rb)"
+      kind: "breaking"
       pattern: "config\\.paths\\[.config/routes.\\]"
       exclude: "routes.rb"
       search_paths:
@@ -255,6 +281,7 @@ breaking_changes:
       variable_name: "CONFIG_ROUTES_PATH"
 
     - name: "assign_attributes with options hash"
+      kind: "breaking"
       pattern: "assign_attributes\\(.*,\\s*\\w+:"
       exclude: ""
       search_paths:
@@ -265,6 +292,7 @@ breaking_changes:
       variable_name: "ASSIGN_ATTRIBUTES_OPTIONS"
 
     - name: "request.env.merge! in tests"
+      kind: "migration"
       pattern: "request\\.env\\.merge!"
       exclude: ""
       search_paths:
@@ -275,6 +303,7 @@ breaking_changes:
       variable_name: "REQUEST_ENV_MERGE"
 
     - name: "_run_validation_callbacks"
+      kind: "breaking"
       pattern: "_run_validation_callbacks"
       exclude: ""
       search_paths:
@@ -285,6 +314,7 @@ breaking_changes:
       variable_name: "RUN_VALIDATION_CALLBACKS"
 
     - name: "select('distinct ...').pluck"
+      kind: "migration"
       pattern: "select\\(.*distinct.*\\)\\.pluck"
       exclude: ""
       search_paths:
@@ -295,6 +325,7 @@ breaking_changes:
       variable_name: "SELECT_DISTINCT_PLUCK"
 
     - name: "ActiveRecord::ImmutableRelation risk"
+      kind: "breaking"
       pattern: "\\.count\\(['\"]distinct"
       exclude: ""
       search_paths:
@@ -305,6 +336,7 @@ breaking_changes:
       variable_name: "IMMUTABLE_RELATION"
 
     - name: "Fixture dynamic dates without string cast"
+      kind: "breaking"
       pattern: "<%=.*\\.(ago|from_now|since|until).*%>"
       exclude: "to_s"
       search_paths:
