@@ -82,14 +82,14 @@ breaking_changes:
       variable_name: "ENUM_SYNTAX"
 
     - name: "image_tag skip_pipeline"
-      kind: "breaking"
+      kind: "optional"
       pattern: "image_tag.*skip_pipeline"
       exclude: ""
       search_paths:
         - "app/views/"
         - "app/helpers/"
-      explanation: "image_tag skip_pipeline option removed in Rails 7.0"
-      fix: "Remove skip_pipeline option from image_tag calls"
+      explanation: "skip_pipeline is fully supported at Rails 7.0; image_tag's implementation is byte-for-byte identical to 6.1. The option was actually expanded at 7.0 to also work on stylesheet_link_tag. This entry flags call sites for review when migrating away from Sprockets to Propshaft / Importmap, but the option itself does not change at this hop and existing calls continue to work"
+      fix: "No change required at the 7.0 hop. If you are also migrating off the Sprockets asset pipeline, audit each skip_pipeline call to confirm it is still doing what you intend under the new pipeline; otherwise leave as-is"
       variable_name: "IMAGE_TAG_PIPELINE"
 
     - name: "ActiveStorage variant syntax"
