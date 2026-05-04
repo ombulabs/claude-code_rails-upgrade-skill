@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 7.0 → 7.1 upgrade"
 breaking_changes:
   high_priority:
     - name: "cache_classes deprecated"
+      kind: "deprecation"
       pattern: "cache_classes"
       exclude: ""
       search_paths:
@@ -13,6 +14,7 @@ breaking_changes:
       variable_name: "CACHE_CLASSES"
 
     - name: "legacy_connection_handling removed"
+      kind: "breaking"
       pattern: "legacy_connection_handling"
       exclude: ""
       search_paths:
@@ -22,6 +24,7 @@ breaking_changes:
       variable_name: "LEGACY_CONNECTION_HANDLING"
 
     - name: "preview_path singular deprecated"
+      kind: "deprecation"
       pattern: "preview_path\\s*="
       exclude: "preview_paths"
       search_paths:
@@ -31,6 +34,7 @@ breaking_changes:
       variable_name: "PREVIEW_PATH"
 
     - name: "Force SSL default changed"
+      kind: "optional"
       pattern: "force_ssl\\s*=\\s*false"
       exclude: ""
       search_paths:
@@ -40,6 +44,7 @@ breaking_changes:
       variable_name: "FORCE_SSL"
 
     - name: "lib/ autoloading changes"
+      kind: "optional"
       pattern: "autoload_paths.*lib|eager_load_paths.*lib"
       exclude: "autoload_lib"
       search_paths:
@@ -50,6 +55,7 @@ breaking_changes:
 
   medium_priority:
     - name: "SQLite database in db/ directory"
+      kind: "optional"
       pattern: "database:\\s*db/.*\\.sqlite3"
       exclude: ""
       search_paths:
@@ -59,6 +65,7 @@ breaking_changes:
       variable_name: "SQLITE_LOCATION"
 
     - name: "Query log tags configuration"
+      kind: "optional"
       pattern: "query_log_tags_enabled"
       exclude: ""
       search_paths:
@@ -68,6 +75,7 @@ breaking_changes:
       variable_name: "QUERY_LOG_TAGS"
 
     - name: "inspect output dependency"
+      kind: "migration"
       pattern: "\\.inspect"
       exclude: ""
       search_paths:
@@ -78,6 +86,7 @@ breaking_changes:
       variable_name: "INSPECT_OUTPUT"
 
     - name: "secrets.yml.enc usage"
+      kind: "deprecation"
       pattern: "secrets\\.yml\\.enc|Rails\\.application\\.secrets"
       exclude: ""
       search_paths:
