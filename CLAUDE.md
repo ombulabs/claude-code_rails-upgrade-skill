@@ -7,7 +7,7 @@ This file captures project-specific conventions Claude should follow when workin
 - `bin/validate-patterns` validates every detection pattern YAML file under `rails-upgrade/detection-scripts/patterns/`. Run it before committing any change to a pattern file. Pure-stdlib Ruby, no Bundler or Gemfile required.
   - `bin/validate-patterns` validates every file
   - `bin/validate-patterns path/to/file.yml` validates one or more specific files
-  - Checks: YAML parses, required top-level keys present, the seven required pattern keys present on each entry, and every `pattern` / `exclude` regex compiles
+  - Checks: YAML parses, required top-level keys present, the seven required pattern keys present on each entry, every `pattern` / `exclude` regex compiles, and any `kind:` value (optional during the issue #53 rollout) is one of the allowed enum values
   - Exits 0 on success, 1 on any failure with a per-file error report
 
 ## Version guides (`rails-upgrade/version-guides/*.md`)
@@ -22,7 +22,7 @@ This file captures project-specific conventions Claude should follow when workin
 
 - File naming: `rails-{VERSION}-patterns.yml` where `{VERSION}` is the major+minor without a dot (e.g., `rails-42-patterns.yml` for Rails 4.2).
 - Organize patterns under `high_priority`, `medium_priority`, and `low_priority`.
-- Each pattern needs: `name`, `pattern` (regex), `exclude` (regex, empty string if none), `search_paths`, `explanation`, `fix`, `variable_name`.
+- Each pattern needs: `name`, `pattern` (regex), `exclude` (regex, empty string if none), `search_paths`, `explanation`, `fix`, `variable_name`. New entries should also set `kind:` (see "Assigning kind" below); the field is optional during the issue #53 rollout and becomes required once every pattern file has been classified.
 - Include a `dependencies` section for any bridge/compatibility gems mentioned in the guide.
 - **Required before committing any change to a detection pattern file:** run `bin/validate-patterns` (or `bin/validate-patterns path/to/file.yml` for the file you touched). Do not commit a pattern change without a clean run; broken YAML or schema drift in this directory breaks the skill at runtime. See the `## Repository tooling` section above for what the script checks.
 
@@ -65,3 +65,23 @@ If most apps will ignore it without consequence, it is LOW.
 3. **Would the app be unaffected unless the user opts into a new feature or runs in a specific environment?** → LOW.
 
 Priority is about **urgency during an upgrade**, not editorial weight.
+
+## Assigning `kind:` (`breaking` / `deprecation` / `migration` / `optional`)
+
+`kind:` describes **what the change is**; `priority` describes **how urgent it is**. The two are orthogonal. A HIGH `deprecation` (silently wrong, like `DIRTY_TRACKING_AFTER_SAVE`) and a HIGH `breaking` (won't boot) are both "fix first" but for different reasons.
+
+The four values:
+
+- **`breaking`** — Raises, removed, or prevents the app from booting / bundling / running its test suite. The user cannot complete the upgrade without addressing it. Example: `update_attributes` removed in 6.1, `redirect_to :back` removed in 5.1.
+- **`deprecation`** — Works at this hop but emits a deprecation warning. Removal is scheduled for a later Rails version. Example: dynamic `:controller` route segments in 5.2, string `if:` conditions on callbacks.
+- **`migration`** — Works today, no warning, but a recommended migration target. Adopting it now avoids rework on the next hop or an entirely new approach. Example: `Rails.application.secrets` → `credentials.yml.enc` in 5.2.
+- **`optional`** — Opt-in feature or improvement. The user can ignore it without consequence. Example: `bootsnap`, `webpacker` in 5.1, `propshaft` adoption ahead of 8.0.
+
+How to decide:
+
+1. **Will the upgrade fail (boot, bundle, tests) without this fix?** → `breaking`.
+2. **Does Rails emit a deprecation warning when this code runs at the target version?** → `deprecation`.
+3. **Is this a recommended path forward (e.g. `secrets.yml` → `credentials.yml.enc`) that does not yet warn?** → `migration`.
+4. **Is this purely opt-in / cosmetic / a new feature?** → `optional`.
+
+If `kind` and `priority` seem to conflict, trust both. They answer different questions.

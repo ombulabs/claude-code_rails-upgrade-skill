@@ -15,6 +15,7 @@ PATTERNS_DIR = File.expand_path("../rails-upgrade/detection-scripts/patterns", _
 TOP_LEVEL_KEYS = %w[version description breaking_changes].freeze
 PATTERN_KEYS = %w[name pattern exclude search_paths explanation fix variable_name].freeze
 PRIORITY_KEYS = %w[high_priority medium_priority low_priority].freeze
+KIND_VALUES = %w[breaking deprecation migration optional].freeze
 
 def validate(path)
   errors = []
@@ -48,6 +49,10 @@ def validate(path)
 
       PATTERN_KEYS.each do |k|
         errors << "#{label}: missing key: #{k}" unless entry.key?(k)
+      end
+
+      if entry.key?("kind") && !KIND_VALUES.include?(entry["kind"])
+        errors << "#{label}: invalid kind: #{entry["kind"].inspect} (allowed: #{KIND_VALUES.join(", ")})"
       end
 
       %w[pattern exclude].each do |key|
