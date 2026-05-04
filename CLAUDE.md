@@ -7,7 +7,7 @@ This file captures project-specific conventions Claude should follow when workin
 - `bin/validate-patterns` validates every detection pattern YAML file under `rails-upgrade/detection-scripts/patterns/`. Run it before committing any change to a pattern file. Pure-stdlib Ruby, no Bundler or Gemfile required.
   - `bin/validate-patterns` validates every file
   - `bin/validate-patterns path/to/file.yml` validates one or more specific files
-  - Checks: YAML parses, required top-level keys present, the seven required pattern keys present on each entry, every `pattern` / `exclude` regex compiles, and any `kind:` value (optional during the issue #53 rollout) is one of the allowed enum values
+  - Checks: YAML parses, required top-level keys present, the eight required pattern keys present on each entry, every `pattern` / `exclude` regex compiles, and the `kind:` value is one of the allowed enum values (`breaking`, `deprecation`, `migration`, `optional`)
   - Exits 0 on success, 1 on any failure with a per-file error report
 
 ## Version guides (`rails-upgrade/version-guides/*.md`)
@@ -22,7 +22,7 @@ This file captures project-specific conventions Claude should follow when workin
 
 - File naming: `rails-{VERSION}-patterns.yml` where `{VERSION}` is the major+minor without a dot (e.g., `rails-42-patterns.yml` for Rails 4.2).
 - Organize patterns under `high_priority`, `medium_priority`, and `low_priority`.
-- Each pattern needs: `name`, `pattern` (regex), `exclude` (regex, empty string if none), `search_paths`, `explanation`, `fix`, `variable_name`. New entries should also set `kind:` (see "Assigning kind" below); the field is optional during the issue #53 rollout and becomes required once every pattern file has been classified.
+- Each pattern needs: `name`, `kind` (one of `breaking` / `deprecation` / `migration` / `optional` — see "Assigning kind" below), `pattern` (regex), `exclude` (regex, empty string if none), `search_paths`, `explanation`, `fix`, `variable_name`. Place `kind:` immediately after `name:` for visual scannability.
 - Include a `dependencies` section for any bridge/compatibility gems mentioned in the guide.
 - **Required before committing any change to a detection pattern file:** run `bin/validate-patterns` (or `bin/validate-patterns path/to/file.yml` for the file you touched). Do not commit a pattern change without a clean run; broken YAML or schema drift in this directory breaks the skill at runtime. See the `## Repository tooling` section above for what the script checks.
 
