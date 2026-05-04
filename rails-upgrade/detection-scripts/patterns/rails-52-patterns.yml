@@ -27,7 +27,7 @@ breaking_changes:
       variable_name: "DYNAMIC_ROUTE_SEGMENTS"
 
     - name: "class_name option with unquoted constant"
-      kind: "deprecation"
+      kind: "breaking"
       pattern: "class_name:\\s*[A-Z][A-Za-z0-9_:]*"
       exclude: "class_name:\\s*['\"]"
       search_paths:
