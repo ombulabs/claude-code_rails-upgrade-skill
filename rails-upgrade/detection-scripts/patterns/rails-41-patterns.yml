@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 4.0 → 4.1 upgrade"
 breaking_changes:
   high_priority:
     - name: "Dynamic finders (find_all_by / find_last_by / scoped_by / find_by)"
+      kind: breaking
       pattern: "\\.(find_all_by_|find_last_by_|scoped_by_|find_by_)[a-zA-Z_0-9]+!?"
       exclude: "\\.find_by\\s*\\("
       search_paths:
@@ -14,6 +15,7 @@ breaking_changes:
       variable_name: "DYNAMIC_FINDERS"
 
     - name: "Dynamic find_or_initialize_by_* / find_or_create_by_*"
+      kind: breaking
       pattern: "\\.(find_or_initialize_by_|find_or_create_by_)[a-zA-Z_0-9]+"
       exclude: ""
       search_paths:
@@ -24,6 +26,7 @@ breaking_changes:
       variable_name: "FIND_OR_X_BY_DYNAMIC"
 
     - name: "return inside inline callback block"
+      kind: breaking
       pattern: "^\\s*(before_|after_|around_)(save|create|update|destroy|validation|commit|rollback|initialize|find|touch)\\b.*\\{[^}]*\\breturn\\b"
       exclude: ""
       search_paths:
@@ -35,6 +38,7 @@ breaking_changes:
       variable_name: "CALLBACK_RETURN"
 
     - name: "Implicit join reference in includes+where string"
+      kind: breaking
       pattern: "\\.includes\\([^)]+\\)[^\\n]*\\.where\\(\\s*['\"][a-z_][a-z_0-9]*\\."
       exclude: "\\.references\\(|\\.eager_load\\("
       search_paths:
@@ -45,6 +49,7 @@ breaking_changes:
       variable_name: "IMPLICIT_JOIN_REFERENCES"
 
     - name: "store_accessor on json/hstore column (PG key semantics)"
+      kind: breaking
       pattern: "^\\s*store_accessor\\s+:"
       exclude: ""
       search_paths:
@@ -54,6 +59,7 @@ breaking_changes:
       variable_name: "PG_JSON_HSTORE_KEYS"
 
     - name: "default_scope in models"
+      kind: breaking
       pattern: "^\\s*default_scope\\b"
       exclude: ""
       search_paths:
@@ -64,6 +70,7 @@ breaking_changes:
 
   medium_priority:
     - name: "MultiJSON usage"
+      kind: breaking
       pattern: "\\bMultiJSON\\b|require\\s+['\"]multi_json['\"]"
       exclude: ""
       search_paths:
@@ -75,6 +82,7 @@ breaking_changes:
       variable_name: "MULTI_JSON"
 
     - name: "ActiveRecord::Relation mutator calls"
+      kind: breaking
       pattern: "\\.(compact!|map!|delete_if|reject!|select!|flatten!|sort!|uniq!|collect!)\\b"
       exclude: ""
       search_paths:
@@ -85,6 +93,7 @@ breaking_changes:
       variable_name: "RELATION_MUTATORS"
 
     - name: "Controller test with format: :js (should use xhr)"
+      kind: breaking
       pattern: "^\\s*(get|post|put|patch|delete)\\s+:[a-z_]+[^\\n]*format:\\s*:js"
       exclude: "\\bxhr\\b"
       search_paths:
@@ -96,6 +105,7 @@ breaking_changes:
       variable_name: "JS_CONTROLLER_TEST"
 
     - name: "flash.to_hash with symbol key filters"
+      kind: breaking
       pattern: "flash\\.to_hash\\.(except|slice|values_at)\\(\\s*:"
       exclude: ""
       search_paths:
@@ -105,6 +115,7 @@ breaking_changes:
       variable_name: "FLASH_SYMBOL_KEYS"
 
     - name: "Cookies serializer not configured"
+      kind: optional
       pattern: "cookies_serializer"
       exclude: ""
       search_paths:
@@ -114,6 +125,7 @@ breaking_changes:
       variable_name: "COOKIES_SERIALIZER"
 
     - name: "I18n enforce_available_locales config"
+      kind: breaking
       pattern: "enforce_available_locales|available_locales"
       exclude: ""
       search_paths:
@@ -123,6 +135,7 @@ breaking_changes:
       variable_name: "I18N_ENFORCE_LOCALES"
 
     - name: "time_precision (as_json millisecond default)"
+      kind: migration
       pattern: "time_precision"
       exclude: ""
       search_paths:
@@ -133,6 +146,7 @@ breaking_changes:
 
   low_priority:
     - name: "Spring gem in Gemfile (presence check)"
+      kind: optional
       pattern: "gem\\s+['\"]spring['\"]"
       exclude: ""
       search_paths:
@@ -142,6 +156,7 @@ breaking_changes:
       variable_name: "SPRING"
 
     - name: "Legacy secret_key_base / secret_token reads"
+      kind: migration
       pattern: "Rails\\.application\\.config\\.secret_(key_base|token)"
       exclude: ""
       search_paths:
@@ -152,6 +167,7 @@ breaking_changes:
       variable_name: "SECRETS_CONFIG_READS"
 
     - name: "render :text usage"
+      kind: migration
       pattern: "\\brender\\s*[\\(\\s]\\s*(?:.*,\\s*)?(?:text:\\s*|:text\\s*=>)"
       exclude: ""
       search_paths:
@@ -161,6 +177,7 @@ breaking_changes:
       variable_name: "RENDER_TEXT"
 
     - name: "encode_json hook override"
+      kind: breaking
       pattern: "def\\s+encode_json\\b"
       exclude: ""
       search_paths:
@@ -171,6 +188,7 @@ breaking_changes:
       variable_name: "ENCODE_JSON_HOOK"
 
     - name: "encode_big_decimal_as_string (dead setting)"
+      kind: migration
       pattern: "encode_big_decimal_as_string"
       exclude: ""
       search_paths:
@@ -180,6 +198,7 @@ breaking_changes:
       variable_name: "BIG_DECIMAL_AS_STRING"
 
     - name: "JSON.generate / JSON.dump on Rails objects"
+      kind: migration
       pattern: "\\bJSON\\.(generate|dump)\\b"
       exclude: ""
       search_paths:
@@ -190,6 +209,7 @@ breaking_changes:
       variable_name: "JSON_GEM_ISOLATION"
 
     - name: "set_callback around lambda with &block"
+      kind: breaking
       pattern: "set_callback\\s+.+,\\s*:around\\s*,\\s*->\\([^)]*&block"
       exclude: ""
       search_paths:
@@ -200,6 +220,7 @@ breaking_changes:
       variable_name: "SET_CALLBACK_AROUND"
 
     - name: "disable_implicit_join_references config (dead setting)"
+      kind: deprecation
       pattern: "disable_implicit_join_references"
       exclude: ""
       search_paths:
@@ -209,6 +230,7 @@ breaking_changes:
       variable_name: "DISABLE_IMPLICIT_JOIN_REFERENCES"
 
     - name: "ActiveRecord::Migration.check_pending! in test helper"
+      kind: optional
       pattern: "ActiveRecord::Migration\\.check_pending!"
       exclude: ""
       search_paths:
