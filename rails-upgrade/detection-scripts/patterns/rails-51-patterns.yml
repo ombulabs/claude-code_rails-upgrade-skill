@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 5.0 → 5.1 upgrade"
 breaking_changes:
   high_priority:
     - name: "render :text removed"
+      kind: "breaking"
       pattern: "\\brender\\s+(:text\\s*=>|text:)"
       exclude: ""
       search_paths:
@@ -13,6 +14,7 @@ breaking_changes:
       variable_name: "RENDER_TEXT"
 
     - name: "render :nothing removed"
+      kind: "breaking"
       pattern: "\\brender\\s+(:nothing\\s*=>|nothing:)"
       exclude: ""
       search_paths:
@@ -22,6 +24,7 @@ breaking_changes:
       variable_name: "RENDER_NOTHING"
 
     - name: "redirect_to :back removed"
+      kind: "breaking"
       pattern: "redirect_to\\s+:back\\b"
       exclude: ""
       search_paths:
@@ -31,6 +34,7 @@ breaking_changes:
       variable_name: "REDIRECT_TO_BACK"
 
     - name: "*_filter callback methods removed"
+      kind: "breaking"
       pattern: "\\b(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_filter\\b"
       exclude: ""
       search_paths:
@@ -41,6 +45,7 @@ breaking_changes:
       variable_name: "FILTER_METHODS"
 
     - name: "String conditions in controller filters"
+      kind: "breaking"
       pattern: "(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_(action|filter)\\b[^\\n]*\\b(if|unless):\\s*['\"]"
       exclude: ""
       search_paths:
@@ -50,6 +55,7 @@ breaking_changes:
       variable_name: "FILTER_STRING_CONDITIONS"
 
     - name: "ActiveRecord::Relation#uniq removed"
+      kind: "breaking"
       pattern: "\\.uniq(\\b|\\()"
       exclude: "\\.(to_a|map|pluck|select|reject|each|values|keys|compact)[^\\n]*\\.uniq"
       search_paths:
@@ -60,6 +66,7 @@ breaking_changes:
       variable_name: "RELATION_UNIQ"
 
     - name: "use_transactional_fixtures removed"
+      kind: "breaking"
       pattern: "use_transactional_fixtures"
       exclude: ""
       search_paths:
@@ -70,6 +77,7 @@ breaking_changes:
       variable_name: "USE_TRANSACTIONAL_FIXTURES"
 
     - name: "Controller test positional arguments"
+      kind: "breaking"
       pattern: "^\\s*(get|post|put|patch|delete|head)\\s+[:'\"][^,\\n]+,\\s*(\\{|[a-z_]+:)"
       exclude: "params:|session:|flash:|headers:|body:|xhr:|format:"
       search_paths:
@@ -83,6 +91,7 @@ breaking_changes:
 
   medium_priority:
     - name: "raise_in_transactional_callbacks config (dead setting)"
+      kind: "breaking"
       pattern: "raise_in_transactional_callbacks"
       exclude: ""
       search_paths:
@@ -92,6 +101,7 @@ breaking_changes:
       variable_name: "RAISE_IN_TRANSACTIONAL_CALLBACKS"
 
     - name: "serve_static_files config renamed"
+      kind: "breaking"
       pattern: "config\\.serve_static_files"
       exclude: ""
       search_paths:
@@ -101,6 +111,7 @@ breaking_changes:
       variable_name: "SERVE_STATIC_FILES_RENAME"
 
     - name: "static_cache_control config renamed"
+      kind: "breaking"
       pattern: "config\\.static_cache_control"
       exclude: ""
       search_paths:
@@ -110,6 +121,7 @@ breaking_changes:
       variable_name: "STATIC_CACHE_CONTROL_RENAME"
 
     - name: "application.secrets nested string-key access"
+      kind: "breaking"
       pattern: "Rails\\.application\\.secrets\\[[^\\]]+\\]\\[['\"]"
       exclude: ""
       search_paths:
@@ -121,6 +133,7 @@ breaking_changes:
       variable_name: "SECRETS_STRING_KEYS"
 
     - name: "application.secrets method-accessor string-key access"
+      kind: "breaking"
       pattern: "Rails\\.application\\.secrets\\.\\w+\\[['\"]"
       exclude: ""
       search_paths:
