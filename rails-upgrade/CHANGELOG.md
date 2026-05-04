@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- `bin/validate-patterns` now accepts an optional `kind:` field on every pattern entry. Allowed values: `breaking`, `deprecation`, `migration`, `optional`. The validator rejects unknown values to guard against typos. The field is optional during the issue #53 rollout and becomes required once every pattern file has been classified. Documented the rubric in `CLAUDE.md` under "Assigning `kind:`".
+
 ## v3.3.0, 28 April 2026
 - Added `upgrade-cleanup` companion plugin for finishing a Rails upgrade campaign. Removes dual-boot scaffolding, drops `NextRails.next?` / `NextRails.current?` branches, retires stale monkey-patches and version-conditional code, and aligns CI matrix / Dockerfile / Ruby pin to the new version baseline. Lives as a sibling plugin in this repo (`upgrade-cleanup/.claude-plugin/plugin.json` + `upgrade-cleanup/upgrade-cleanup/SKILL.md` + `upgrade-cleanup/upgrade-cleanup/workflows/upgrade-cleanup-workflow.md`). `load_defaults` alignment and deprecation triage stay with the rails-upgrade skill, cleanup deliberately does not duplicate them. Based on FastRuby.io's "Finishing an Upgrade" methodology. (Closes #1)
 - Cleanup is **user-triggered, never automatic**. After each Rails upgrade ships, the rails-upgrade skill now mentions the cleanup option but does not run it. Between hops in a multi-hop campaign the user usually wants to keep dual-boot in place and roll straight into the next hop. Cleanup ends the campaign.
