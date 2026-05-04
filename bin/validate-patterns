@@ -13,7 +13,7 @@ require "yaml"
 
 PATTERNS_DIR = File.expand_path("../rails-upgrade/detection-scripts/patterns", __dir__)
 TOP_LEVEL_KEYS = %w[version description upgrade_findings].freeze
-PATTERN_KEYS = %w[name pattern exclude search_paths explanation fix variable_name].freeze
+PATTERN_KEYS = %w[name kind pattern exclude search_paths explanation fix variable_name].freeze
 PRIORITY_KEYS = %w[high_priority medium_priority low_priority].freeze
 KIND_VALUES = %w[breaking deprecation migration optional].freeze
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 - `bin/validate-patterns` now accepts an optional `kind:` field on every pattern entry. Allowed values: `breaking`, `deprecation`, `migration`, `optional`. The validator rejects unknown values to guard against typos. The field is optional during the issue #53 rollout and becomes required once every pattern file has been classified. Documented the rubric in `CLAUDE.md` under "Assigning `kind:`".
+- `bin/validate-patterns` now **requires** the `kind:` field on every pattern entry (issue #53 rollout, sub-issue #67). All 12 pattern files have been classified across the preceding 12 sub-issues. Updated `CLAUDE.md` to list `kind:` among the required per-pattern fields and to remove the rollout caveat.
 - Renamed the top-level pattern-file key `breaking_changes:` → `upgrade_findings:` (issue #53 rollout, sub-issue #68). The old name was a misnomer — most entries are deprecations, migrations, or opt-in features rather than hard-breaking changes. Touched all 12 `rails-*-patterns.yml` files, `bin/validate-patterns` (the `TOP_LEVEL_KEYS` constant and the lookup variable in `validate`), and `rails-upgrade/workflows/direct-detection-workflow.md` (5 references). The validator now rejects files that still use the old key.
 
 ## v3.3.0, 28 April 2026
