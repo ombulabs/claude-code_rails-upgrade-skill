@@ -119,7 +119,7 @@ breaking_changes:
       search_paths:
         - "app/models/"
         - "lib/"
-      explanation: "Rails 5.2 deprecates overriding ActiveRecord's quoted_id. Custom implementations were used by some legacy gems to coerce non-AR objects into queries; this is now handled via Type::Value#serialize and ActiveModel::Type"
+      explanation: "Rails 5.2 removes the respond_to?(:quoted_id) hook in AR's quoting pipeline (deprecated in 5.1). Defining `def quoted_id` on a model no longer raises and no longer warns -- Rails simply ignores it during query construction, so the custom logic becomes silently dead code with production impact. Custom implementations were used by some legacy gems to coerce non-AR objects into queries; this is now handled via Type::Value#serialize and ActiveModel::Type"
       fix: "Migrate the logic to a custom ActiveModel::Type (define #serialize / #cast) or accept the model's default quoting behavior"
       variable_name: "QUOTED_ID_METHOD"
 
