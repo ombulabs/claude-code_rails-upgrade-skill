@@ -52,7 +52,7 @@ breaking_changes:
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 5.2 deprecates config.active_support.halt_callback_chains_on_return_false. The `return false` halt mechanism was removed in Rails 5.0; the config has been a no-op since"
+      explanation: "Rails 5.2 removes ActiveSupport.halt_callback_chains_on_return_false entirely. The `return false` halt mechanism was removed in Rails 5.0; the config has been a no-op deprecated shim since 5.1 and is now gone. Assigning the config in config/application.rb or an initializer raises NoMethodError at boot"
       fix: "Remove the line entirely. Code that relied on `return false` to halt callbacks should already be using `throw :abort` after the 4.2 → 5.0 hop"
       variable_name: "HALT_CALLBACK_CHAINS_ON_RETURN_FALSE"
 
