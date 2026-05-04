@@ -93,13 +93,13 @@ breaking_changes:
       variable_name: "IMAGE_TAG_PIPELINE"
 
     - name: "ActiveStorage variant syntax"
-      kind: "deprecation"
+      kind: "migration"
       pattern: "\\.variant\\(.*resize:"
       exclude: ""
       search_paths:
         - "app/"
-      explanation: "ActiveStorage variant syntax changes in Rails 7.0"
-      fix: "Use new syntax: variant(resize_to_limit: [100, 100])"
+      explanation: "Rails 7.0 makes vips the default variant processor for newly generated apps, but existing apps keep their previous setting (mini_magick) and the resize: form continues to work without any deprecation warning. activestorage/lib/active_storage/transformers/image_processing_transformer.rb is byte-for-byte identical between 6.1 and 7.0. If the app opts into vips by setting config.active_storage.variant_processor = :vips, then ImageMagick-flavored resize: arguments will fail at the libvips layer; that is a consequence of opting in, not a Rails-emitted deprecation"
+      fix: "If staying on mini_magick, no change required. If switching to vips (recommended for new apps), rewrite using libvips primitives: variant(resize_to_limit: [100, 100]), variant(resize_to_fill: [100, 100]), etc."
       variable_name: "ACTIVE_STORAGE_VARIANT"
 
     - name: "Turbolinks"
