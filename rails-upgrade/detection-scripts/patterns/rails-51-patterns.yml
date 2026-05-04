@@ -144,6 +144,72 @@ upgrade_findings:
       fix: "Use symbol keys: `Rails.application.secrets.smtp_settings[:address]` instead of `[\"address\"]`"
       variable_name: "SECRETS_METHOD_ACCESSOR_STRING_KEYS"
 
+    - name: "ActionDispatch::ParamsParser::ParseError"
+      kind: "deprecation"
+      pattern: "ActionDispatch::ParamsParser::ParseError"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+        - "app/middleware/"
+        - "lib/"
+      explanation: "Rails 5.1 deprecates ActionDispatch::ParamsParser::ParseError in favor of ActionDispatch::Http::Parameters::ParseError. The old constant is preserved at 5.1 with a deprecation warning when referenced; removal scheduled for a later Rails version. Apps usually hit this in rescue handlers around malformed JSON / params"
+      fix: "Replace ActionDispatch::ParamsParser::ParseError with ActionDispatch::Http::Parameters::ParseError in rescue clauses"
+      variable_name: "PARAMS_PARSER_ERROR"
+
+    - name: "set_callback / skip_callback string :if / :unless"
+      kind: "deprecation"
+      pattern: "(set_callback|skip_callback)\\b[^\\n]*\\b(if|unless):\\s*['\"]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 5.1 deprecates passing a string to :if / :unless options on set_callback and skip_callback. Use a symbol (method name) or a lambda. NOISY REGEX: matches set_callback / skip_callback call sites with inline string conditions; most projects do not call these directly (they use the higher-level before_*, after_* DSL covered by FILTER_STRING_CONDITIONS in this file). For projects that do call them, inspect each match"
+      fix: "Replace the string with a symbol: `set_callback :save, :before, :method_name, if: :should_run?` instead of `if: 'should_run?'`. For inline expressions use a lambda: `if: -> { ... }`"
+      variable_name: "SET_CALLBACK_STRING_CONDITIONS"
+
+    - name: "lock! on dirty AR record"
+      kind: "deprecation"
+      pattern: "\\.lock!(?=\\(|\\s|$)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 5.1 deprecates calling #lock! on an ActiveRecord record with unsaved changes. activerecord/lib/active_record/locking/pessimistic.rb at 5.1 emits ActiveSupport::Deprecation.warn 'Locking a record with unpersisted changes is deprecated and will raise an exception in Rails 5.2'. NOISY REGEX: matches every .lock! call site; most are correct usage on persisted records with no in-memory edits. Audit each match. The 5.2 hop turns this into a RuntimeError (see rails-52-patterns.yml LOCK_BANG_UNPERSISTED)"
+      fix: "Save (or reload) before locking: record.save; record.lock!. If you intended to lock and then mutate, the correct order is record.lock! followed by the assignment + save"
+      variable_name: "LOCK_BANG_DEPRECATION"
+
+  low_priority:
+    - name: "raise_on_unfiltered_parameters config"
+      kind: "deprecation"
+      pattern: "raise_on_unfiltered_parameters"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 5.1 deprecates config.action_controller.raise_on_unfiltered_parameters. The setting has had no effect since 5.1; existing config lines emit a deprecation warning at boot"
+      fix: "Remove the line entirely from config/application.rb or environment configs"
+      variable_name: "RAISE_ON_UNFILTERED_PARAMS"
+
+    - name: "halt_callback_chains_on_return_false"
+      kind: "deprecation"
+      pattern: "halt_callback_chains_on_return_false"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 5.1 deprecates ActiveSupport.halt_callback_chains_on_return_false. The underlying `return false` halt mechanism was already removed at 5.0; the 5.1 config setter is a no-op deprecated shim. Removed entirely at 5.2 (see rails-52-patterns.yml HALT_CALLBACK_CHAINS_ON_RETURN_FALSE for the breaking entry)"
+      fix: "Remove the assignment from config/application.rb / initializers. Code that relied on `return false` to halt callbacks should already be using `throw :abort` after the 4.2 → 5.0 hop"
+      variable_name: "HALT_CALLBACK_CHAINS_DEPRECATION"
+
+    - name: "Defining quoted_id"
+      kind: "deprecation"
+      pattern: "def\\s+quoted_id\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+        - "lib/"
+      explanation: "Rails 5.1 deprecates overriding ActiveRecord's #quoted_id. The hook is preserved at 5.1 with a deprecation warning when the user-defined method fires during quoting. Removed at 5.2 — at the 5.2 hop, defining the method no longer raises but is silently dead (see rails-52-patterns.yml QUOTED_ID_METHOD)"
+      fix: "Migrate the logic to a custom ActiveModel::Type (define #serialize / #cast) or accept the model's default quoting behavior"
+      variable_name: "QUOTED_ID_DEPRECATION"
+
 dependencies:
   webpacker:
     check: false
