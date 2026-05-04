@@ -35,7 +35,9 @@ detection-scripts/patterns/rails-80-patterns.yml
 The pattern file contains:
 - `upgrade_findings.high_priority` - Critical patterns to search
 - `upgrade_findings.medium_priority` - Important patterns to search
-- Each pattern has: `name`, `pattern`, `search_paths`, `explanation`, `fix`
+- `upgrade_findings.low_priority` - Lower-urgency patterns to search
+- Each pattern has: `name`, `kind`, `pattern`, `search_paths`, `explanation`, `fix`, `variable_name`
+- `kind` is one of `breaking` / `deprecation` / `migration` / `optional` — see `CLAUDE.md` → "Assigning `kind:`" for the rubric. The bucket each finding lands in (see Step 4 / Output Format) is driven by `kind`, not by priority.
 
 ---
 
@@ -79,43 +81,65 @@ Grep:
 
 ---
 
-### Step 3: Process Medium Priority Patterns
+### Step 3: Process Medium and Low Priority Patterns
 
-Same process for `upgrade_findings.medium_priority` patterns.
+Same process for `upgrade_findings.medium_priority` and `upgrade_findings.low_priority` patterns.
 
 ---
 
-### Step 4: Compile Findings
+### Step 4: Compile Findings (group by `kind`, sub-order by `priority`)
+
+Group findings into **two buckets** based on each pattern's `kind`:
+
+- **Fix before bump** — `kind: breaking`. The user cannot complete the upgrade without addressing these (raises, removed APIs, won't boot, silently wrong production behavior).
+- **Fix when ready** — `kind: deprecation` / `migration` / `optional`. These can be addressed during or shortly after the upgrade without blocking it.
+
+Within each bucket, sub-order by `priority` (HIGH → MEDIUM → LOW). Priority drives urgency *within the bucket*; `kind` drives the bucket itself.
 
 Structure findings as:
 
 ```
 findings = {
-  high_priority: [
-    {
-      name: "Sprockets usage",
-      explanation: "Rails 8.0 replaces Sprockets with Propshaft",
-      fix: "Migrate to Propshaft or keep Sprockets explicitly",
-      occurrences: 3,
-      files: [
-        { path: "Gemfile", line: 16, content: "gem 'sprockets-rails'" },
-        { path: "config/initializers/assets.rb", line: 5, content: "config.assets.compile = true" },
-        { path: "config/application.rb", line: 23, content: "require 'sprockets/railtie'" }
-      ]
-    },
-    ...
-  ],
-  medium_priority: [
-    ...
-  ],
+  fix_before_bump: {  # kind: breaking
+    high_priority:   [...entries...],
+    medium_priority: [...entries...],
+    low_priority:    [...entries...]
+  },
+  fix_when_ready: {   # kind: deprecation, migration, optional
+    high_priority:   [...entries...],
+    medium_priority: [...entries...],
+    low_priority:    [...entries...]
+  },
   summary: {
     total_issues: 5,
-    high_priority_count: 3,
-    medium_priority_count: 2,
+    breaking_count: 2,
+    deprecation_count: 2,
+    migration_count: 1,
+    optional_count: 0,
     affected_files: ["Gemfile", "config/initializers/assets.rb", ...]
   }
 }
 ```
+
+Each entry retains its individual fields plus `kind` and `priority`:
+
+```
+{
+  name: "Sprockets usage",
+  kind: "migration",
+  priority: "high_priority",
+  explanation: "Rails 8.0 replaces Sprockets with Propshaft",
+  fix: "Migrate to Propshaft or keep Sprockets explicitly",
+  occurrences: 3,
+  files: [
+    { path: "Gemfile", line: 16, content: "gem 'sprockets-rails'" },
+    { path: "config/initializers/assets.rb", line: 5, content: "config.assets.compile = true" },
+    { path: "config/application.rb", line: 23, content: "require 'sprockets/railtie'" }
+  ]
+}
+```
+
+A HIGH `deprecation` (silently wrong, like `DIRTY_TRACKING_AFTER_SAVE`) lands in `fix_when_ready.high_priority` — the bucket reflects what kind of change it is; the priority HIGH still tells the user to address it first within that bucket.
 
 ---
 
@@ -192,6 +216,7 @@ description: "Breaking change patterns for Rails 7.2 → 8.0 upgrade"
 upgrade_findings:
   high_priority:
     - name: "Human-readable name"
+      kind: "breaking"  # one of: breaking | deprecation | migration | optional
       pattern: "regex pattern"
       exclude: "exclusion pattern (optional)"
       search_paths:
@@ -205,6 +230,8 @@ upgrade_findings:
     - name: "Another pattern"
       # same structure
 ```
+
+The `kind` field determines the output bucket (fix-before-bump vs fix-when-ready). See `CLAUDE.md` → "Assigning `kind:`" for the full rubric and decision flow.
 
 ---
 
@@ -234,34 +261,57 @@ upgrade_findings:
 
 ## Output Format
 
-Present findings to the report generation step as structured data:
+Present findings grouped by `kind` (fix-before-bump vs fix-when-ready), with `priority` driving sub-ordering inside each bucket:
 
 ```markdown
 ## Detection Results
 
-### High Priority Issues (3 found)
+### 🛑 Fix Before Bump (2 found)
 
-#### 1. Sprockets usage
-**Explanation:** Rails 8.0 replaces Sprockets with Propshaft
-**Fix:** Migrate to Propshaft or keep Sprockets explicitly
+These are `kind: breaking` — the upgrade cannot complete cleanly until they are addressed.
+
+#### HIGH
+
+##### 1. update_attributes removed
+**Kind:** `breaking` · **Priority:** HIGH
+**Explanation:** Rails 6.1 removes `update_attributes` — calls raise `NoMethodError`
+**Fix:** Replace `record.update_attributes(...)` with `record.update(...)`
 
 **Found in:**
-- `Gemfile:16` - `gem 'sprockets-rails'`
-- `config/initializers/assets.rb:5` - `config.assets.compile = true`
-- `config/application.rb:23` - `require 'sprockets/railtie'`
+- `app/controllers/posts_controller.rb:42` - `@post.update_attributes(post_params)`
+- `app/services/comment_updater.rb:18` - `comment.update_attributes!(attrs)`
 
-#### 2. Asset pipeline configuration
+#### MEDIUM
 ...
 
-### Medium Priority Issues (2 found)
+### 📅 Fix When Ready (3 found)
+
+These are `kind: deprecation` / `migration` / `optional` — the upgrade can land without addressing them, but the user should plan to.
+
+#### HIGH
+
+##### 1. ActiveModel::Dirty methods after save
+**Kind:** `deprecation` · **Priority:** HIGH
+**Explanation:** Rails 5.2 emits a deprecation warning when `*_changed?` / `*_was` are called post-save (silently returns `false`/`nil`)
+**Fix:** Migrate to `saved_change_to_*` / `attribute_before_last_save` for post-save reads
+
+**Found in:**
+- `app/models/user.rb:78` - `if name_changed?` (inside `after_commit`)
+
+#### MEDIUM
+
+##### 1. Rails.application.secrets usage
+**Kind:** `migration` · **Priority:** MEDIUM
 ...
 
 ### Summary
-- Total issues: 5
-- High priority: 3
-- Medium priority: 2
+- Total findings: 5
+- By kind: 2 breaking, 2 deprecation, 1 migration, 0 optional
+- By priority: 3 HIGH, 2 MEDIUM, 0 LOW
 - Affected files: 4
 ```
+
+**Why two buckets?** The user reads detection output to decide what to fix when. Mixing breaking changes (must fix now) with deprecations and opt-in features (can fix later) buries the urgent signal. The kind grouping puts the "this blocks your upgrade" findings at the top, regardless of priority. Priority then controls order within each bucket.
 
 ---
 
@@ -290,11 +340,12 @@ After detection completes:
 Before proceeding to report generation:
 
 - [ ] All patterns from version YAML file processed
-- [ ] High priority patterns all checked
-- [ ] Medium priority patterns all checked
+- [ ] High, medium, and low priority patterns all checked
 - [ ] Findings include file:line references
 - [ ] Affected file contents read for context
-- [ ] Findings structured for report generation
+- [ ] Findings grouped into the two buckets: `fix_before_bump` (`kind: breaking`) vs `fix_when_ready` (`kind: deprecation` / `migration` / `optional`)
+- [ ] Within each bucket, sub-ordered by priority (HIGH → MEDIUM → LOW)
+- [ ] Each finding tagged with both its `kind` and `priority` in the output
 - [ ] Any search errors noted
 
 ---
