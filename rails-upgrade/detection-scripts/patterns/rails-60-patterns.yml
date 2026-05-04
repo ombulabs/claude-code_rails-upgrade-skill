@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 5.2 → 6.0 upgrade"
 breaking_changes:
   high_priority:
     - name: "require_dependency usage"
+      kind: "migration"
       pattern: "require_dependency"
       exclude: ""
       search_paths:
@@ -14,6 +15,7 @@ breaking_changes:
       variable_name: "REQUIRE_DEPENDENCY"
 
     - name: "Classic autoloader configuration"
+      kind: "deprecation"
       pattern: "config.autoloader\\s*=\\s*:classic"
       exclude: ""
       search_paths:
@@ -23,6 +25,7 @@ breaking_changes:
       variable_name: "CLASSIC_AUTOLOADER"
 
     - name: "ActiveRecord belongs_to required"
+      kind: "migration"
       pattern: "belongs_to.*optional:\\s*false"
       exclude: ""
       search_paths:
@@ -32,6 +35,7 @@ breaking_changes:
       variable_name: "BELONGS_TO_REQUIRED"
 
     - name: "protect_from_forgery"
+      kind: "migration"
       pattern: "protect_from_forgery.*with:\\s*:exception"
       exclude: ""
       search_paths:
@@ -41,6 +45,7 @@ breaking_changes:
       variable_name: "CSRF_PROTECTION"
 
     - name: "update_attributes deprecated"
+      kind: "deprecation"
       pattern: "update_attributes[^_]"
       exclude: "update_attribute"
       search_paths:
@@ -52,6 +57,7 @@ breaking_changes:
 
   medium_priority:
     - name: "ActionCable configuration"
+      kind: "migration"
       pattern: "config.action_cable"
       exclude: ""
       search_paths:
@@ -61,6 +67,7 @@ breaking_changes:
       variable_name: "ACTION_CABLE_CONFIG"
 
     - name: "ActiveStorage direct upload"
+      kind: "deprecation"
       pattern: "ActiveStorage::Blob\\.create_after_upload"
       exclude: ""
       search_paths:
@@ -71,6 +78,7 @@ breaking_changes:
       variable_name: "ACTIVE_STORAGE_UPLOAD"
 
     - name: "before_filter deprecated"
+      kind: "breaking"
       pattern: "before_filter"
       exclude: ""
       search_paths:
@@ -80,6 +88,7 @@ breaking_changes:
       variable_name: "BEFORE_FILTER"
 
     - name: "skip_before_filter deprecated"
+      kind: "breaking"
       pattern: "skip_before_filter"
       exclude: ""
       search_paths:
@@ -89,6 +98,7 @@ breaking_changes:
       variable_name: "SKIP_BEFORE_FILTER"
 
     - name: "render nothing: true"
+      kind: "breaking"
       pattern: "render.*nothing:\\s*true"
       exclude: ""
       search_paths:
@@ -98,6 +108,7 @@ breaking_changes:
       variable_name: "RENDER_NOTHING"
 
     - name: "Ruby version requirement"
+      kind: "breaking"
       pattern: "ruby.*['\"](?:1\\.|2\\.[0-4])"
       exclude: ""
       search_paths:
@@ -108,6 +119,7 @@ breaking_changes:
       variable_name: "RUBY_VERSION"
 
     - name: "Controller-level force_ssl deprecated"
+      kind: "deprecation"
       pattern: "^\\s*force_ssl\\b"
       exclude: ""
       search_paths:
@@ -117,6 +129,7 @@ breaking_changes:
       variable_name: "FORCE_SSL_DEPRECATED"
 
     - name: "Cookies metadata config (rollback compatibility)"
+      kind: "optional"
       pattern: "use_cookies_with_metadata"
       exclude: ""
       search_paths:
@@ -126,6 +139,7 @@ breaking_changes:
       variable_name: "COOKIES_METADATA_INCOMPATIBLE"
 
     - name: "Hosts authorization configuration"
+      kind: "breaking"
       pattern: "config\\.hosts\\b"
       exclude: ""
       search_paths:
@@ -135,6 +149,7 @@ breaking_changes:
       variable_name: "HOSTS_AUTHORIZATION_DEV"
 
     - name: "Legacy npm package names (actioncable / activestorage / rails-ujs)"
+      kind: "breaking"
       pattern: "['\"](actioncable|activestorage|rails-ujs)['\"]"
       exclude: "@rails/"
       search_paths:
@@ -145,6 +160,7 @@ breaking_changes:
       variable_name: "NPM_RAILS_PACKAGES"
 
     - name: "Rails.application.secrets.secret_token"
+      kind: "breaking"
       pattern: "Rails\\.application\\.secrets\\.secret_token\\b"
       exclude: ""
       search_paths:
@@ -156,6 +172,7 @@ breaking_changes:
       variable_name: "SECRETS_SECRET_TOKEN"
 
     - name: "fragment_cache_key helper"
+      kind: "breaking"
       pattern: "\\bfragment_cache_key\\b"
       exclude: "combined_fragment_cache_key"
       search_paths:
@@ -166,6 +183,7 @@ breaking_changes:
       variable_name: "FRAGMENT_CACHE_KEY"
 
     - name: "TestResponse predicate methods (success?/missing?/error?)"
+      kind: "breaking"
       pattern: "\\b(response|@response|last_response)\\.(success\\?|missing\\?|error\\?)"
       exclude: ""
       search_paths:
@@ -176,6 +194,7 @@ breaking_changes:
       variable_name: "TEST_RESPONSE_PREDICATES"
 
     - name: "ActiveRecord calculation methods with column name and block"
+      kind: "breaking"
       pattern: "\\.(count|sum)\\(\\s*:\\w+\\s*\\)\\s*(do\\b|\\{)"
       exclude: ""
       search_paths:
@@ -186,6 +205,7 @@ breaking_changes:
       variable_name: "AR_CALC_WITH_BLOCK"
 
     - name: "insert_fixtures adapter method"
+      kind: "breaking"
       pattern: "\\binsert_fixtures\\b"
       exclude: "insert_fixtures_set"
       search_paths:
@@ -197,6 +217,7 @@ breaking_changes:
       variable_name: "INSERT_FIXTURES_ADAPTER"
 
     - name: "ActiveRecord::Migrator.migrations_path setter"
+      kind: "breaking"
       pattern: "ActiveRecord::Migrator\\.migrations_path\\s*="
       exclude: ""
       search_paths:
@@ -209,6 +230,7 @@ breaking_changes:
 
   low_priority:
     - name: "image_alt view helper"
+      kind: "breaking"
       pattern: "\\bimage_alt\\b"
       exclude: ""
       search_paths:
@@ -219,6 +241,7 @@ breaking_changes:
       variable_name: "IMAGE_ALT_HELPER"
 
     - name: "Raw SQL strings in AR query methods"
+      kind: "breaking"
       pattern: "\\.(order|pluck|select|group)\\(\\s*['\"]"
       exclude: "Arel\\.sql"
       search_paths:
@@ -229,6 +252,7 @@ breaking_changes:
       variable_name: "AR_RAW_STRINGS"
 
     - name: "Direct Arel usage in queries"
+      kind: "deprecation"
       pattern: "\\bArel(::|\\.(?!sql\\b))"
       exclude: ""
       search_paths:
@@ -239,6 +263,7 @@ breaking_changes:
       variable_name: "AREL_DIRECT_USAGE"
 
     - name: "Dynamic :controller / :action segments in routes"
+      kind: "deprecation"
       pattern: "\\b(:controller|:action)\\b"
       exclude: "controller:|action:|action_dispatch|action_view|action_mailer|action_cable|action_pack|action_controller"
       search_paths:
@@ -248,6 +273,7 @@ breaking_changes:
       variable_name: "DYNAMIC_ROUTE_SEGMENTS"
 
     - name: "config.ru with application class"
+      kind: "deprecation"
       pattern: "^\\s*run\\s+\\w+::Application\\b"
       exclude: ""
       search_paths:
@@ -257,6 +283,7 @@ breaking_changes:
       variable_name: "CONFIG_RU_APP_CLASS"
 
     - name: "escape_attributes tag helper"
+      kind: "deprecation"
       pattern: "\\bescape_attributes\\b"
       exclude: ""
       search_paths:
@@ -267,6 +294,7 @@ breaking_changes:
       variable_name: "ESCAPE_ATTRIBUTES_HELPER"
 
     - name: "Transaction#set_state"
+      kind: "breaking"
       pattern: "\\.set_state\\("
       exclude: ""
       search_paths:
