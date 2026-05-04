@@ -14,13 +14,13 @@ breaking_changes:
       variable_name: "SSL_COMMENTED"
 
     - name: "pool to max_connections"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "pool:"
       exclude: "max_connections"
       search_paths:
         - "config/database.yml"
-      explanation: "Rails 8.1 renames 'pool:' to 'max_connections:' in database.yml"
-      fix: "Replace pool: with max_connections: in all database configurations"
+      explanation: "Rails 8.1 renames the database config key from pool: to max_connections:. The old name is preserved as an alias and emits a deprecation warning at runtime; existing apps still boot and connect normally with pool:. activerecord/lib/active_record/database_configurations/hash_config.rb at 8.1 defines `alias :pool :max_connections` followed by `deprecate pool: :max_connections, deprecator: ActiveRecord.deprecator`. Boot only fails when both pool: and max_connections: are set with different values (Ambiguous configuration error)"
+      fix: "Rename pool: to max_connections: in every entry of config/database.yml. Do not set both keys at the same time -- that path raises Ambiguous configuration"
       variable_name: "POOL_RENAME"
 
     - name: "bundler-audit required"
