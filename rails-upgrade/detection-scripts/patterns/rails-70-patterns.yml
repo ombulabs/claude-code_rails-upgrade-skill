@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 6.1 → 7.0 upgrade"
 breaking_changes:
   high_priority:
     - name: "Ruby version requirement"
+      kind: "breaking"
       pattern: "ruby.*['\"]2\\.[0-6]"
       exclude: ""
       search_paths:
@@ -14,6 +15,7 @@ breaking_changes:
       variable_name: "RUBY_VERSION"
 
     - name: "Webpacker usage"
+      kind: "migration"
       pattern: "webpacker|javascript_pack_tag"
       exclude: "importmap"
       search_paths:
@@ -25,6 +27,7 @@ breaking_changes:
       variable_name: "WEBPACKER"
 
     - name: "Spring usage"
+      kind: "optional"
       pattern: "gem ['\"]spring['\"]"
       exclude: ""
       search_paths:
@@ -34,6 +37,7 @@ breaking_changes:
       variable_name: "SPRING"
 
     - name: "form_with local option"
+      kind: "migration"
       pattern: "form_with.*local:\\s*(true|false)"
       exclude: ""
       search_paths:
@@ -43,6 +47,7 @@ breaking_changes:
       variable_name: "FORM_WITH_LOCAL"
 
     - name: "ActionController::Base.allow_forgery_protection"
+      kind: "migration"
       pattern: "allow_forgery_protection"
       exclude: ""
       search_paths:
@@ -55,17 +60,19 @@ breaking_changes:
 
   medium_priority:
     - name: "secrets.yml usage"
+      kind: "migration"
       pattern: "Rails\\.application\\.secrets"
       exclude: "credentials"
       search_paths:
         - "app/"
         - "lib/"
         - "config/"
-      explanation: "Rails.application.secrets is deprecated in favor of credentials"
-      fix: "Migrate to Rails.application.credentials"
+      explanation: "Rails.application.secrets still works at 7.0 with no deprecation warning; def secrets in railties/lib/rails/application.rb is byte-for-byte identical to 6.1. The runtime API is officially deprecated in 7.1, so migrating to Rails.application.credentials at this hop avoids rework on the next one"
+      fix: "Move values from config/secrets.yml into config/credentials.yml.enc (`rails credentials:edit`), then update readers: Rails.application.secrets.api_key → Rails.application.credentials.api_key. config/master.key must NOT be committed"
       variable_name: "SECRETS_YML"
 
     - name: "ActiveRecord enum prefix/suffix"
+      kind: "migration"
       pattern: "enum.*:.*\\{"
       exclude: ""
       search_paths:
@@ -75,25 +82,28 @@ breaking_changes:
       variable_name: "ENUM_SYNTAX"
 
     - name: "image_tag skip_pipeline"
+      kind: "optional"
       pattern: "image_tag.*skip_pipeline"
       exclude: ""
       search_paths:
         - "app/views/"
         - "app/helpers/"
-      explanation: "image_tag skip_pipeline option removed in Rails 7.0"
-      fix: "Remove skip_pipeline option from image_tag calls"
+      explanation: "skip_pipeline is fully supported at Rails 7.0; image_tag's implementation is byte-for-byte identical to 6.1. The option was actually expanded at 7.0 to also work on stylesheet_link_tag. This entry flags call sites for review when migrating away from Sprockets to Propshaft / Importmap, but the option itself does not change at this hop and existing calls continue to work"
+      fix: "No change required at the 7.0 hop. If you are also migrating off the Sprockets asset pipeline, audit each skip_pipeline call to confirm it is still doing what you intend under the new pipeline; otherwise leave as-is"
       variable_name: "IMAGE_TAG_PIPELINE"
 
     - name: "ActiveStorage variant syntax"
+      kind: "migration"
       pattern: "\\.variant\\(.*resize:"
       exclude: ""
       search_paths:
         - "app/"
-      explanation: "ActiveStorage variant syntax changes in Rails 7.0"
-      fix: "Use new syntax: variant(resize_to_limit: [100, 100])"
+      explanation: "Rails 7.0 makes vips the default variant processor for newly generated apps, but existing apps keep their previous setting (mini_magick) and the resize: form continues to work without any deprecation warning. activestorage/lib/active_storage/transformers/image_processing_transformer.rb is byte-for-byte identical between 6.1 and 7.0. If the app opts into vips by setting config.active_storage.variant_processor = :vips, then ImageMagick-flavored resize: arguments will fail at the libvips layer; that is a consequence of opting in, not a Rails-emitted deprecation"
+      fix: "If staying on mini_magick, no change required. If switching to vips (recommended for new apps), rewrite using libvips primitives: variant(resize_to_limit: [100, 100]), variant(resize_to_fill: [100, 100]), etc."
       variable_name: "ACTIVE_STORAGE_VARIANT"
 
     - name: "Turbolinks"
+      kind: "migration"
       pattern: "turbolinks|Turbolinks"
       exclude: ""
       search_paths:
@@ -105,6 +115,7 @@ breaking_changes:
       variable_name: "TURBOLINKS"
 
     - name: "UJS (rails-ujs)"
+      kind: "migration"
       pattern: "rails-ujs|@rails/ujs"
       exclude: ""
       search_paths:
@@ -116,6 +127,7 @@ breaking_changes:
       variable_name: "RAILS_UJS"
 
     - name: "to_s(:format) deprecation"
+      kind: "deprecation"
       pattern: "\\.to_s\\(:"
       exclude: ""
       search_paths:
