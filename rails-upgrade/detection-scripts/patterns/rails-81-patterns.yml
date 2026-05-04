@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 8.0 → 8.1 upgrade"
 breaking_changes:
   high_priority:
     - name: "SSL configuration commented"
+      kind: "optional"
       pattern: "#.*force_ssl|#.*assume_ssl"
       exclude: ""
       search_paths:
@@ -13,15 +14,17 @@ breaking_changes:
       variable_name: "SSL_COMMENTED"
 
     - name: "pool to max_connections"
+      kind: "deprecation"
       pattern: "pool:"
       exclude: "max_connections"
       search_paths:
         - "config/database.yml"
-      explanation: "Rails 8.1 renames 'pool:' to 'max_connections:' in database.yml"
-      fix: "Replace pool: with max_connections: in all database configurations"
+      explanation: "Rails 8.1 renames the database config key from pool: to max_connections:. The old name is preserved as an alias and emits a deprecation warning at runtime; existing apps still boot and connect normally with pool:. activerecord/lib/active_record/database_configurations/hash_config.rb at 8.1 defines `alias :pool :max_connections` followed by `deprecate pool: :max_connections, deprecator: ActiveRecord.deprecator`. Boot only fails when both pool: and max_connections: are set with different values (Ambiguous configuration error)"
+      fix: "Rename pool: to max_connections: in every entry of config/database.yml. Do not set both keys at the same time -- that path raises Ambiguous configuration"
       variable_name: "POOL_RENAME"
 
     - name: "bundler-audit required"
+      kind: "optional"
       pattern: "bundler-audit"
       exclude: ""
       search_paths:
@@ -34,6 +37,7 @@ breaking_changes:
 
   medium_priority:
     - name: "Semicolon query separator"
+      kind: "breaking"
       pattern: "param.*;"
       exclude: ""
       search_paths:
@@ -44,15 +48,17 @@ breaking_changes:
       variable_name: "SEMICOLON_SEPARATOR"
 
     - name: "Sidekiq adapter built-in"
+      kind: "deprecation"
       pattern: "sidekiq-rails|activejob-sidekiq"
       exclude: ""
       search_paths:
         - "Gemfile"
-      explanation: "Rails 8.1 removes built-in Sidekiq adapter"
-      fix: "Use sidekiq gem directly (6.5+) which includes its own adapter"
+      explanation: "Rails 8.1 deprecates the built-in ActiveJob Sidekiq adapter (NOT removed yet). activejob/lib/active_job/queue_adapters/sidekiq_adapter.rb is still present at 8.1; the activejob/CHANGELOG.md entry says 'Deprecate built-in `sidekiq` adapter. If you're using this adapter, upgrade to `sidekiq` 7.3.3 or later to use the `sidekiq` gem's adapter.' Apps continue to function with a deprecation warning"
+      fix: "Upgrade to sidekiq 7.3.3+ and use the gem's own adapter, which the gem registers when loaded. The Rails-bundled adapter is scheduled for removal in a later version"
       variable_name: "SIDEKIQ_ADAPTER"
 
     - name: "SuckerPunch adapter"
+      kind: "breaking"
       pattern: "sucker_punch"
       exclude: ""
       search_paths:
@@ -63,6 +69,7 @@ breaking_changes:
       variable_name: "SUCKER_PUNCH"
 
     - name: "Azure storage service"
+      kind: "breaking"
       pattern: "azure_storage|microsoft_azure"
       exclude: ""
       search_paths:
@@ -73,16 +80,18 @@ breaking_changes:
       variable_name: "AZURE_STORAGE"
 
   low_priority:
-    - name: "MySQL unsigned types"
-      pattern: "unsigned:\\s*true"
+    - name: "MySQL unsigned_float / unsigned_decimal short-hand"
+      kind: "breaking"
+      pattern: "\\bunsigned_(float|decimal)\\b"
       exclude: ""
       search_paths:
         - "db/migrate/"
-      explanation: "MySQL unsigned integer types deprecation notice in Rails 8.1"
-      fix: "Use check constraints instead of unsigned integers"
+      explanation: "Rails 8.1 removes the t.unsigned_float and t.unsigned_decimal short-hand column methods that were deprecated in 8.0 (activerecord/CHANGELOG.md: 'Remove deprecated `:unsigned_float` and `:unsigned_decimal` column methods for MySQL.'). Migrations using these short-hands raise NoMethodError. Background: as of MySQL 8.0.17, the UNSIGNED attribute is itself deprecated for FLOAT / DOUBLE / DECIMAL columns at the database level, so Rails no longer ships the convenience methods. Note: the pattern was previously matching `unsigned: true`, which is the column-option form on integer / bigint columns and is unrelated and unaffected"
+      fix: "Replace t.unsigned_float :amount with t.float :amount, unsigned: true (still allowed on integer / bigint via the column option) or, for DECIMAL, use a CHECK constraint on the value range. Audit each migration that used the short-hand"
       variable_name: "MYSQL_UNSIGNED"
 
     - name: "gitignore config keys"
+      kind: "optional"
       pattern: "\\.key$"
       exclude: "/config/"
       search_paths:
