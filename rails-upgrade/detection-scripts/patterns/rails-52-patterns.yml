@@ -4,6 +4,7 @@ description: "Breaking change patterns for Rails 5.1 → 5.2 upgrade"
 breaking_changes:
   high_priority:
     - name: "ActiveModel::Dirty methods after save"
+      kind: "deprecation"
       pattern: "\\b\\w+_(changed\\?|was)|\\.changes\\b|\\.changed\\?"
       exclude: "saved_change_to_|attribute_before_last_save|saved_changes"
       search_paths:
@@ -16,6 +17,7 @@ breaking_changes:
 
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
+      kind: "deprecation"
       pattern: "\\b(:controller|:action)\\b"
       exclude: "controller:|action:|:controller\\s*=>|:action\\s*=>|action_dispatch|action_view|action_mailer|action_cable|action_pack|action_controller"
       search_paths:
@@ -25,6 +27,7 @@ breaking_changes:
       variable_name: "DYNAMIC_ROUTE_SEGMENTS"
 
     - name: "class_name option with unquoted constant"
+      kind: "deprecation"
       pattern: "class_name:\\s*[A-Z][A-Za-z0-9_:]*"
       exclude: "class_name:\\s*['\"]"
       search_paths:
@@ -34,6 +37,7 @@ breaking_changes:
       variable_name: "CLASS_NAME_CONSTANT"
 
     - name: "error_on_ignored_order_or_limit config (renamed)"
+      kind: "deprecation"
       pattern: "error_on_ignored_order_or_limit"
       exclude: ""
       search_paths:
@@ -43,6 +47,7 @@ breaking_changes:
       variable_name: "ERROR_ON_IGNORED_ORDER_OR_LIMIT"
 
     - name: "halt_callback_chains_on_return_false config (deprecated)"
+      kind: "deprecation"
       pattern: "halt_callback_chains_on_return_false"
       exclude: ""
       search_paths:
@@ -52,6 +57,7 @@ breaking_changes:
       variable_name: "HALT_CALLBACK_CHAINS_ON_RETURN_FALSE"
 
     - name: "String if:/unless: conditions on model callbacks"
+      kind: "deprecation"
       pattern: "(before|after|around)_(save|create|update|destroy|validation|commit|rollback|initialize|find|touch)\\b[^\\n]*\\b(if|unless):\\s*['\"]"
       exclude: ""
       search_paths:
@@ -61,6 +67,7 @@ breaking_changes:
       variable_name: "CALLBACK_STRING_CONDITIONS"
 
     - name: "Rails.application.secrets usage"
+      kind: "migration"
       pattern: "Rails\\.application\\.secrets\\b"
       exclude: ""
       search_paths:
@@ -73,6 +80,7 @@ breaking_changes:
 
   low_priority:
     - name: "Bootsnap gem in Gemfile (presence check)"
+      kind: "optional"
       pattern: "gem\\s+['\"]bootsnap['\"]"
       exclude: ""
       search_paths:
@@ -82,6 +90,7 @@ breaking_changes:
       variable_name: "BOOTSNAP_PRESENCE"
 
     - name: "event_redis ActionCable adapter"
+      kind: "deprecation"
       pattern: "event_redis"
       exclude: ""
       search_paths:
@@ -92,6 +101,7 @@ breaking_changes:
       variable_name: "EVENT_REDIS_ADAPTER"
 
     - name: "Erubis template handler references"
+      kind: "deprecation"
       pattern: "\\bErubis\\b|::Handlers::Erubis"
       exclude: ""
       search_paths:
@@ -103,6 +113,7 @@ breaking_changes:
       variable_name: "ERUBIS_HANDLER"
 
     - name: "Defining quoted_id method"
+      kind: "deprecation"
       pattern: "def\\s+quoted_id\\b"
       exclude: ""
       search_paths:
@@ -113,6 +124,7 @@ breaking_changes:
       variable_name: "QUOTED_ID_METHOD"
 
     - name: "ConnectionPool#verify with arguments"
+      kind: "deprecation"
       pattern: "\\.verify\\(\\s*\\S[^)]*\\)"
       exclude: ""
       search_paths:
@@ -123,6 +135,7 @@ breaking_changes:
       variable_name: "VERIFY_METHOD_DEPRECATION"
 
     - name: "lock! on ActiveRecord object"
+      kind: "deprecation"
       pattern: "\\.lock!(?=\\(|\\s|$)"
       exclude: ""
       search_paths:
@@ -133,6 +146,7 @@ breaking_changes:
       variable_name: "LOCK_BANG_UNPERSISTED"
 
     - name: "Legacy secret_key_base configuration"
+      kind: "deprecation"
       pattern: "Rails\\.application\\.config\\.secret_(token|key_base)"
       exclude: ""
       search_paths:
