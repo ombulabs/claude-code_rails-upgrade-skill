@@ -79,6 +79,39 @@ upgrade_findings:
       fix: "Switch to S3, GCS, or Disk storage. Or use azure-storage gem directly."
       variable_name: "AZURE_STORAGE"
 
+    - name: "Routes drawn with multiple paths (removed)"
+      kind: "breaking"
+      pattern: "^\\s*(get|post|put|patch|delete|match)\\s+\\["
+      exclude: ""
+      search_paths:
+        - "config/routes.rb"
+      explanation: "Rails 8.1 removes the deprecated form of drawing one route action with an array of paths (e.g. `get ['/old1', '/old2'], to: 'foo#bar'`). actionpack/CHANGELOG.md: 'Remove deprecated support to a route to multiple paths.' Routes that still use the array form raise at boot when routes are drawn. Was deprecated at 8.0 (see rails-80-patterns.yml ROUTES_MULTIPLE_PATHS)"
+      fix: "Use `with_options` or an explicit loop: `['/old1','/old2'].each { |p| get p, to: 'foo#bar' }`. The new shape is faster at boot time"
+      variable_name: "ROUTES_MULTIPLE_PATHS_REMOVED"
+
+    - name: "Benchmark.ms (removed)"
+      kind: "breaking"
+      pattern: "\\bBenchmark\\.ms\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 8.1 removes the `Benchmark.ms` core extension. activesupport/CHANGELOG.md: 'Remove deprecated `Benchmark.ms` method. It is now defined in the `benchmark` gem.' Calls raise NoMethodError unless the `benchmark` gem is required. Was deprecated at 8.0 (see rails-80-patterns.yml BENCHMARK_MS)"
+      fix: "Add `gem 'benchmark'` to the Gemfile (will be bundled with Ruby 3.5; explicit until then) and `require 'benchmark'` wherever `Benchmark.ms` is used. Or replace with `Process.clock_gettime(Process::CLOCK_MONOTONIC)` deltas for hot paths"
+      variable_name: "BENCHMARK_MS_REMOVED"
+
+    - name: "ActiveSupport::Configurable"
+      kind: "deprecation"
+      pattern: "ActiveSupport::Configurable"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+      explanation: "Rails 8.1 deprecates ActiveSupport::Configurable. activesupport/CHANGELOG.md: 'Deprecate `ActiveSupport::Configurable`.' Apps that include / extend it on their own classes (often as a gem-like in-app component) emit a warning. The deprecation message points users at plain `class_attribute` / `mattr_accessor` / Anyway gem alternatives"
+      fix: "Replace `include ActiveSupport::Configurable` / `extend ActiveSupport::Configurable` with explicit `class_attribute` declarations or a small custom configuration object. The replacement is mechanical for most use sites"
+      variable_name: "AS_CONFIGURABLE"
+
   low_priority:
     - name: "MySQL unsigned_float / unsigned_decimal short-hand"
       kind: "breaking"
@@ -99,6 +132,37 @@ upgrade_findings:
       explanation: "Rails 8.1 changes .gitignore to use /config/*.key"
       fix: "Update .gitignore to use /config/*.key instead of *.key"
       variable_name: "GITIGNORE_KEYS"
+
+    - name: "ignore_leading_brackets config"
+      kind: "deprecation"
+      pattern: "ignore_leading_brackets"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.1 deprecates Rails.application.config.action_dispatch.ignore_leading_brackets. actionpack/CHANGELOG.md: 'Deprecate `Rails.application.config.action_dispatch.ignore_leading_brackets`.' The setting is paired with an 8.1 removal of the leading-bracket-skipping behavior in the parameter parser; existing config lines emit a deprecation warning"
+      fix: "Remove the assignment from config/application.rb / environment configs. Audit form names in views for legacy leading-bracket params (e.g. `name=\"[user][name]\"`) and rewrite to the standard `name=\"user[name]\"` shape"
+      variable_name: "IGNORE_LEADING_BRACKETS_CONFIG"
+
+    - name: "to_time_preserves_timezone config"
+      kind: "deprecation"
+      pattern: "to_time_preserves_timezone"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.1 deprecates config.active_support.to_time_preserves_timezone. activesupport/CHANGELOG.md: 'Deprecate `config.active_support.to_time_preserves_timezone`.' Tied to the broader 8.1 change that #to_time always preserves the receiver timezone (the legacy 'preserve system local time' behavior is gone). The config is now a no-op deprecated shim"
+      fix: "Remove the assignment from config/application.rb / environment configs. If app code depends on Time#to_time returning system-local time, audit those call sites; #to_time now always preserves the receiver's timezone"
+      variable_name: "TO_TIME_PRESERVES_TIMEZONE_CONFIG"
+
+    - name: "String#mb_chars / Multibyte::Chars"
+      kind: "deprecation"
+      pattern: "\\.mb_chars\\b|ActiveSupport::Multibyte::Chars"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 8.1 deprecates String#mb_chars and ActiveSupport::Multibyte::Chars. activesupport/CHANGELOG.md: 'Deprecate `String#mb_chars` and `ActiveSupport::Multibyte::Chars`. These APIs are a relic of the Ruby 1.8 days when Ruby strings weren't encoding aware.' Modern Ruby strings handle Unicode natively. NOISY REGEX: `.mb_chars` may match unrelated method calls of the same name (uncommon)"
+      fix: "Drop `.mb_chars` from method chains: `str.mb_chars.upcase` → `str.upcase`. Modern Ruby's String methods handle multibyte correctly without the wrapper. For ActiveSupport::Multibyte::Chars instantiations, switch to plain String"
+      variable_name: "MB_CHARS"
 
 dependencies:
   bundler_audit:
