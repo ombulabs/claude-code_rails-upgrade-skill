@@ -91,10 +91,10 @@ Same process for `upgrade_findings.medium_priority` and `upgrade_findings.low_pr
 
 Group findings into **two buckets** based on each pattern's `kind`:
 
-- **Fix before bump** — `kind: breaking` or `kind: deprecation`. These either raise / remove APIs / prevent boot at the target version, or emit a deprecation warning at the target version. Both should be addressed during the same upgrade campaign:
+- **Fix before bump** — `kind: breaking` and `kind: deprecation`. These either raise / remove APIs / prevent boot at the target version, or emit a deprecation warning at the target version. Both should be addressed during the same upgrade campaign:
   - `breaking` blocks the upgrade outright.
   - `deprecation` works at this hop but warns at runtime (log noise in production) and typically becomes `breaking` at the next hop. Addressing it now is the same work either way and de-risks the next upgrade.
-- **Fix when ready** — `kind: migration` or `kind: optional`. These are silent and fully working at this hop:
+- **Fix when ready** — `kind: migration` and `kind: optional`. These are silent and fully working at this hop:
   - `migration` is a recommended path forward (e.g., `secrets.yml` → `credentials.yml.enc`) with no warning today.
   - `optional` is an opt-in feature or improvement that can be safely ignored.
 
@@ -104,12 +104,12 @@ Structure findings as:
 
 ```
 findings = {
-  fix_before_bump: {  # kind: breaking or deprecation
+  fix_before_bump: {  # kind: breaking and deprecation
     high_priority:   [...entries...],
     medium_priority: [...entries...],
     low_priority:    [...entries...]
   },
-  fix_when_ready: {   # kind: migration or optional
+  fix_when_ready: {   # kind: migration and optional
     high_priority:   [...entries...],
     medium_priority: [...entries...],
     low_priority:    [...entries...]
@@ -272,7 +272,7 @@ Present findings grouped by `kind` (fix-before-bump vs fix-when-ready), with `pr
 
 ### 🛑 Fix Before Bump (4 found)
 
-These are `kind: breaking` or `kind: deprecation` — they either block the upgrade outright or warn at runtime today (and typically become `breaking` at the next hop). Address them in the same upgrade campaign.
+These are `kind: breaking` and `kind: deprecation` — they either block the upgrade outright or warn at runtime today (and typically become `breaking` at the next hop). Address them in the same upgrade campaign.
 
 #### HIGH
 
@@ -298,7 +298,7 @@ These are `kind: breaking` or `kind: deprecation` — they either block the upgr
 
 ### 📅 Fix When Ready (1 found)
 
-These are `kind: migration` or `kind: optional` — silent and fully working at this hop. Addressing them is recommended but not tied to the upgrade boundary.
+These are `kind: migration` and `kind: optional` — silent and fully working at this hop. Addressing them is recommended but not tied to the upgrade boundary.
 
 #### MEDIUM
 
@@ -349,7 +349,7 @@ Before proceeding to report generation:
 - [ ] High, medium, and low priority patterns all checked
 - [ ] Findings include file:line references
 - [ ] Affected file contents read for context
-- [ ] Findings grouped into the two buckets: `fix_before_bump` (`kind: breaking` or `deprecation`) vs `fix_when_ready` (`kind: migration` or `optional`)
+- [ ] Findings grouped into the two buckets: `fix_before_bump` (`kind: breaking` and `deprecation`) vs `fix_when_ready` (`kind: migration` and `optional`)
 - [ ] Within each bucket, sub-ordered by priority (HIGH → MEDIUM → LOW)
 - [ ] Each finding tagged with both its `kind` and `priority` in the output
 - [ ] Any search errors noted
