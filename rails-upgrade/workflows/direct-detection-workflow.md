@@ -91,8 +91,12 @@ Same process for `upgrade_findings.medium_priority` and `upgrade_findings.low_pr
 
 Group findings into **two buckets** based on each pattern's `kind`:
 
-- **Fix before bump** — `kind: breaking`. The user cannot complete the upgrade without addressing these (raises, removed APIs, won't boot, silently wrong production behavior).
-- **Fix when ready** — `kind: deprecation` / `migration` / `optional`. These can be addressed during or shortly after the upgrade without blocking it.
+- **Fix before bump** — `kind: breaking` or `kind: deprecation`. These either raise / remove APIs / prevent boot at the target version, or emit a deprecation warning at the target version. Both should be addressed during the same upgrade campaign:
+  - `breaking` blocks the upgrade outright.
+  - `deprecation` works at this hop but warns at runtime (log noise in production) and typically becomes `breaking` at the next hop. Addressing it now is the same work either way and de-risks the next upgrade.
+- **Fix when ready** — `kind: migration` or `kind: optional`. These are silent and fully working at this hop:
+  - `migration` is a recommended path forward (e.g., `secrets.yml` → `credentials.yml.enc`) with no warning today.
+  - `optional` is an opt-in feature or improvement that can be safely ignored.
 
 Within each bucket, sub-order by `priority` (HIGH → MEDIUM → LOW). Priority drives urgency *within the bucket*; `kind` drives the bucket itself.
 
@@ -100,12 +104,12 @@ Structure findings as:
 
 ```
 findings = {
-  fix_before_bump: {  # kind: breaking
+  fix_before_bump: {  # kind: breaking or deprecation
     high_priority:   [...entries...],
     medium_priority: [...entries...],
     low_priority:    [...entries...]
   },
-  fix_when_ready: {   # kind: deprecation, migration, optional
+  fix_when_ready: {   # kind: migration or optional
     high_priority:   [...entries...],
     medium_priority: [...entries...],
     low_priority:    [...entries...]
@@ -139,7 +143,7 @@ Each entry retains its individual fields plus `kind` and `priority`:
 }
 ```
 
-A HIGH `deprecation` (silently wrong, like `DIRTY_TRACKING_AFTER_SAVE`) lands in `fix_when_ready.high_priority` — the bucket reflects what kind of change it is; the priority HIGH still tells the user to address it first within that bucket.
+A HIGH `deprecation` (silently wrong, like `DIRTY_TRACKING_AFTER_SAVE`) lands in `fix_before_bump.high_priority` — both because it warns at runtime today and because skipping it now means it becomes a `breaking` hard-break at the next hop. Priority HIGH within the bucket means address before MEDIUM/LOW deprecations or breakings.
 
 ---
 
@@ -266,9 +270,9 @@ Present findings grouped by `kind` (fix-before-bump vs fix-when-ready), with `pr
 ```markdown
 ## Detection Results
 
-### 🛑 Fix Before Bump (2 found)
+### 🛑 Fix Before Bump (4 found)
 
-These are `kind: breaking` — the upgrade cannot complete cleanly until they are addressed.
+These are `kind: breaking` or `kind: deprecation` — they either block the upgrade outright or warn at runtime today (and typically become `breaking` at the next hop). Address them in the same upgrade campaign.
 
 #### HIGH
 
@@ -281,28 +285,30 @@ These are `kind: breaking` — the upgrade cannot complete cleanly until they ar
 - `app/controllers/posts_controller.rb:42` - `@post.update_attributes(post_params)`
 - `app/services/comment_updater.rb:18` - `comment.update_attributes!(attrs)`
 
-#### MEDIUM
-...
-
-### 📅 Fix When Ready (3 found)
-
-These are `kind: deprecation` / `migration` / `optional` — the upgrade can land without addressing them, but the user should plan to.
-
-#### HIGH
-
-##### 1. ActiveModel::Dirty methods after save
+##### 2. ActiveModel::Dirty methods after save
 **Kind:** `deprecation` · **Priority:** HIGH
-**Explanation:** Rails 5.2 emits a deprecation warning when `*_changed?` / `*_was` are called post-save (silently returns `false`/`nil`)
+**Explanation:** Rails 5.2 emits a deprecation warning when `*_changed?` / `*_was` are called post-save (silently returns `false`/`nil`); becomes `breaking` at a later hop
 **Fix:** Migrate to `saved_change_to_*` / `attribute_before_last_save` for post-save reads
 
 **Found in:**
 - `app/models/user.rb:78` - `if name_changed?` (inside `after_commit`)
 
 #### MEDIUM
+...
+
+### 📅 Fix When Ready (1 found)
+
+These are `kind: migration` or `kind: optional` — silent and fully working at this hop. Addressing them is recommended but not tied to the upgrade boundary.
+
+#### MEDIUM
 
 ##### 1. Rails.application.secrets usage
 **Kind:** `migration` · **Priority:** MEDIUM
-...
+**Explanation:** `Rails.application.secrets` still works at 5.2 with no warning; `credentials.yml.enc` is the recommended path forward
+**Fix:** Run `rails credentials:edit`, migrate readers to `Rails.application.credentials.*`
+
+**Found in:**
+- `config/initializers/api.rb:3` - `Rails.application.secrets.api_key`
 
 ### Summary
 - Total findings: 5
@@ -311,7 +317,7 @@ These are `kind: deprecation` / `migration` / `optional` — the upgrade can lan
 - Affected files: 4
 ```
 
-**Why two buckets?** The user reads detection output to decide what to fix when. Mixing breaking changes (must fix now) with deprecations and opt-in features (can fix later) buries the urgent signal. The kind grouping puts the "this blocks your upgrade" findings at the top, regardless of priority. Priority then controls order within each bucket.
+**Why two buckets?** The user reads detection output to decide what to fix when. Putting `breaking` and `deprecation` together as "fix before bump" reflects the practical truth: deprecations warn in production logs at this hop and become hard breaks at the next, so addressing them in the same campaign is cheaper than splitting the work across two upgrades. `migration` and `optional` are silent at this hop — they don't compete for the user's attention during the upgrade itself.
 
 ---
 
@@ -343,7 +349,7 @@ Before proceeding to report generation:
 - [ ] High, medium, and low priority patterns all checked
 - [ ] Findings include file:line references
 - [ ] Affected file contents read for context
-- [ ] Findings grouped into the two buckets: `fix_before_bump` (`kind: breaking`) vs `fix_when_ready` (`kind: deprecation` / `migration` / `optional`)
+- [ ] Findings grouped into the two buckets: `fix_before_bump` (`kind: breaking` or `deprecation`) vs `fix_when_ready` (`kind: migration` or `optional`)
 - [ ] Within each bucket, sub-ordered by priority (HIGH → MEDIUM → LOW)
 - [ ] Each finding tagged with both its `kind` and `priority` in the output
 - [ ] Any search errors noted
