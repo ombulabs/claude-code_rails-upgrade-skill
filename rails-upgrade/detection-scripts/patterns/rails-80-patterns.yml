@@ -24,39 +24,6 @@ upgrade_findings:
       fix: "Convert to the explicit form: `enum :status, { active: 0, archived: 1 }, prefix: true`. Mechanical migration; no runtime behavior change once converted"
       variable_name: "ENUM_KWARGS"
 
-    - name: "Sprockets usage"
-      kind: "migration"
-      pattern: "sprockets|Sprockets"
-      exclude: "propshaft"
-      search_paths:
-        - "Gemfile"
-        - "config/"
-        - "app/assets/"
-      explanation: "Rails 8.0 replaces Sprockets with Propshaft as the default asset pipeline"
-      fix: "Migrate to Propshaft or keep Sprockets with explicit configuration"
-      variable_name: "SPROCKETS"
-
-    - name: "Asset pipeline configuration"
-      kind: "migration"
-      pattern: "config\\.assets\\."
-      exclude: ""
-      search_paths:
-        - "config/environments/"
-        - "config/initializers/"
-      explanation: "Asset pipeline configuration changes significantly with Propshaft"
-      fix: "Review and update asset configuration for Propshaft compatibility"
-      variable_name: "ASSET_CONFIG"
-
-    - name: "javascript_include_tag (missing importmap)"
-      kind: "migration"
-      pattern: "javascript_include_tag"
-      exclude: "importmap"
-      search_paths:
-        - "app/views/layouts/"
-      explanation: "Rails 8.0 uses Import Maps - check javascript includes"
-      fix: "Ensure using javascript_importmap_tags for Import Maps"
-      variable_name: "JS_INCLUDE"
-
     - name: "assume_ssl configuration"
       kind: "optional"
       pattern: "force_ssl\\s*="
@@ -164,6 +131,39 @@ upgrade_findings:
       variable_name: "ROUTES_MULTIPLE_PATHS"
 
   low_priority:
+    - name: "Sprockets usage (optional Propshaft migration)"
+      kind: "optional"
+      pattern: "sprockets|Sprockets"
+      exclude: "propshaft"
+      search_paths:
+        - "Gemfile"
+        - "config/"
+        - "app/assets/"
+      explanation: "Rails 8.0 makes Propshaft the default asset pipeline for new apps, but Sprockets stays a first-class citizen. Existing apps can keep Sprockets at 8.0 with no changes — sprockets-rails continues to ship and work. Migrating from Sprockets to Propshaft is a separate, opt-in modernization, not a fix-before-bump"
+      fix: "No action required for the version bump. Optionally migrate to Propshaft as a separate effort if you want the new defaults (faster, no preprocessing pipeline). See https://github.com/rails/propshaft"
+      variable_name: "SPROCKETS"
+
+    - name: "Asset pipeline configuration (sprockets-style)"
+      kind: "optional"
+      pattern: "config\\.assets\\."
+      exclude: ""
+      search_paths:
+        - "config/environments/"
+        - "config/initializers/"
+      explanation: "config.assets.* keys (compile, css_compressor, js_compressor, paths, version, debug, quiet, precompile) are Sprockets-era. They keep working at 8.0 if you stay on Sprockets. They become irrelevant only if you migrate to Propshaft, which is optional"
+      fix: "No action required for the version bump if you keep Sprockets. If migrating to Propshaft later, audit each key — Propshaft removes most of these knobs (no compilation step, no compressor configuration; minification is handled at the asset-source layer)"
+      variable_name: "ASSET_CONFIG"
+
+    - name: "javascript_include_tag (sprockets-style)"
+      kind: "optional"
+      pattern: "javascript_include_tag"
+      exclude: "importmap"
+      search_paths:
+        - "app/views/layouts/"
+      explanation: "javascript_include_tag is the Sprockets-era helper. It keeps working at 8.0 on the Sprockets pipeline. Import Maps / javascript_importmap_tags is the new-app default but is not required for the version bump"
+      fix: "No action required for the version bump. If migrating to Import Maps later, replace javascript_include_tag with javascript_importmap_tags and move JS bundling to importmap.rb"
+      variable_name: "JS_INCLUDE"
+
     - name: "warn_on_records_fetched_greater_than config"
       kind: "breaking"
       pattern: "warn_on_records_fetched_greater_than"
