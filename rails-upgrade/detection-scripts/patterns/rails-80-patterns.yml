@@ -3,6 +3,27 @@ description: "Breaking change patterns for Rails 7.2 → 8.0 upgrade"
 
 upgrade_findings:
   high_priority:
+    - name: "Ruby version requirement"
+      kind: "breaking"
+      pattern: "ruby.*['\"](2\\.|3\\.[01])"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+        - ".ruby-version"
+      explanation: "Rails 8.0 requires Ruby 3.2.0 or newer (rails.gemspec: required_ruby_version = '>= 3.2.0'). Apps on Ruby 3.1 or older fail to bundle"
+      fix: "Upgrade Ruby to 3.2.0+ before bumping Rails. Update Gemfile and .ruby-version, then `bundle update rails`"
+      variable_name: "RUBY_VERSION"
+
+    - name: "enum with keyword-arguments form"
+      kind: "breaking"
+      pattern: "^\\s*enum\\s+\\w+:\\s*"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 8.0 removes the keyword-arguments form of enum (`enum status: { ... }, _prefix: true`). The 7.0 / 7.1 hash form (`enum :status, { ... }, prefix: true`) is now the only supported syntax. activerecord/CHANGELOG.md: 'Remove deprecated support for defining `enum` with keyword arguments.' Models still using the old form raise ArgumentError on class load — the app fails to boot"
+      fix: "Convert to the explicit form: `enum :status, { active: 0, archived: 1 }, prefix: true`. Mechanical migration; no runtime behavior change once converted"
+      variable_name: "ENUM_KWARGS"
+
     - name: "Sprockets usage"
       kind: "migration"
       pattern: "sprockets|Sprockets"
@@ -119,6 +140,93 @@ upgrade_findings:
       explanation: "Rails 8.0 restructures database.yml for Solid gems"
       fix: "Review database.yml structure for multi-database support"
       variable_name: "DB_POOL"
+
+    - name: "ENV[\"SCHEMA_CACHE\"] usage"
+      kind: "breaking"
+      pattern: "ENV\\[['\"]SCHEMA_CACHE['\"]\\]"
+      exclude: ""
+      search_paths:
+        - "config/"
+        - "lib/"
+        - "bin/"
+      explanation: "Rails 8.0 removes deprecated support for setting ENV['SCHEMA_CACHE']. activerecord/CHANGELOG.md: 'Remove deprecated support to setting ENV[\"SCHEMA_CACHE\"].' Apps reading or assigning this env var lose the schema-cache control hook; rake tasks or initializers that depended on it stop influencing schema cache behavior"
+      fix: "Use the schema_cache_path / cache_dump_filename API directly, or rely on the new ActiveRecord::Base.schema_cache_ignored_tables / connection_pool.schema_reflection knobs depending on the use case"
+      variable_name: "ENV_SCHEMA_CACHE"
+
+    - name: "Routes drawn with multiple paths"
+      kind: "deprecation"
+      pattern: "^\\s*(get|post|put|patch|delete|match)\\s+\\["
+      exclude: ""
+      search_paths:
+        - "config/routes.rb"
+      explanation: "Rails 8.0 deprecates drawing a single route action with an array of paths (e.g. `get ['/old1', '/old2'], to: 'foo#bar'`). actionpack/CHANGELOG.md: 'Deprecate drawing routes with multiple paths to make routing faster. You may use `with_options` or a loop to make drawing multiple paths easier.' Removed at 8.1"
+      fix: "Replace the array with a `with_options` block or an explicit loop: `['/old1','/old2'].each { |p| get p, to: 'foo#bar' }`. The new shape is faster at boot time"
+      variable_name: "ROUTES_MULTIPLE_PATHS"
+
+  low_priority:
+    - name: "warn_on_records_fetched_greater_than config"
+      kind: "breaking"
+      pattern: "warn_on_records_fetched_greater_than"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.0 removes config.active_record.warn_on_records_fetched_greater_than. activerecord/CHANGELOG.md: 'Remove deprecated `config.active_record.warn_on_records_fetched_greater_than`.' Existing config lines raise NoMethodError at boot"
+      fix: "Remove the line entirely. For per-query large-result-set warnings, use `find_each` / `in_batches` and standard application-level instrumentation"
+      variable_name: "WARN_ON_RECORDS_FETCHED"
+
+    - name: "allow_deprecated_singular_associations_name config"
+      kind: "breaking"
+      pattern: "allow_deprecated_singular_associations_name"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.0 removes config.active_record.allow_deprecated_singular_associations_name. activerecord/CHANGELOG.md: 'Remove deprecated `config.active_record.allow_deprecated_singular_associations_name`.' Existing config lines raise NoMethodError at boot"
+      fix: "Remove the line entirely and audit any associations that relied on the deprecated singular name resolution"
+      variable_name: "ALLOW_DEPRECATED_SINGULAR_ASSOCIATIONS_NAME"
+
+    - name: "commit_transaction_on_non_local_return config"
+      kind: "breaking"
+      pattern: "commit_transaction_on_non_local_return"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.0 removes config.active_record.commit_transaction_on_non_local_return. activerecord/CHANGELOG.md: 'Remove deprecated `config.active_record.commit_transaction_on_non_local_return`.' Existing config lines raise NoMethodError at boot"
+      fix: "Remove the line entirely; the post-deprecation behavior (rollback on non-local return) is now the only behavior"
+      variable_name: "COMMIT_TRANSACTION_ON_NON_LOCAL_RETURN"
+
+    - name: "unsigned_float / unsigned_decimal in migrations"
+      kind: "deprecation"
+      pattern: "\\bunsigned_(float|decimal)\\b"
+      exclude: ""
+      search_paths:
+        - "db/migrate/"
+      explanation: "Rails 8.0 deprecates the `t.unsigned_float` and `t.unsigned_decimal` short-hand column methods. activerecord/CHANGELOG.md: 'Deprecate `unsigned_float` and `unsigned_decimal` short-hand column methods.' Background: as of MySQL 8.0.17 the UNSIGNED attribute is itself deprecated for FLOAT / DOUBLE / DECIMAL columns at the database level. Removed at 8.1 (see rails-81-patterns.yml MYSQL_UNSIGNED)"
+      fix: "Replace `t.unsigned_float :amount` with `t.float :amount, unsigned: true` (column-option form on integer / bigint stays unaffected). For DECIMAL, prefer a CHECK constraint on the value range"
+      variable_name: "UNSIGNED_FLOAT_DECIMAL"
+
+    - name: "Benchmark.ms"
+      kind: "deprecation"
+      pattern: "\\bBenchmark\\.ms\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 8.0 deprecates the `Benchmark.ms` core extension. activesupport/CHANGELOG.md: 'Deprecate `Benchmark.ms` core extension. The benchmark gem will become bundled in Ruby 3.5.' Removed at 8.1"
+      fix: "Add `gem 'benchmark'` to the Gemfile (will be bundled with Ruby 3.5; explicit until then) and require 'benchmark' wherever `Benchmark.ms` is used. Or replace with `Process.clock_gettime(Process::CLOCK_MONOTONIC)` deltas for hot paths"
+      variable_name: "BENCHMARK_MS"
+
+    - name: "rake stats"
+      kind: "deprecation"
+      pattern: "\\brake\\s+stats\\b"
+      exclude: ""
+      search_paths:
+        - "bin/"
+        - ".github/"
+        - ".circleci/"
+        - "Rakefile"
+      explanation: "Rails 8.0 deprecates `bin/rake stats` in favor of `bin/rails stats`. railties/CHANGELOG.md: 'Deprecate `bin/rake stats` in favor of `bin/rails stats`.' The rake task continues to work at 8.0 with a deprecation warning"
+      fix: "Replace `rake stats` with `rails stats` in CI configs, scripts, and developer docs"
+      variable_name: "RAKE_STATS"
 
 dependencies:
   propshaft:
