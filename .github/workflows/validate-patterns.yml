@@ -25,3 +25,4 @@ jobs:
         with:
           ruby-version: "3.3"
       - run: ruby bin/validate-patterns
+      - run: ruby bin/validate-patterns --self-test
