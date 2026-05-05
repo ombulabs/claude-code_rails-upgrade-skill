@@ -47,6 +47,28 @@ fi
 
 ### Step 2: Run the Test Suite
 
+#### 2a. Sweep for deprecation-behavior overrides
+
+Before running the suite, grep for places that change `ActiveSupport::Deprecation` behavior (raise / silence / disallow) so test results can be interpreted correctly. The obvious places (`config/application.rb`, `config/environments/*.rb`) are not enough. RSpec autoloads `-r` requires from `.rspec`, and test helpers can install hooks like `RSpec.configure { |c| c.raise_errors_for_deprecations! }`. Miss those and a "the upgrade broke tests" report can really be "every deprecation has been raising for months."
+
+Sweep these locations:
+
+- `config/application.rb`, `config/environments/*.rb`, `config/initializers/*.rb`
+- `.rspec`, `spec/.rspec` (look for `-r raise_errors_for_deprecations` and similar autoloads)
+- `spec/spec_helper.rb`, `spec/rails_helper.rb`, `spec/support/**/*.rb`
+- `Rakefile`, `lib/tasks/*.rake`
+- Any Bundler-loaded test-group gem that wires deprecation behavior
+
+```bash
+grep -rnE "raise_errors_for_deprecations|ActiveSupport::Deprecation\.(behavior|disallowed_behavior|silenced)\s*=|ActiveSupport::Deprecation\.silence\b" \
+  .rspec spec/.rspec spec/spec_helper.rb spec/rails_helper.rb Rakefile \
+  config/ spec/support/ lib/tasks/ 2>/dev/null
+```
+
+The trailing `silence\b` alternation catches the block form `ActiveSupport::Deprecation.silence do ... end`, which scopes silencing to a noisy call site and is otherwise easy to miss. The `\b` word boundary excludes `silenced` (already covered by the assignment branch).
+
+#### 2b. Run the suite
+
 Execute the appropriate test command:
 
 **For RSpec:**

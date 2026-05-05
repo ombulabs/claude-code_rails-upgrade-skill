@@ -16,6 +16,27 @@ Deprecation warnings notify you that a specific feature (method, class, or API) 
 
 ## Finding Deprecation Warnings
 
+### Check Existing Deprecation Behavior First
+
+Before reading test logs, sweep for places that already override `ActiveSupport::Deprecation` behavior. Otherwise "no deprecation warnings in the log" can mean "they're being silenced", and "every test fails" can mean "they've been raising the whole time, unrelated to the upgrade." `config/application.rb` and `config/environments/*.rb` are not the only places this is configured: RSpec autoloads `-r` requires from `.rspec`, and test helpers can install hooks like `RSpec.configure { |c| c.raise_errors_for_deprecations! }`.
+
+```bash
+grep -rnE "raise_errors_for_deprecations|ActiveSupport::Deprecation\.(behavior|disallowed_behavior|silenced)\s*=|ActiveSupport::Deprecation\.silence\b" \
+  .rspec spec/.rspec spec/spec_helper.rb spec/rails_helper.rb Rakefile \
+  config/ spec/support/ lib/tasks/ 2>/dev/null
+```
+
+The trailing `silence\b` alternation catches the block form `ActiveSupport::Deprecation.silence do ... end` (or `{ ... }`), which is the recommended way to scope a silence to a single noisy call site. The `\b` word boundary keeps it from matching `silenced` (which is already covered by the assignment branch).
+
+A common gotcha is a single line in `.rspec`:
+
+```
+# .rspec
+-r raise_errors_for_deprecations
+```
+
+That installs an RSpec hook that raises on every `ActiveSupport::Deprecation.warn`. Easy to miss because nothing about it lives under `config/`.
+
 ### In Test Suite Logs
 
 If you have good test coverage, run your test suite and check the logs:
