@@ -298,7 +298,7 @@ Determines which gems must be bumped before the Rails version change can resolve
 
 **Deliverable #1: Comprehensive Upgrade Report**
 - **Input:** Direct detection findings + version guide data
-- **Output:** A report covering breaking changes (with OLD vs NEW code examples taken from the user's actual files), custom-code warnings flagged with ⚠️, a step-by-step migration plan, a testing checklist, and a rollback plan.
+- **Output:** A report covering findings grouped into the two buckets defined in `workflows/direct-detection-workflow.md` — **fix-before-bump** (`kind: breaking` and `kind: deprecation`) and **fix-when-ready** (`kind: migration` and `kind: optional`) — with OLD vs NEW code examples taken from the user's actual files, custom-code warnings flagged with ⚠️, a step-by-step migration plan, a testing checklist, and a rollback plan.
 
 **Deliverable #2: app:update Preview**
 - **Input:** Actual config files + findings
@@ -308,14 +308,14 @@ Determines which gems must be bumped before the Rails version change can resolve
 ```
 1. Present Comprehensive Upgrade Report first
 2. Present app:update Preview Report second
-3. Implement breaking change fixes using `NextRails.next?` for dual-boot code
+3. Implement fix-before-bump fixes (`kind: breaking` and `kind: deprecation`) using `NextRails.next?` for dual-boot code
 4. Update Gemfile to target Rails version
 5. Run test suite against both versions
 6. **Check CI config matches the upgraded Gemfile** — load `workflows/ci-sync-workflow.md`, fix any mismatches before proceeding
 7. Deploy and verify
 ```
 
-**Do not fix deprecations printed by the next version during this hop.** Those belong to the *next* upgrade cycle and will be addressed before the next version bump. Triaging them now expands the scope of the current hop and risks shipping a half-finished change.
+**Do not fix `load_defaults`-triggered runtime deprecation warnings about *future* Rails versions during this hop.** This caveat covers the post-bump runtime warnings emitted by Rails X+1 about behavior scheduled to change in X+2 — typically surfaced once `load_defaults X.Y` flips on in Step 7. Those belong to the *next* upgrade cycle and will be addressed before the next version bump. This is **not** a contradiction of fix-before-bump: the `kind: deprecation` patterns from Step 4's detection (warnings emitted by the *current* Rails version about APIs that go away at the *target* version) are still part of fix-before-bump and should be addressed in this hop. Triaging tomorrow's deprecation warnings now expands the scope of the current hop and risks shipping a half-finished change.
 
 ### Step 7: Align load_defaults
 ```
@@ -423,7 +423,7 @@ Before starting ANY upgrade:
 5. Present both reports to user
 
 **Action - Step 6 (Implement & Upgrade):**
-1. Fix breaking changes using `NextRails.next?` for dual-boot code
+1. Implement fix-before-bump fixes (`kind: breaking` and `kind: deprecation`) using `NextRails.next?` for dual-boot code
 2. Update Gemfile to target Rails version
 3. Run tests against both versions
 4. **Check CI config matches the upgraded Gemfile** (`workflows/ci-sync-workflow.md`) — fix any mismatches before declaring Step 6 complete
@@ -492,7 +492,7 @@ Before delivering, verify:
 **For Comprehensive Upgrade Report:**
 - [ ] All {PLACEHOLDERS} replaced with actual values
 - [ ] Used ACTUAL findings from direct detection (not generic examples)
-- [ ] Breaking changes section includes real file:line references
+- [ ] Findings grouped into the two buckets — fix-before-bump (`kind: breaking` and `kind: deprecation`) and fix-when-ready (`kind: migration` and `kind: optional`) — with real file:line references in each entry
 - [ ] Custom code warnings based on actual detected issues
 - [ ] Code examples use user's actual code from affected files
 - [ ] Next steps clearly outlined
