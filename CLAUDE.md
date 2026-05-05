@@ -7,6 +7,7 @@ This file captures project-specific conventions Claude should follow when workin
 - `bin/validate-patterns` validates every detection pattern YAML file under `rails-upgrade/detection-scripts/patterns/`. Run it before committing any change to a pattern file. Pure-stdlib Ruby, no Bundler or Gemfile required.
   - `bin/validate-patterns` validates every file
   - `bin/validate-patterns path/to/file.yml` validates one or more specific files
+  - `bin/validate-patterns --self-test` runs built-in fixture assertions covering the four positive `kind:` values and the four rejection paths (missing top-level key, missing required pattern key, broken regex, unknown `kind:` value). CI runs this alongside the file-validation step
   - Checks: YAML parses, required top-level keys present, the eight required pattern keys present on each entry, every `pattern` / `exclude` regex compiles, and the `kind:` value is one of the allowed enum values (`breaking`, `deprecation`, `migration`, `optional`)
   - Exits 0 on success, 1 on any failure with a per-file error report
 

@@ -6,10 +6,12 @@
 # Usage:
 #   bin/validate-patterns                # validate every patterns file
 #   bin/validate-patterns path/to/file   # validate a specific file (one or more)
+#   bin/validate-patterns --self-test    # run built-in fixture assertions
 #
-# Exits 0 if all files pass, 1 otherwise.
+# Exits 0 if all files / assertions pass, 1 otherwise.
 
 require "yaml"
+require "tmpdir"
 
 PATTERNS_DIR = File.expand_path("../rails-upgrade/detection-scripts/patterns", __dir__)
 TOP_LEVEL_KEYS = %w[version description upgrade_findings].freeze
@@ -70,6 +72,90 @@ def validate(path)
   end
 
   errors
+end
+
+def self_test
+  base = {
+    "version" => "test",
+    "description" => "self-test fixture",
+    "upgrade_findings" => {
+      "high_priority" => [
+        {
+          "name" => "Test entry",
+          "kind" => "breaking",
+          "pattern" => "foo",
+          "exclude" => "",
+          "search_paths" => ["app/"],
+          "explanation" => "test",
+          "fix" => "test",
+          "variable_name" => "TEST"
+        }
+      ]
+    }
+  }
+
+  cases = []
+
+  KIND_VALUES.each do |kind|
+    doc = Marshal.load(Marshal.dump(base))
+    doc["upgrade_findings"]["high_priority"][0]["kind"] = kind
+    cases << { name: "valid kind=#{kind}", doc: doc, expect: :pass }
+  end
+
+  missing_top = Marshal.load(Marshal.dump(base))
+  missing_top.delete("upgrade_findings")
+  cases << { name: "missing upgrade_findings", doc: missing_top, expect: :fail, match: /missing top-level key: upgrade_findings/ }
+
+  missing_kind = Marshal.load(Marshal.dump(base))
+  missing_kind["upgrade_findings"]["high_priority"][0].delete("kind")
+  cases << { name: "missing pattern key kind", doc: missing_kind, expect: :fail, match: /missing key: kind/ }
+
+  bad_regex = Marshal.load(Marshal.dump(base))
+  bad_regex["upgrade_findings"]["high_priority"][0]["pattern"] = "[unclosed"
+  cases << { name: "broken regex", doc: bad_regex, expect: :fail, match: /pattern regex does not compile/ }
+
+  bad_kind = Marshal.load(Marshal.dump(base))
+  bad_kind["upgrade_findings"]["high_priority"][0]["kind"] = "bogus"
+  cases << { name: "unknown kind value", doc: bad_kind, expect: :fail, match: /invalid kind: "bogus"/ }
+
+  passed = 0
+  failed = []
+
+  Dir.mktmpdir do |dir|
+    cases.each_with_index do |c, i|
+      path = File.join(dir, "fixture_#{i}.yml")
+      File.write(path, c[:doc].to_yaml)
+      errors = validate(path)
+
+      ok =
+        case c[:expect]
+        when :pass then errors.empty?
+        when :fail then errors.any? { |e| e =~ c[:match] }
+        end
+
+      if ok
+        passed += 1
+      else
+        failed << { name: c[:name], expected: c[:expect], errors: errors }
+      end
+    end
+  end
+
+  total = cases.size
+  if failed.empty?
+    puts "OK   self-test (#{passed}/#{total} passed)"
+    0
+  else
+    puts "FAIL self-test (#{passed}/#{total} passed)"
+    failed.each do |f|
+      puts "     - #{f[:name]} (expected #{f[:expected]}, got errors: #{f[:errors].inspect})"
+    end
+    1
+  end
+end
+
+if ARGV.include?("--self-test")
+  exit self_test
 end
 
 paths =
