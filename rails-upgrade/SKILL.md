@@ -308,7 +308,7 @@ Determines which gems must be bumped before the Rails version change can resolve
 ```
 1. Present Comprehensive Upgrade Report first
 2. Present app:update Preview Report second
-3. Apply fix-before-bump changes (`kind: breaking` and `kind: deprecation`) using `NextRails.next?` for dual-boot code
+3. Apply fix-before-bump changes (`kind: breaking` and `kind: deprecation`). Most fixes are direct rewrites — the new API typically works on both sides of the dual-boot pair (e.g., `update_attributes` → `update`). Use `NextRails.next?` only when the fix requires target-version-only APIs that don't exist in the current Rails
 4. Update Gemfile to target Rails version
 5. Run test suite against both versions
 6. **Check CI config matches the upgraded Gemfile** — load `workflows/ci-sync-workflow.md`, fix any mismatches before proceeding
@@ -427,7 +427,7 @@ Before starting ANY upgrade:
 5. Present both reports to user
 
 **Action - Step 6 (Implement & Upgrade):**
-1. Apply fix-before-bump changes (`kind: breaking` and `kind: deprecation`) using `NextRails.next?` for dual-boot code
+1. Apply fix-before-bump changes (`kind: breaking` and `kind: deprecation`). Most fixes are direct rewrites — the new API typically works on both sides of the dual-boot pair (e.g., `update_attributes` → `update`). Use `NextRails.next?` only when the fix requires target-version-only APIs that don't exist in the current Rails
 2. Update Gemfile to target Rails version
 3. Run tests against both versions
 4. **Check CI config matches the upgraded Gemfile** (`workflows/ci-sync-workflow.md`) — fix any mismatches before declaring Step 6 complete
