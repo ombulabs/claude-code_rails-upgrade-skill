@@ -170,6 +170,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `workflows/direct-detection-workflow.md` - How to run breaking change detection directly
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
 - `workflows/gem-compatibility-workflow.md` - **Load in Step 4.5** - Per-lockfile gem compatibility check against the target Rails version. Documents both the primary (`next_rails` `bundle_report compatibility`) and the secondary (railsbump.org API) and the rules for when to escalate.
+- `workflows/boot-smoke-test-workflow.md` - **Load in Step 4.6** - Run a Rails-loading command against `Gemfile.next` to catch gem-level runtime incompat that the resolver can't see (gems calling removed Rails internals or `require`-ing removed files).
 - `workflows/ci-sync-workflow.md` - **MANDATORY before opening the upgrade PR** - How to verify CI config matches the upgraded Gemfile
 - `workflows/app-update-preview-workflow.md` - How to generate app:update previews
 - **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding and drops `NextRails.next?` / `NextRails.current?` branches. Deprecation triage stays with this skill for the next hop.
@@ -286,6 +287,39 @@ Determines which gems must be bumped before the Rails version change can resolve
 3. If any blockers exist, load references/gem-compatibility.md for
    the fork/replace/vendor playbook and the gem update order. Skip
    otherwise.
+```
+
+### Step 4.6: Boot Smoke Test on Gemfile.next
+```
+Catches the gem-internal incompatibilities that Step 4 (codebase grep) and
+Step 4.5 (resolver-level compat check) cannot see.
+
+A gem can declare loose Rails constraints — no upper bound on activerecord /
+activesupport — and `bundle_report compatibility` plus `bundle install` will
+both call it "compatible." But at runtime, the gem may:
+
+  - call a Rails internal that was removed at the target version
+    (e.g. database_cleaner-active_record 2.1.x calling
+    AR::ConnectionAdapters#schema_migration, removed in Rails 7.2)
+  - require a file that was removed at the target version
+    (e.g. jbuilder 2.11.x doing `require "active_support/proxy_object"`,
+    removed in Rails 8.0)
+
+These surface only when something boots Rails. Catching them here, before
+the report is written, lets them land in fix-before-bump where they belong
+instead of mid-implementation.
+
+1. Read: workflows/boot-smoke-test-workflow.md
+2. Run a Rails-loading command against Gemfile.next:
+     BUNDLE_GEMFILE=Gemfile.next bundle exec rspec --dry-run
+   (or `bin/rails runner "puts Rails.version"`, or `bundle exec rspec` if
+   the suite is fast enough — anything that triggers
+   `Bundler.require(*Rails.groups)` and the framework boot.)
+3. If boot fails, capture the LoadError / NoMethodError trace, identify
+   the offending gem (grep the bundle paths for the missing constant or
+   file), check rubygems for a newer version with target-Rails compat,
+   and add the bump to the fix-before-bump bucket for Step 5.
+4. Re-run the boot smoke test until it succeeds. Then proceed to Step 5.
 ```
 
 ### Step 5: Load Report Resources & Generate Reports

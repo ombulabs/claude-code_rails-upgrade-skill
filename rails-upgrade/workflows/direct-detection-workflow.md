@@ -37,7 +37,46 @@ The pattern file contains:
 - `upgrade_findings.medium_priority` - Important patterns to search
 - `upgrade_findings.low_priority` - Lower-urgency patterns to search
 - Each pattern has: `name`, `kind`, `pattern`, `search_paths`, `explanation`, `fix`, `variable_name`
+- Each pattern may optionally declare `prereqs:` — a list of gem-version floors that must be in place for the suggested `fix:` to actually work. See "The `prereqs:` field" below.
 - `kind` is one of `breaking` / `deprecation` / `migration` / `optional` — see `CLAUDE.md` → "Assigning `kind:`" for the rubric. The bucket each finding lands in (see Step 4 / Output Format) is driven by `kind`, not by priority.
+
+#### The `prereqs:` field (optional)
+
+Some patterns describe a Rails-API change whose `fix:` only works on a *recent enough* version of a wrapper gem. The Rails API exists at the target version, but the gem that exposes it to the app may need a bump first.
+
+Example: at Rails 7.2 the `fixture_path=` setter on `ActiveSupport::TestCase` is deprecated in favor of `fixture_paths=` (plural array). `fixture_paths=` exists from Rails 7.1+ — but in an rspec project the setter goes through `RSpec::Core::Configuration`, which only forwards `fixture_paths=` from `rspec-rails 6.1.0+`. On `rspec-rails 6.0.x` the suggested fix raises `NoMethodError`.
+
+Declaring this in the pattern:
+
+```yaml
+- name: "fixture_path deprecated"
+  kind: "deprecation"
+  pattern: "fixture_path[^s]"
+  exclude: "fixture_paths"
+  search_paths:
+    - "test/"
+    - "spec/"
+    - "config/"
+  explanation: "fixture_path singular is deprecated in favor of fixture_paths plural"
+  fix: "Change fixture_path to fixture_paths (array)"
+  variable_name: "FIXTURE_PATH"
+  prereqs:
+    - gem: "rspec-rails"
+      min_version: "6.1.0"
+      reason: "config.fixture_paths= is forwarded from RSpec::Core::Configuration only on 6.1+"
+      when: "rspec-rails is present in the bundle"
+```
+
+When compiling findings:
+
+1. For each pattern with `prereqs:`, check the user's `Gemfile.lock`.
+2. For each prereq whose `when:` matches (or has no `when:`):
+   - If the gem is at or above `min_version`, ignore the prereq.
+   - If the gem is below `min_version`, add a fix-before-bump entry **for the prereq gem bump**, in addition to (and ordered before) the original finding.
+
+This makes the cascade explicit in the report — readers see "bump rspec-rails first, *then* rename fixture_path" instead of discovering the second step mid-implementation.
+
+`prereqs:` is optional. Most patterns describe Rails-only API changes and need none.
 
 ---
 

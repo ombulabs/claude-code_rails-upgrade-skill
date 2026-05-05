@@ -81,6 +81,11 @@ upgrade_findings:
       explanation: "fixture_path singular is deprecated in favor of fixture_paths plural"
       fix: "Change fixture_path to fixture_paths (array)"
       variable_name: "FIXTURE_PATH"
+      prereqs:
+        - gem: "rspec-rails"
+          min_version: "6.1.0"
+          reason: "config.fixture_paths= is forwarded from RSpec::Core::Configuration only on rspec-rails 6.1+. On 6.0.x the new setter raises NoMethodError."
+          when: "rspec-rails is present in the bundle"
 
     - name: "query_constraints deprecated"
       kind: "deprecation"
