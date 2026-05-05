@@ -71,6 +71,10 @@ Priority is about **urgency during an upgrade**, not editorial weight.
 
 `kind:` describes **what the change is**; `priority` describes **how urgent it is**. The two are orthogonal. A HIGH `deprecation` (silently wrong, like `DIRTY_TRACKING_AFTER_SAVE`) and a HIGH `breaking` (won't boot) are both "fix first" but for different reasons.
 
+**Judge `kind` at the target hop, not the API's historical timeline.** Each `rails-XY-patterns.yml` file is a statement *about that hop* — what changes when the user upgrades INTO that version. A removal that was first deprecated in an earlier Rails minor is `breaking` in the file for the version where it actually raises, not `deprecation` because of its history. The same API can legitimately be `deprecation` in `rails-31-patterns.yml` and `breaking` in `rails-40-patterns.yml`. Apply the rule to all four kinds: `kind` reflects what the change *is at this hop*, not what it *was* earlier or *will become* later.
+
+Concrete example: `SCOPE_WITHOUT_LAMBDA` was deprecated in Rails 3.1 and raises in 4.0 — it is `breaking` in `rails-40-patterns.yml`.
+
 The four values:
 
 - **`breaking`** — Raises, removed, or prevents the app from booting / bundling / running its test suite. The user cannot complete the upgrade without addressing it. Example: `update_attributes` removed in 6.1, `redirect_to :back` removed in 5.1.
@@ -86,3 +90,30 @@ How to decide:
 4. **Is this purely opt-in / cosmetic / a new feature?** → `optional`.
 
 If `kind` and `priority` seem to conflict, trust both. They answer different questions.
+
+## How the `dependencies:` section relates to `kind`
+
+The top-level `dependencies:` block in each `rails-*-patterns.yml` file is not bound to a single `kind` value. It serves two distinct purposes:
+
+1. **Bridge / compatibility gems for `breaking` patterns** — gems that rescue functionality removed from Rails core, so the user can keep shipping while migrating call sites. A `breaking` pattern with a corresponding bridge entry is a *softenable* break: install the gem to keep the upgrade landing while migration happens separately. Examples:
+   - `protected_attributes` rescues `attr_accessible` / `attr_protected` (4.0)
+   - `activerecord-deprecated_finders` rescues removed dynamic finders (4.0)
+   - `rails-observers` rescues `ActiveRecord::Observer` and `ActionController::Caching::Sweeper` (4.0)
+   - `responders` rescues `respond_with` and class-level `respond_to` (4.2)
+   - `rails-controller-testing` rescues `assigns` / `assert_template` (5.0)
+
+2. **New gems Rails introduces or recommends at this version** — gems that are not in the previous version's Gemfile. These pair with `optional` patterns (the user can ignore them) or with no pattern at all. Examples:
+   - `bootsnap` (5.2), `web-console` (4.2), `webpacker` (5.1)
+   - `propshaft` (8.0), `solid_cache` / `solid_queue` / `solid_cable` (8.0)
+   - `kamal` (8.0), `bundler-audit` (8.1)
+
+The `check: true` / `check: false` flag on each `dependencies:` entry is **editorial advice about whether the gem applies broadly**, not a per-app determination. The actual applicability depends on whether the user's app triggers the `breaking` pattern the bridge rescues:
+
+- `check: true` — the gem rescues a `breaking` that most apps will trigger (e.g., `responders` rescues `respond_with`, which most controller-heavy apps use). Default to recommending it.
+- `check: false` — either a bridge for a `breaking` that not all apps will trigger (e.g., `actionpack-action_caching` only matters if the app uses `caches_page` / `caches_action`), or a new-default gem the user can adopt at their own pace (e.g., `bootsnap`, `propshaft`). The user's actual code drives whether they need it.
+
+A `check: false` bridge gem still becomes effectively required for any specific app that triggers its rescued `breaking` pattern. Treat the flag as a starting recommendation; the per-app `fix:` field on each pattern entry is what tells the user whether they actually hit it.
+
+`kind: deprecation`, `migration`, and `optional` patterns are resolved in code via the per-pattern `fix:` field, not via `dependencies:`.
+
+`bin/validate-patterns` does not enforce the rules in this section — they are editorial guidance for authors and reviewers. The validator only checks schema (required keys, regex compilation, `kind:` enum membership), not the semantic relationship between `dependencies:` entries and `kind:` values.
