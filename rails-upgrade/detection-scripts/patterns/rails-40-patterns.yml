@@ -301,17 +301,6 @@ upgrade_findings:
       fix: "Do NOT bulk-drop the second arg pre-bump. Two safe paths: (1) branch the call with NextRails.next? — `if NextRails.next? then obj.assign_attributes(attrs) else obj.assign_attributes(attrs, as: :admin) end`; or (2) keep the option-hash form and rely on the protected_attributes bridge gem on the next side, which preserves role-scoped attr_accessible on Rails 4+. Pick (1) when the role scope is genuinely unused; pick (2) when role-based mass assignment is load-bearing"
       variable_name: "ASSIGN_ATTRIBUTES_OPTIONS"
 
-    - name: "request.env.merge! in tests"
-      kind: "migration"
-      pattern: "request\\.env\\.merge!"
-      exclude: ""
-      search_paths:
-        - "spec/"
-        - "test/"
-      explanation: "Rails 4.0 changed test request header API from request.env to request.headers. The catch: ActionDispatch::Http::Headers#merge! also exists on Rails 3.2, but the Rack-key normalization layer that Rails 4 added is absent. Test specs typically use Rack-env-style keys (HTTP_AUTHORIZATION, HTTP_*) because that is what request.env accepts; after a bulk request.env.merge! → request.headers.merge! rewrite, the same keys still work on Rails 4 but on Rails 3.2 the headers do not reach the controller and every authed request returns 400/401"
-      fix: "Do NOT bulk-rewrite pre-bump for any spec suite that uses request.env.merge! to set auth or content-type headers — a real hop saw ~65% of auth-heavy controller examples fail because the auth header silently stopped propagating on Rails 3.2. Defer to dual-boot: the next bundle's Rails 4 has the normalization, so the rewrite is correct there. On the 4+ side it is a 1:1 substitution — request.env.merge!(headers) → request.headers.merge!(headers). For codebases without auth-header specs (rare), the rewrite can run pack-by-pack with each pack's full spec suite as the gate"
-      variable_name: "REQUEST_ENV_MERGE"
-
     - name: "_run_validation_callbacks"
       kind: "breaking"
       pattern: "_run_validation_callbacks"
@@ -355,6 +344,18 @@ upgrade_findings:
       explanation: "Rails 4.0 is stricter about date parsing in YAML fixtures"
       fix: "Cast dynamic dates to strings: <%= 3.days.ago.to_s(:db) %>"
       variable_name: "FIXTURE_DATES"
+
+  low_priority:
+    - name: "request.env.merge! in tests"
+      kind: "optional"
+      pattern: "request\\.env\\.merge!"
+      exclude: ""
+      search_paths:
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.0 added request.headers.merge! as the preferred test request-header API, but request.env.merge! continues to work through at least Rails 7 — both APIs coexist. Rails 8 is expected to remove the env-based form (verify against the current Rails changelog before scheduling the rewrite). For a 3.2 → 4.0 hop, this is opt-in cleanup, not a required fix"
+      fix: "Skippable for the 3.2 → 4.0 hop — request.env.merge! still works on Rails 4+. If opting in: on Rails 4+ it is a 1:1 substitution, request.env.merge!(headers) → request.headers.merge!(headers). Trap on Rails 3.2: ActionDispatch::Http::Headers#merge! exists but the Rack-key normalization layer Rails 4 added is absent, so Rack-env-style keys (HTTP_AUTHORIZATION, HTTP_*) silently fail to reach the controller — a real hop saw ~65% of auth-heavy controller examples fail because the auth header stopped propagating on 3.2. If rewriting during the dual-boot window, defer to the Rails 4+ side; do not bulk-rewrite pre-bump"
+      variable_name: "REQUEST_ENV_MERGE"
 
 dependencies:
   protected_attributes:
