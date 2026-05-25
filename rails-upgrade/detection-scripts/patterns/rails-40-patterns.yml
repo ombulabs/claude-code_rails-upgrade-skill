@@ -286,8 +286,8 @@ upgrade_findings:
       search_paths:
         - "config/"
         - "lib/"
-      explanation: "Rails 4.0 changed the config path key from 'config/routes' to 'config/routes.rb'"
-      fix: "Change config.paths[\"config/routes\"] to config.paths[\"config/routes.rb\"]"
+      explanation: "Rails 4.0 changed the config-paths key from 'config/routes' to 'config/routes.rb'. On Rails 3.2 only the un-suffixed key is populated; renaming pre-bump returns nil for the old key and the next chained call raises NoMethodError: undefined method `concat' for nil:NilClass at boot. The claim that Rails 3.2.13+ silently accepts either form is false — only Rails 4+ accepts the .rb-suffixed key"
+      fix: "Do NOT rename in place pre-bump — that breaks Rails 3.2 boot. Branch with NextRails.next?: `key = NextRails.next? ? \"config/routes.rb\" : \"config/routes\"; config.paths[key].concat(...)` (or duplicate the block inside `if NextRails.next? ... else ... end`). Once the app is fully on Rails 4+, drop the branch"
       variable_name: "CONFIG_ROUTES_PATH"
 
     - name: "assign_attributes with options hash"
