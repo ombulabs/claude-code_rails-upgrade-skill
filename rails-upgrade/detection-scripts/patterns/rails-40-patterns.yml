@@ -309,8 +309,8 @@ upgrade_findings:
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Internal method _run_validation_callbacks was replaced in Rails 4.0"
-      fix: "Replace with run_callbacks(:validation)"
+      explanation: "Internal method _run_validation_callbacks was removed in Rails 4.0 with no deprecation warning"
+      fix: "Replace with run_callbacks(:validation) — the public API exists on Rails 3.2 (via ActiveModel::Validations::Callbacks / ActiveSupport::Callbacks) and 4.0+, so the swap is backwards-compatible. Real-world incidence is low — typically only ActiveModel form objects and edge-case validators hit this internal API"
       variable_name: "RUN_VALIDATION_CALLBACKS"
 
     - name: "select('distinct ...').pluck"
