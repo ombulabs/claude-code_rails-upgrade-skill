@@ -353,7 +353,7 @@ upgrade_findings:
       search_paths:
         - "spec/"
         - "test/"
-      explanation: "Rails 4.0 added request.headers.merge! as the preferred test request-header API, but request.env.merge! continues to work through at least Rails 7 — both APIs coexist. Rails 8 is expected to remove the env-based form (verify against the current Rails changelog before scheduling the rewrite). For a 3.2 → 4.0 hop, this is opt-in cleanup, not a required fix"
+      explanation: "Rails 4.0 added request.headers.merge! as the preferred test request-header API, but request.env.merge! continues to work in legacy ActionController::TestCase-style controller specs on every supported Rails version. The real forcing function is the Rails 5+ migration from ActionController::TestCase to ActionDispatch::IntegrationTest (the former was extracted to the rails-controller-testing gem in 5.1, still maintained). For a 3.2 → 4.0 hop, this is opt-in cleanup, not a required fix — no specific Rails version removes request.env.merge! outright"
       fix: "Skippable for the 3.2 → 4.0 hop — request.env.merge! still works on Rails 4+. If opting in: on Rails 4+ it is a 1:1 substitution, request.env.merge!(headers) → request.headers.merge!(headers). Trap on Rails 3.2: ActionDispatch::Http::Headers#merge! exists but the Rack-key normalization layer Rails 4 added is absent, so Rack-env-style keys (HTTP_AUTHORIZATION, HTTP_*) silently fail to reach the controller — a real hop saw ~65% of auth-heavy controller examples fail because the auth header stopped propagating on 3.2. If rewriting during the dual-boot window, defer to the Rails 4+ side; do not bulk-rewrite pre-bump"
       variable_name: "REQUEST_ENV_MERGE"
 
