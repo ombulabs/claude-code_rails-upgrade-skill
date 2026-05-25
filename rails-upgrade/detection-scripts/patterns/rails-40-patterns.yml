@@ -140,6 +140,17 @@ upgrade_findings:
       fix: "Two valid paths. (1) Defer: leave the calls in place for the 3.2 → 4.0 hop and rely on the bundled activerecord-deprecated_finders gem; rewrite at the 4.0 → 4.1 hop. (2) Pre-bump cleanup: replace find_or_initialize_by_column(val) with find_or_initialize_by(column: val). Both forms work on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
       variable_name: "FIND_OR_INITIALIZE_BY"
 
+    - name: "Dynamic finders (find_last_by_*)"
+      kind: "deprecation"
+      pattern: "find_last_by_"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Dynamic finders like find_last_by_* are deprecated in Rails 4.0 but continue to work because Rails 4.0 ships activerecord-deprecated_finders as a default dependency. The finders are actually removed in Rails 4.1, when the bridge gem is no longer bundled"
+      fix: "Two valid paths. (1) Defer: leave the calls in place for the 3.2 → 4.0 hop and rely on the bundled activerecord-deprecated_finders gem; rewrite at the 4.0 → 4.1 hop. (2) Pre-bump cleanup: replace find_last_by_column(val) with where(column: val).last. Both forms work on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
+      variable_name: "FIND_LAST_BY"
+
     - name: "Association :readonly option on through"
       kind: "breaking"
       pattern: "(has_many|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
