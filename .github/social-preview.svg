@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-label="Rails Upgrade Assistant — a Claude Code skill by FastRuby.io">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fdfaf7"/>
+      <stop offset="100%" stop-color="#f5ece4"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#CC0000"/>
+      <stop offset="100%" stop-color="#A60000"/>
+    </linearGradient>
+    <style>
+      .title { font: 700 76px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1a1a1a; letter-spacing: -2px; }
+      .sub   { font: 500 30px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #4a4a4a; }
+      .tag   { font: 700 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #CC0000; letter-spacing: 3px; }
+      .meta  { font: 500 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #6a6a6a; }
+      .pill  { font: 600 18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- Left accent bar -->
+  <rect x="0" y="0" width="14" height="640" fill="url(#accent)"/>
+
+  <!-- Eyebrow tag -->
+  <text x="80" y="180" class="tag">CLAUDE CODE SKILL</text>
+
+  <!-- Title -->
+  <text x="80" y="260" class="title">Rails Upgrade</text>
+  <text x="80" y="340" class="title">Assistant</text>
+
+  <!-- Accent underline -->
+  <rect x="80" y="370" width="120" height="6" rx="3" fill="url(#accent)"/>
+
+  <!-- Subtitle -->
+  <text x="80" y="430" class="sub">Generate version-by-version migration reports</text>
+  <text x="80" y="470" class="sub">for Rails apps — built on 60,000+ hours of</text>
+  <text x="80" y="510" class="sub">production upgrade experience.</text>
+
+  <!-- Footer attribution -->
+  <g transform="translate(80, 558)">
+    <!-- FastRuby.io icon -->
+    <svg x="0" y="0" width="58" height="32" viewBox="8 18 154 82">
+      <path d="M32.8 18L8 42.6796L59.2 100L110.4 42.6796L85.6 18H32.8Z" fill="#EA3323" fill-opacity="0.18"/>
+      <path d="M48.8001 18L24.0001 42.6796L75.2001 100L126.4 42.6796L101.6 18H48.8001Z" fill="#EA3323" fill-opacity="0.35"/>
+      <path d="M66.4 18L41.6 42.6796L92.7999 100L144 42.6796L119.2 18H66.4Z" fill="#EA3323" fill-opacity="0.6"/>
+      <path d="M84.0216 18L59.2216 42.6796L110.422 100L161.622 42.6796L136.822 18H84.0216Z" fill="#EA3323"/>
+    </svg>
+    <text x="70" y="23" class="meta">FastRuby.io</text>
+    <text x="208" y="23" class="meta" fill="#b9a594">·</text>
+    <!-- OmbuLabs.ai icon -->
+    <svg x="232" y="0" width="32" height="32" viewBox="0 0 159 159">
+      <circle cx="79.5" cy="79.5" r="79.5" fill="#000000"/>
+      <g transform="translate(32.25, 37.5) scale(1.5)">
+        <path d="M31.9278 0C37.7951 4.27442 41.9367 24.2217 31.9278 27.0713C26.7508 27.0713 20.6075 13.6781 31.9278 0Z" fill="#ffffff"/>
+        <path d="M59.5646 50.591C53.0442 53.6979 34.2354 47.426 36.8487 37.0553C39.4372 32.4281 53.7473 33.6338 59.5646 50.591Z" fill="#F70A7C"/>
+        <path d="M3.02583 50.2904C3.67892 42.909 18.3461 29.2336 25.7417 36.7547C28.3302 41.382 20.1635 53.5694 3.02583 50.2904Z" fill="#FFC000"/>
+      </g>
+    </svg>
+    <text x="274" y="23" class="meta">OmbuLabs.ai</text>
+  </g>
+
+  <!-- Footer right: repo handle -->
+  <text x="1200" y="590" class="meta" text-anchor="end">ombulabs/claude-code_rails-upgrade-skill</text>
+</svg>
