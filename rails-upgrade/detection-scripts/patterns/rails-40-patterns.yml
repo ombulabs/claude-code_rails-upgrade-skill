@@ -114,8 +114,8 @@ upgrade_findings:
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Dynamic finders like find_all_by_* are deprecated in Rails 4.0"
-      fix: "Replace find_all_by_column(val) with where(column: val)"
+      explanation: "Dynamic finders like find_all_by_* are deprecated in Rails 4.0 but continue to work because Rails 4.0 ships activerecord-deprecated_finders as a default dependency. The finders are actually removed in Rails 4.1, when the bridge gem is no longer bundled"
+      fix: "Two valid paths. (1) Defer: leave the calls in place for the 3.2 → 4.0 hop and rely on the bundled activerecord-deprecated_finders gem; rewrite at the 4.0 → 4.1 hop where the gem is no longer default. (2) Pre-bump cleanup: replace find_all_by_column(val) with where(column: val) — works on Rails 3.2 and 4.0+. Note the return-type shift: find_all_by_* returned an Array; where(...) returns an ActiveRecord::Relation. If downstream code uses Array-specific methods (.flatten, indexed access, Array#-), add .to_a"
       variable_name: "FIND_ALL_BY"
 
     - name: "Dynamic finders (find_or_create_by_*)"
@@ -125,8 +125,8 @@ upgrade_findings:
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Dynamic finders like find_or_create_by_* are deprecated in Rails 4.0"
-      fix: "Replace find_or_create_by_column(val) with find_or_create_by(column: val)"
+      explanation: "Dynamic finders like find_or_create_by_* are deprecated in Rails 4.0 but continue to work because Rails 4.0 ships activerecord-deprecated_finders as a default dependency. The finders are actually removed in Rails 4.1, when the bridge gem is no longer bundled"
+      fix: "Two valid paths. (1) Defer: leave the calls in place for the 3.2 → 4.0 hop and rely on the bundled activerecord-deprecated_finders gem; rewrite at the 4.0 → 4.1 hop. (2) Pre-bump cleanup: replace find_or_create_by_column(val) with find_or_create_by(column: val). Both forms work on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
       variable_name: "FIND_OR_CREATE_BY"
 
     - name: "Dynamic finders (find_or_initialize_by_*)"
@@ -136,8 +136,8 @@ upgrade_findings:
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Dynamic finders like find_or_initialize_by_* are deprecated in Rails 4.0"
-      fix: "Replace find_or_initialize_by_column(val) with find_or_initialize_by(column: val)"
+      explanation: "Dynamic finders like find_or_initialize_by_* are deprecated in Rails 4.0 but continue to work because Rails 4.0 ships activerecord-deprecated_finders as a default dependency. The finders are actually removed in Rails 4.1, when the bridge gem is no longer bundled"
+      fix: "Two valid paths. (1) Defer: leave the calls in place for the 3.2 → 4.0 hop and rely on the bundled activerecord-deprecated_finders gem; rewrite at the 4.0 → 4.1 hop. (2) Pre-bump cleanup: replace find_or_initialize_by_column(val) with find_or_initialize_by(column: val). Both forms work on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
       variable_name: "FIND_OR_INITIALIZE_BY"
 
     - name: "Association :readonly option on through"
