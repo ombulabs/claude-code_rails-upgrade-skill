@@ -356,6 +356,19 @@ upgrade_findings:
       fix: "Cast dynamic dates to strings: <%= 3.days.ago.to_s(:db) %>"
       variable_name: "FIXTURE_DATES"
 
+    - name: "update_all with hash/string/array conditions (two-arg form)"
+      kind: "deprecation"
+      pattern: "update_all\\([^)]*,\\s*[\\{\"'\\[]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "Class.update_all(set, conditions) two-arg form is deprecated in Rails 4.0 and removed in 4.1. The new form is Class.where(conditions).update_all(set). Covers hash, string, and array condition shapes. Note: activerecord-deprecated_finders does NOT bridge update_all — the bundled gem covers find(:first/:all/:last) and dynamic finders only, so this form must be rewritten before reaching Rails 4.1"
+      fix: "Lift the second arg into a where chain. Hash: Class.update_all(set, {col: v}) → Class.where(col: v).update_all(set). Array: Class.update_all(set, [\"x = ?\", v]) → Class.where(\"x = ?\", v).update_all(set). String: Class.update_all(set, \"x = 1\") → Class.where(\"x = 1\").update_all(set). Both forms work on Rails 3.2 so the rewrite is backwards-compatible. False-positive watch: single-arg update_all on a relation that already has a where chain is the modern form (no comma + brace/quote/bracket — should not match the regex); rare update_all(strings.join(\",\")) shapes can trigger on the inner comma-quote — verify the second token is an actual conditions arg"
+      variable_name: "UPDATE_ALL_TWO_ARG"
+
   low_priority:
     - name: "request.env.merge! in tests"
       kind: "optional"
