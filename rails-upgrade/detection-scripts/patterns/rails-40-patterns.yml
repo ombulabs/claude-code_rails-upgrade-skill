@@ -297,8 +297,8 @@ upgrade_findings:
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 4.0 removed the options argument from assign_attributes"
-      fix: "Remove the second argument (e.g., without_protection: true)"
+      explanation: "Rails 4.0 removed the options argument from assign_attributes. On Rails 3.2, assign_attributes(attrs, as: :admin) (or without_protection: true) invokes role-based mass-assignment tied to attr_accessible :foo, as: :admin. Dropping the options hash pre-bump silently changes mass-assignment scope on remaining 3.2 deploys and may permit attribute writes that the role-scoped attr_accessible declaration would otherwise filter — a silent security regression"
+      fix: "Do NOT bulk-drop the second arg pre-bump. Two safe paths: (1) branch the call with NextRails.next? — `if NextRails.next? then obj.assign_attributes(attrs) else obj.assign_attributes(attrs, as: :admin) end`; or (2) keep the option-hash form and rely on the protected_attributes bridge gem on the next side, which preserves role-scoped attr_accessible on Rails 4+. Pick (1) when the role scope is genuinely unused; pick (2) when role-based mass assignment is load-bearing"
       variable_name: "ASSIGN_ATTRIBUTES_OPTIONS"
 
     - name: "request.env.merge! in tests"
