@@ -369,6 +369,19 @@ upgrade_findings:
       fix: "Lift the second arg into a where chain. Hash: Class.update_all(set, {col: v}) → Class.where(col: v).update_all(set). Array: Class.update_all(set, [\"x = ?\", v]) → Class.where(\"x = ?\", v).update_all(set). String: Class.update_all(set, \"x = 1\") → Class.where(\"x = 1\").update_all(set). Both forms work on Rails 3.2 so the rewrite is backwards-compatible. False-positive watch: single-arg update_all on a relation that already has a where chain is the modern form (no comma + brace/quote/bracket — should not match the regex); rare update_all(strings.join(\",\")) shapes can trigger on the inner comma-quote — verify the second token is an actual conditions arg"
       variable_name: "UPDATE_ALL_TWO_ARG"
 
+    - name: "Old-style finder (find(:first|:all|:last, conditions:))"
+      kind: "deprecation"
+      pattern: "find\\(\\s*:(first|all|last)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "find(:first/:all/:last, conditions: ..., order: ..., ...) is the legacy ARel-1.0-style finder. Deprecated in Rails 3.2 (still works), removed in Rails 4.1. On Rails 4.0 it continues to work because activerecord-deprecated_finders ships as a default dependency — the gem is removed at 4.1, at which point the form must be rewritten"
+      fix: "Two valid paths. (1) Defer: leave the calls in place for the 3.2 → 4.0 hop and rely on the bundled activerecord-deprecated_finders gem; rewrite at the 4.0 → 4.1 hop. (2) Pre-bump cleanup: lift each hash key into a chained relation method. Class.find(:first, conditions: c) → Class.where(c).first; Class.find(:first, conditions: c, order: o) → Class.where(c).order(o).first; Class.find(:all, conditions: c) → Class.where(c); Class.find(:last, conditions: c) → Class.where(c).last. All recipes work on Rails 3.2 and 4.0+ natively. Important semantic shift for the :all form: find(:all, ...) returned an Array; where(...) returns an ActiveRecord::Relation. Most call sites just iterate, so the bare where(c) rewrite is fine; add .to_a only when downstream uses Array-specific methods. False-positive watch: Enumerable#find(ifnone) accepts a positional argument as the default if no block matches, so array.find(:all) / hash.find(:first) etc. would technically match — verify the receiver is an ActiveRecord class or relation (not a plain Array/Hash/Range). Also watch for Capybara page.find(..., match: :first) — different API, leave alone"
+      variable_name: "OLD_FINDER"
+
   low_priority:
     - name: "request.env.merge! in tests"
       kind: "optional"
