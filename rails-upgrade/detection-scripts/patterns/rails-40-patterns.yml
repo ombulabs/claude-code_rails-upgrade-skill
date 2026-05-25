@@ -203,6 +203,16 @@ upgrade_findings:
       fix: "Keep the FIRST `root` declaration as the default `:root` name; add `as: :<unique_name>` to the SECOND and subsequent declarations. Renaming all of them (giving the first an `as:` too) silently breaks every `root_path` / `root_url` call site because the `:root` name is no longer registered. Real apps have dozens to hundreds of these helper calls. Verification step: `grep -rnE \"\\b(root_path|root_url)\\b\" app/ config/ lib/` and confirm no caller targets a constraint-bound root that was renamed"
       variable_name: "DUPLICATE_ROOT_ROUTES"
 
+    - name: "Hyphenated or CamelCase controller name in routes to: value"
+      kind: "breaking"
+      pattern: "to:\\s*\"[^\"]*(-|[A-Z])[^\"]*#"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 4 validates controller names in `to:` clauses with strict rules: no hyphens, no CamelCase. Hyphenated values raise `ArgumentError: 'foo-bar' is not a supported controller name`; the CamelCase form raises the same error. Rails 3.2 was lenient. URL paths (the route path itself) can keep hyphens — only the controller class reference in `to:` needs to be snake_case"
+      fix: "Replace hyphens with underscores and CamelCase with snake_case in `to:` values. URL paths keep their original form. The snake_case form resolves to the same controller class on Rails 3.2, so the rewrite ships pre-bump and is backwards-compatible. Example: `to: \"my-pages#show\"` → `to: \"my_pages#show\"`; `to: \"MyPages#show\"` → `to: \"my_pages#show\"`"
+      variable_name: "ROUTES_CONTROLLER_NAMES"
+
   medium_priority:
     - name: "rescue_action method"
       kind: "breaking"
