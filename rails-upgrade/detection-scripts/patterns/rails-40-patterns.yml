@@ -168,8 +168,8 @@ upgrade_findings:
       search_paths:
         - "config/routes.rb"
         - "config/routes/"
-      explanation: "Rails 4.0 requires match routes to specify an HTTP method via: option"
-      fix: "Add via: :get (or appropriate method) or replace with get/post/put/patch/delete helper"
+      explanation: "Rails 4.0 requires match routes to specify an HTTP method via: option. Rails 3.2's bare match accepted all verbs, so any non-GET request (POST/PUT/PATCH/DELETE) currently served by a matchless match route will silently 404 if the fix narrows the verb list. Also note: on Rails 3.2 `via: :all` is treated as literal HTTP method name `\"ALL\"` and 404s every request — the any-verb special-casing only exists on Rails 4+. Verified on Rails 3.2.22.5 with Rack::MockRequest"
+      fix: "Default to the behavior-preserving explicit verb list: `via: [:get, :post, :put, :patch, :delete]`. Works identically on Rails 3.2 and 4.0+, zero behavior delta from the matchless-match default. Only narrow to `via: :get` (or another single verb) after a per-route audit confirms the route is GET-only — otherwise POST/PUT/etc. silently 404 after the rewrite, and the regression often first surfaces in production because spec suites rarely cover every verb on every route. NEVER emit `via: :all` — on Rails 3.2 it 404s every request. Verb-tightening is a separate workstream from the upgrade rewrite"
       variable_name: "MATCH_WITHOUT_VIA"
 
     - name: "config.whiny_nils"
