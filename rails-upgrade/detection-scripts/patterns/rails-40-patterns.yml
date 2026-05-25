@@ -308,8 +308,8 @@ upgrade_findings:
       search_paths:
         - "spec/"
         - "test/"
-      explanation: "Rails 4.0 changed test request header API from request.env to request.headers"
-      fix: "Replace request.env.merge!(headers) with request.headers.merge!(headers)"
+      explanation: "Rails 4.0 changed test request header API from request.env to request.headers. The catch: ActionDispatch::Http::Headers#merge! also exists on Rails 3.2, but the Rack-key normalization layer that Rails 4 added is absent. Test specs typically use Rack-env-style keys (HTTP_AUTHORIZATION, HTTP_*) because that is what request.env accepts; after a bulk request.env.merge! → request.headers.merge! rewrite, the same keys still work on Rails 4 but on Rails 3.2 the headers do not reach the controller and every authed request returns 400/401"
+      fix: "Do NOT bulk-rewrite pre-bump for any spec suite that uses request.env.merge! to set auth or content-type headers — a real hop saw ~65% of auth-heavy controller examples fail because the auth header silently stopped propagating on Rails 3.2. Defer to dual-boot: the next bundle's Rails 4 has the normalization, so the rewrite is correct there. On the 4+ side it is a 1:1 substitution — request.env.merge!(headers) → request.headers.merge!(headers). For codebases without auth-header specs (rare), the rewrite can run pack-by-pack with each pack's full spec suite as the gate"
       variable_name: "REQUEST_ENV_MERGE"
 
     - name: "_run_validation_callbacks"
