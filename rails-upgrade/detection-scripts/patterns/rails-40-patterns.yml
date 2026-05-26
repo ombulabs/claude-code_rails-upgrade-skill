@@ -103,8 +103,8 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 deprecated :finder_sql with no direct replacement"
-      fix: "Rewrite using standard associations with scopes or custom query methods"
+      explanation: "Rails 4.0 deprecated `:finder_sql` with no direct in-place replacement. The Rails-4-canonical form is `has_many :name, -> { where(...) }, class_name: ...`, but the lambda-as-second-arg signature on `has_many` raises `ArgumentError: wrong number of arguments (given 3, expected 1..2)` on Rails 3.2 — verified on 3.2.22.5. A naive pre-bump rewrite breaks 3.2 boot"
+      fix: "Defer to dual-boot and branch the association definition with `NextRails.next?`. Common 3.2 use case is `finder_sql: \"SELECT id FROM x WHERE id IS NULL\"` as a deliberate always-empty stub for `accepts_nested_attributes_for`; preserve that intent in the dual-boot branch. FK gotcha: the scope-form replacement (`has_many :foo, -> { none }, class_name: \"Foo\"`) restores Rails' default FK predicate. Rails 4 computes `<owner_class_name>_id` as the FK column on the associated table — for self-referential associations or any case where the implied FK column does not exist, accessing the association raises an unknown-column SQL error even when the scope returns no rows. Pin `foreign_key:` and `primary_key:` to existing columns on both sides; for an always-empty stub used purely by `accepts_nested_attributes_for`, `foreign_key: :id, primary_key: :id` is a safe default"
       variable_name: "FINDER_SQL"
 
     - name: "Dynamic finders (find_all_by_*)"
