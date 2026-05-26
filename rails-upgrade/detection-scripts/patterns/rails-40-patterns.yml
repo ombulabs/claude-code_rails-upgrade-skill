@@ -203,6 +203,17 @@ upgrade_findings:
       fix: "Replace `^...$` with `\\A...\\z` (absolute start/end of string). Ruby's regex engine accepts both forms on every Rails version, so the rewrite ships pre-bump without a NextRails.next? branch. Secondary grep for the block-options form: `grep -rnE \"validates\\s+:\\w+.*format:.*?/[^/]*\\^\" app/ --include=\"*.rb\"`. For method-call regex args, fix at the helper method's return value — one fix covers every caller"
       variable_name: "VALIDATES_FORMAT_OF_ANCHORS"
 
+    - name: "Regex constant built via Regexp.new with multiline anchors"
+      kind: "breaking"
+      pattern: "Regexp\\.new\\([^)]*[\\^\\$]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Companion to VALIDATES_FORMAT_OF_ANCHORS. A regex constant defined via `Regexp.new(%q{^...$})` (or `Regexp.new(\"^...$\")`) is invisible to the primary anchor grep, which looks for literal `/^.../` regexes inline. Apps commonly extract validation regexes into constants — `EMAIL = Regexp.new(%q{^[^@]+@[^@]+$})` — then reference them by name in `validates_format_of`. Rails 4 still raises at model class-load when check_options_validity examines the constant's compiled regex"
+      fix: "Same rewrite as the primary pattern: `\\A` for `^`, `\\z` for `$`, applied at the constant's definition. One fix covers every caller. Backwards-compatible — Ruby accepts `\\A` / `\\z` on every Rails version. Per-match judgment required: not every `Regexp.new` constant feeds a validator. `String#match` / `String#scan` callers operating on multi-line input may need `^` / `$` for start/end-of-line semantics. Inspect call sites (`grep -rnE \"\\b<CONSTANT_NAME>\\b\" app/ lib/`) and only rewrite when every consumer is OK with absolute-anchor semantics"
+      variable_name: "VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND"
+
   medium_priority:
     - name: "rescue_action method"
       kind: "breaking"
