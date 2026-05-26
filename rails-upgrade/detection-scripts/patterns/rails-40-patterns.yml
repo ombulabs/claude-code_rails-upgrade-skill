@@ -356,6 +356,17 @@ upgrade_findings:
       fix: "Cast dynamic dates to strings: <%= 3.days.ago.to_s(:db) %>"
       variable_name: "FIXTURE_DATES"
 
+    - name: "CollectionProxy guarded by is_a?(Enumerable)"
+      kind: "breaking"
+      pattern: "is_a\\?\\(Enumerable\\)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "On Rails 4 CollectionProxy was rewritten to inherit from ActiveRecord::Relation and no longer includes Enumerable directly. Code branching on `value.is_a?(Enumerable)` to decide single-record vs collection misclassifies CollectionProxy as a single record on Rails 4. The check was correct on Rails 3.2 because CollectionProxy was a delegating proxy that forwarded is_a? to its underlying Array target via method_missing — silently shifts to wrong on Rails 4 with no error"
+      fix: "Broaden the guard: `value.is_a?(Enumerable) || value.is_a?(::ActiveRecord::Relation)`. Correct under both versions: Rails 3.2 CollectionProxy is not a Relation subclass, so the new branch is false there and the original short-circuit behavior is preserved; Rails 4.0 CollectionProxy < Relation, so the new branch correctly classifies it as a collection. Backwards-compatible — applies directly to the current side. The leading `::` is required: inside a scope that shadows ActiveRecord (e.g. `class MyApp::ActiveRecord < ::ActiveRecord::Base`), bare `ActiveRecord::Relation` resolves to the shadowed inner constant and raises NameError"
+      variable_name: "COLLECTION_PROXY_ENUMERABLE_GUARD"
+
     - name: "update_all with hash/string/array conditions (two-arg form)"
       kind: "deprecation"
       pattern: "update_all\\([^)]*,\\s*[\\{\"'\\[]"
