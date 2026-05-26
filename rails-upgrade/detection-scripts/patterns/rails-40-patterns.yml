@@ -367,6 +367,17 @@ upgrade_findings:
       fix: "Broaden the guard: `value.is_a?(Enumerable) || value.is_a?(::ActiveRecord::Relation)`. Correct under both versions: Rails 3.2 CollectionProxy is not a Relation subclass, so the new branch is false there and the original short-circuit behavior is preserved; Rails 4.0 CollectionProxy < Relation, so the new branch correctly classifies it as a collection. Backwards-compatible — applies directly to the current side. The leading `::` is required: inside a scope that shadows ActiveRecord (e.g. `class MyApp::ActiveRecord < ::ActiveRecord::Base`), bare `ActiveRecord::Relation` resolves to the shadowed inner constant and raises NameError"
       variable_name: "COLLECTION_PROXY_ENUMERABLE_GUARD"
 
+    - name: "HashWithIndifferentAccess#convert_value override with 1-arg signature"
+      kind: "breaking"
+      pattern: "def convert_value\\(value\\)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4 changed `HashWithIndifferentAccess#convert_value` to take a second argument (`options = {}`). Overrides with the 1-arg signature raise `ArgumentError: wrong number of arguments (given 2, expected 1)` on Rails 4 the first time AR calls the method during a hash mutation"
+      fix: "Add `_options = {}` (ignored) as a second parameter to the override: `def convert_value(value, _options = {})`. Rails 3.2 does not pass the second argument, so the default value is used and behavior is unchanged on the current side. Backwards-compatible — applies directly without a NextRails.next? branch"
+      variable_name: "HWIA_CONVERT_VALUE_OVERRIDE"
+
     - name: "update_all with hash/string/array conditions (two-arg form)"
       kind: "deprecation"
       pattern: "update_all\\([^)]*,\\s*[\\{\"'\\[]"
