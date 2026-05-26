@@ -203,6 +203,16 @@ upgrade_findings:
       fix: "Change `versions: \"string\"` / `version: \"string\"` to `versions: :symbol` / `version: :symbol`. paper_trail accepts symbols on Rails 3.2 too, so the rewrite ships pre-bump and is backwards-compatible"
       variable_name: "PAPER_TRAIL_STRING_VERSIONS"
 
+    - name: "validates_as_paranoid (rails3_acts_as_paranoid DSL)"
+      kind: "breaking"
+      pattern: "\\bvalidates_as_paranoid\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "`validates_as_paranoid` is a class-method DSL provided by `rails3_acts_as_paranoid` (Rails-3-only soft-delete gem). When that gem is gated `unless next?` in the Gemfile — the typical disposition because the gem is unmaintained on Rails 4+ — call sites raise `NoMethodError: undefined method 'validates_as_paranoid' for ...` at model class-load on the next side. Boot-fatal, surfaced by an eager-load smoke test. The `paranoia` replacement gem (the standard Rails-4-compatible soft-delete replacement that pairs with `acts_as_paranoid`) does NOT provide `validates_as_paranoid` — its default_scope automatically excludes soft-deleted records from `Model.where(...)` uniqueness validations, so the explicit declaration is unnecessary on the next side"
+      fix: "Guard the call with `unless NextRails.next?`: `validates_as_paranoid unless NextRails.next?`. With paranoia's default_scope, uniqueness validators using `Model.where(...)` automatically skip soft-deleted records, so the explicit declaration is redundant on Rails 4+. Same guard applies if the codebase keeps `rails3_acts_as_paranoid` gated `unless next?` without swapping to paranoia — the call site is a no-op on the next side either way"
+      variable_name: "VALIDATES_AS_PARANOID"
+
   medium_priority:
     - name: "rescue_action method"
       kind: "breaking"
