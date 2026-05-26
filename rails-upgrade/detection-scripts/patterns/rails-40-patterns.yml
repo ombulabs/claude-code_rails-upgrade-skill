@@ -436,8 +436,14 @@ dependencies:
   actionpack_action_caching:
     check: false
     gem_name: "actionpack-action_caching"
-    message: "Required if using caches_page or caches_action"
+    message: "Required if using caches_action — extracted from Rails core at 4.0"
     url: "https://github.com/rails/actionpack-action_caching"
+
+  actionpack_page_caching:
+    check: false
+    gem_name: "actionpack-page_caching"
+    message: "Required if using caches_page — extracted from Rails core at 4.0 (separate gem from actionpack-action_caching)"
+    url: "https://github.com/rails/actionpack-page_caching"
 
   activeresource:
     check: false
