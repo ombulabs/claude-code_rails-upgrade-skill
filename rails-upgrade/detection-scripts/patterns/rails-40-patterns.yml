@@ -356,6 +356,16 @@ upgrade_findings:
       fix: "Cast dynamic dates to strings: <%= 3.days.ago.to_s(:db) %>"
       variable_name: "FIXTURE_DATES"
 
+    - name: "Association :conditions option with proc — self binding change"
+      kind: "breaking"
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?conditions.*?(\\bproc\\s*\\{|Proc\\.new\\s*(do|\\{))"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Subtle behavior change in Rails 4 layered on top of the `:conditions` removal. On Rails 3.2 you could pass a `proc { ... }` as `:conditions` and `self` inside the proc was the AR record being loaded — bare attribute references resolved against the record. On Rails 4 the replacement lambda must take an explicit `(record)` parameter and reference attributes through `record.x` rather than bare `x`; `self` inside the lambda is the class, not the instance. Every proc body referencing `self.<attr>` or bare attribute names must be rewritten — silent semantic shift otherwise (the proc evaluates, but against the wrong receiver)"
+      fix: "Rewrite to an arity-1 lambda and reference attributes through the record parameter. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` → `belongs_to :foo, ->(record) { where(clinic_id: record.clinic_id) }`. Each proc body needs manual inspection — bare attribute references (`x`, `self.x`) become `record.x`, while local variables and constants stay as-is. The lambda form works on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
+      variable_name: "ASSOCIATION_CONDITIONS_PROC"
+
     - name: "update_all with hash/string/array conditions (two-arg form)"
       kind: "deprecation"
       pattern: "update_all\\([^)]*,\\s*[\\{\"'\\[]"
