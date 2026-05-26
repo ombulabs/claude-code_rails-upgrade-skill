@@ -382,6 +382,19 @@ upgrade_findings:
       fix: "Two valid paths. (1) Defer: leave the calls in place for the 3.2 → 4.0 hop and rely on the bundled activerecord-deprecated_finders gem; rewrite at the 4.0 → 4.1 hop. (2) Pre-bump cleanup: lift each hash key into a chained relation method. Class.find(:first, conditions: c) → Class.where(c).first; Class.find(:first, conditions: c, order: o) → Class.where(c).order(o).first; Class.find(:all, conditions: c) → Class.where(c); Class.find(:last, conditions: c) → Class.where(c).last. All recipes work on Rails 3.2 and 4.0+ natively. Important semantic shift for the :all form: find(:all, ...) returned an Array; where(...) returns an ActiveRecord::Relation. Most call sites just iterate, so the bare where(c) rewrite is fine; add .to_a only when downstream uses Array-specific methods. False-positive watch: Enumerable#find(ifnone) accepts a positional argument as the default if no block matches, so array.find(:all) / hash.find(:first) etc. would technically match — verify the receiver is an ActiveRecord class or relation (not a plain Array/Hash/Range). Also watch for Capybara page.find(..., match: :first) — different API, leave alone"
       variable_name: "OLD_FINDER"
 
+    - name: "Class.scoped (deprecated, returns base relation)"
+      kind: "deprecation"
+      pattern: "\\.scoped\\b"
+      exclude: "unscoped|with_scope|reorder|reset_scope|deprecation_stream"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "Two related Rails-3-only deprecations share the `.scoped` name: bare `Model.scoped` (returns base Relation, replaced by `Model.all`/`where(nil)`) and `Model.scoped(conditions: ..., include: ..., order: ...)` (the with-args ad-hoc scope constructor, replaced by chained relation methods). Both deprecated in Rails 4.0, removed in 4.1. On Rails 4.0 the bundled activerecord-deprecated_finders gem keeps both forms working — rewrite is mandatory before the 4.0 → 4.1 hop. The exclude regex filters unrelated APIs (unscoped, with_scope, reorder, reset_scope, RSpec's deprecation_stream)"
+      fix: "Form A — bare `Model.scoped` (no args). Pick per call-site by looking at what comes after. A1 (terminal, no further chaining): `Model.scoped` → `Model.all`. On Rails 3.2 `.all` materializes to an Array; on 4.0+ it returns a Relation. Iteration via `.each`/`.map` works on both. A2 (chained, followed by `.joins`/`.where`/`.merge`): `Model.scoped` → `Model.where(nil)`. `where(nil)` returns a Relation with no conditions on both 3.2 and 4.0+, preserving chaining. Example: `scope :foo, -> { scoped.joins(:bar) }` → `scope :foo, -> { where(nil).joins(:bar) }`. Form B — `Model.scoped(hash)`. Break the hash into chained methods: `conditions:` → `.where`, `include:` → `.includes`, `order:` → `.order`, `joins:` → `.joins`, `select:` → `.select`, `limit:` → `.limit`, `offset:` → `.offset`, `group:` → `.group`, `having:` → `.having`, `readonly: true` → `.readonly(true)`. All chains work on Rails 3.2 and 4.0+. False-positive watch: custom method names like `def some_method_scoped` (rare)"
+      variable_name: "CLASS_SCOPED"
+
   low_priority:
     - name: "request.env.merge! in tests"
       kind: "optional"
