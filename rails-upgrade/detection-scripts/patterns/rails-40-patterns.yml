@@ -193,6 +193,16 @@ upgrade_findings:
       fix: "Delete the config.whiny_nils = true line entirely. No replacement — Ruby's own nil-method errors are sufficient. False-positive watch: matches in comments documenting the removal; verify the hit is an actual assignment, not a comment"
       variable_name: "WHINY_NILS"
 
+    - name: "has_paper_trail with string :versions / :version option"
+      kind: "breaking"
+      pattern: "has_paper_trail.*versions?:\\s*\""
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "has_paper_trail internally calls has_many with the name from `versions:` / `version:`. On Rails 4 the symbol-required check raises `ArgumentError: association names must be a Symbol` from inside paper_trail's own code when the option value is a string. Boot-fatal on Rails 4 for any model carrying the string form"
+      fix: "Change `versions: \"string\"` / `version: \"string\"` to `versions: :symbol` / `version: :symbol`. paper_trail accepts symbols on Rails 3.2 too, so the rewrite ships pre-bump and is backwards-compatible"
+      variable_name: "PAPER_TRAIL_STRING_VERSIONS"
+
   medium_priority:
     - name: "rescue_action method"
       kind: "breaking"
