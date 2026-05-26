@@ -376,6 +376,16 @@ upgrade_findings:
       fix: "Branch to literal SQL on the next side: `if NextRails.next?; relation.order(\"events.start ASC\"); else; relation.order(event: :start); end` (or duplicate the chain inside an `if NextRails.next?` block). The choice of which join table to name in the SQL depends on the receiver chain — operator judgment per site. Forward-compat note for Rails 5.2+: bare-string `.order(\"events.start ASC\")` triggers a `Dangerous query method` warning; wrap with `Arel.sql(...)` (`Arel.sql(\"events.start ASC\")`) for forward compatibility. `Arel.sql` exists since Rails 3.0, so the wrap is backwards-compatible"
       variable_name: "SQUEEL_ORDER_JOINED_TABLE"
 
+    - name: "has_many / has_one / belongs_to with string association name"
+      kind: "breaking"
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many)\\s+\"[^\"]+\""
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4 raises `ArgumentError: association names must be a Symbol` when the first argument to has_many / has_one / belongs_to / HABTM is a string. Rails 3.2 accepts strings but auto-coerces; Rails 4 made the strict-Symbol type check explicit. Note: the primary regex matches only a literal `\"...\"` first argument. Method-chain shapes like `has_many type.tableize, dependent: :destroy` (inside a `types.each` loop) also raise the same error at class-load but the chain result is invisible to grep — a broader regex would generate too many false positives from options-keyword method calls. Recovery for method-chain shapes is via boot smoke: Rails 4's error ships with a stack trace pointing at the offending has_* line; append `.to_sym` to the computed expression"
+      fix: "Convert string association names to symbols. For dynamic names (e.g. `has_many \"name_#{x}\"`), add `.to_sym` at the end of the expression. Symbols work on Rails 3.2 identically, so the rewrite ships pre-bump and is backwards-compatible"
+      variable_name: "ASSOC_NAME_STRING"
+
     - name: "update_all with hash/string/array conditions (two-arg form)"
       kind: "deprecation"
       pattern: "update_all\\([^)]*,\\s*[\\{\"'\\[]"
