@@ -366,6 +366,16 @@ upgrade_findings:
       fix: "Rewrite to an arity-1 lambda and reference attributes through the record parameter. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` → `belongs_to :foo, ->(record) { where(clinic_id: record.clinic_id) }`. Each proc body needs manual inspection — bare attribute references (`x`, `self.x`) become `record.x`, while local variables and constants stay as-is. The lambda form works on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
       variable_name: "ASSOCIATION_CONDITIONS_PROC"
 
+    - name: "Squeel-style order(joined_table: :column) joined-table ordering"
+      kind: "breaking"
+      pattern: "order\\(\\s*:?\\w+\\s*:\\s*:\\w+"
+      exclude: ":asc|:desc"
+      search_paths:
+        - "app/models/"
+      explanation: "Apps using the Squeel gem may have `order(event: :start)` where `:event` is a joined table and `:start` is the column. On Rails 4 + Squeel 1.2's AR-4.0 adapter, `order!` validates the value side of any hash arg as a direction (`:asc` / `:desc`) — anything else raises `ArgumentError: Direction should be :asc or :desc`. The Squeel hash-form is correct on Rails 3.2; the Rails-4 replacement is literal SQL. The exclude regex filters legitimate direction hashes (`order(name: :asc)`, `order(id: :desc)`)"
+      fix: "Branch to literal SQL on the next side: `if NextRails.next?; relation.order(\"events.start ASC\"); else; relation.order(event: :start); end` (or duplicate the chain inside an `if NextRails.next?` block). The choice of which join table to name in the SQL depends on the receiver chain — operator judgment per site. Forward-compat note for Rails 5.2+: bare-string `.order(\"events.start ASC\")` triggers a `Dangerous query method` warning; wrap with `Arel.sql(...)` (`Arel.sql(\"events.start ASC\")`) for forward compatibility. `Arel.sql` exists since Rails 3.0, so the wrap is backwards-compatible"
+      variable_name: "SQUEEL_ORDER_JOINED_TABLE"
+
     - name: "update_all with hash/string/array conditions (two-arg form)"
       kind: "deprecation"
       pattern: "update_all\\([^)]*,\\s*[\\{\"'\\[]"
