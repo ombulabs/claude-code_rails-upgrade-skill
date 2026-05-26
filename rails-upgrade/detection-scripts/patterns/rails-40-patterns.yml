@@ -378,6 +378,16 @@ upgrade_findings:
       fix: "Add `_options = {}` (ignored) as a second parameter to the override: `def convert_value(value, _options = {})`. Rails 3.2 does not pass the second argument, so the default value is used and behavior is unchanged on the current side. Backwards-compatible — applies directly without a NextRails.next? branch"
       variable_name: "HWIA_CONVERT_VALUE_OVERRIDE"
 
+    - name: "Rack::Lock middleware insert_before usage"
+      kind: "breaking"
+      pattern: "config\\.middleware\\.insert_before\\s+Rack::Lock"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 4 dropped Rack::Lock from its default middleware stack. `config.middleware.insert_before Rack::Lock, ...` raises `RuntimeError: No such middleware to insert before: Rack::Lock` at boot. The Rack::Lock reference is removed entirely from the next side; a single declaration that names it cannot satisfy both versions"
+      fix: "Branch the call with NextRails.next?: on the next side use `config.middleware.insert(0, ...)` (top of stack) or `config.middleware.unshift(...)`; on the current side keep `config.middleware.insert_before Rack::Lock, ...`. Example: `if NextRails.next?; config.middleware.insert(0, MyMiddleware); else; config.middleware.insert_before Rack::Lock, MyMiddleware; end`. Marked in-scope-branched, not deferred-to-dual-boot — the branch is pure source and only requires NextRails.next? to be loadable, no Gemfile.next dependency"
+      variable_name: "RACK_LOCK_MIDDLEWARE"
+
     - name: "update_all with hash/string/array conditions (two-arg form)"
       kind: "deprecation"
       pattern: "update_all\\([^)]*,\\s*[\\{\"'\\[]"
