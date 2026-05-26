@@ -214,6 +214,17 @@ upgrade_findings:
       fix: "Same rewrite as the primary pattern: `\\A` for `^`, `\\z` for `$`, applied at the constant's definition. One fix covers every caller. Backwards-compatible — Ruby accepts `\\A` / `\\z` on every Rails version. Per-match judgment required: not every `Regexp.new` constant feeds a validator. `String#match` / `String#scan` callers operating on multi-line input may need `^` / `$` for start/end-of-line semantics. Inspect call sites (`grep -rnE \"\\b<CONSTANT_NAME>\\b\" app/ lib/`) and only rewrite when every consumer is OK with absolute-anchor semantics"
       variable_name: "VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND"
 
+    - name: "accepts_nested_attributes_for without matching association"
+      kind: "breaking"
+      pattern: "accepts_nested_attributes_for\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+        - "lib/"
+      explanation: "Rails 3.2 accepted `accepts_nested_attributes_for :foo` even when `:foo` was not a declared association — projects sometimes paired it with a hand-rolled reader (polymorphic lookup, memoized custom join) and Rails generated the `foo_attributes=` writer against whatever the override returned. Rails 4.0 looks up the reflection at class-load and raises `ArgumentError: No association found for name 'foo'` at boot. The protected_attributes bridge gem (used during the 3.2 → 4.0 hop to keep attr_accessible alive) hits the same check earlier, so the error can surface even before AR's own reflection lookup runs. Boot-fatal — the class fails to load before any spec runs. Note: the primary regex catches ALL `accepts_nested_attributes_for` calls; most matches are benign (the model already declares the matching association). Operator filters to the breaking ones by inspecting each model"
+      fix: "Add `belongs_to :foo, polymorphic: true` (or the matching has_one / has_many) under `if NextRails.next?` so the auto-generated reader is registered with AR but does NOT replace the hand-rolled `def foo` override — Ruby method lookup resolves the explicit `def foo` first. Why the gate: declaring unconditionally on the current side introduces a new auto-generated reader+writer on Rails 3.2 where neither existed; even if `def foo` shadows the reader (placement-dependent), the new writer makes `record.foo = ...` silently succeed where it previously raised NoMethodError. Inheritance pitfall: the missing reflection may be a side effect of a parallel gem bump (e.g. paper_trail 2.x's top-level `Version` moves to `PaperTrail::Version` in 3.x — inherited reflection disappears with no app code change). Check the gem's migration docs before patching the subclass. After cutover, drop the gate"
+      variable_name: "ACCEPTS_NESTED_NO_REFLECTION"
+
   medium_priority:
     - name: "rescue_action method"
       kind: "breaking"
