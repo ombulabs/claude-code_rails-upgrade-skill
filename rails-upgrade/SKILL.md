@@ -336,9 +336,10 @@ is lost entirely. This step closes the gap by eager-loading every app class.
 3. Tier A — eager-load boot:
      BUNDLE_GEMFILE=Gemfile.next bundle exec rails runner "Rails.application.eager_load!; puts 'EAGER OK'"
 4. Tier B — zeitwerk:check (Zeitwerk apps only; skip on classic autoloader).
-5. Tier C — eager-load with deprecation behavior forced loud, grep "DEPRECATION
-   WARNING", de-dupe. These are load-time deprecations only — method-body
-   deprecations still need Step 6 / DeprecationTracker.
+5. Tier C — eager-load with a deprecation behavior lambda that records each
+   warning with its callstack, then maps it to the app file:line that fired it
+   (so it is fixable in this hop). These are load-time deprecations only —
+   method-body deprecations still need Step 6 / DeprecationTracker.
 6. Route app-code load failures and kind: deprecation warnings into Step 5's
    fix-before-bump bucket. Attach the coverage caveat: a clean run is NOT proof
    of zero deprecations.
