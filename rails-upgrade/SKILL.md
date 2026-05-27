@@ -333,13 +333,17 @@ is lost entirely. This step closes the gap by eager-loading every app class.
 1. Read: workflows/runtime-detection-workflow.md
 2. Confirm deprecations are not silenced (sweep lives in the dual-boot skill's
    references/deprecation-tracking.md — do not duplicate it).
-3. Tier A — eager-load boot:
+   Bundle split matters: Tiers A/B boot Gemfile.next (does it load under the
+   target?); Tier C boots the CURRENT bundle (the current Rails emits this hop's
+   deprecations). See the workflow's "Which bundle to boot" section.
+3. Tier A — eager-load boot against the target:
      BUNDLE_GEMFILE=Gemfile.next bundle exec rails runner "Rails.application.eager_load!; puts 'EAGER OK'"
-4. Tier B — zeitwerk:check (Zeitwerk apps only; skip on classic autoloader).
-5. Tier C — eager-load with a deprecation behavior lambda that records each
-   warning with its callstack, then maps it to the app file:line that fired it
-   (so it is fixable in this hop). These are load-time deprecations only —
-   method-body deprecations still need Step 6 / DeprecationTracker.
+4. Tier B — zeitwerk:check against the target (Zeitwerk apps only; skip on classic autoloader).
+5. Tier C — against the CURRENT bundle (no BUNDLE_GEMFILE), eager-load with a
+   deprecation behavior lambda that records each warning with its callstack,
+   then maps it to the app file:line that fired it (so it is fixable in this
+   hop). These are load-time deprecations only — method-body deprecations still
+   need Step 6 / DeprecationTracker.
 6. Route app-code load failures and kind: deprecation warnings into Step 5's
    fix-before-bump bucket. Attach the coverage caveat: a clean run is NOT proof
    of zero deprecations.

@@ -32,7 +32,18 @@ Eager-load `require`s every file under the eager-load paths, which runs each **c
 
 If deprecation behavior is silenced, this step's eager-load will run clean-looking while warnings vanish. Before Tier C, confirm deprecations are not silenced using the sweep in the dual-boot skill's `references/deprecation-tracking.md` ("Step 1: Detect If Deprecations Are Silenced"). Do not duplicate that sweep here — run it from there. If `:silence` or `report_deprecations = false` is set, the warnings you want are being thrown away.
 
-Substitute the project's own runner throughout (detect `bin/rails`, `bin/test`, `bundle exec`, etc., as the dual-boot skill's Key Principle 4 describes). Prefix every command with `BUNDLE_GEMFILE=Gemfile.next` so it runs against the target Rails version.
+Substitute the project's own runner throughout (detect `bin/rails`, `bin/test`, `bundle exec`, etc., as the dual-boot skill's Key Principle 4 describes).
+
+---
+
+## Which bundle to boot — this matters
+
+The tiers split across **two** Rails versions, and getting this wrong collects the wrong signal:
+
+- **Tiers A and B run against `Gemfile.next` (the target version).** The question they answer is "does the app still *load* under the new Rails?" Anything the target removed crashes here.
+- **Tier C runs against the *current* bundle (no `BUNDLE_GEMFILE`).** Deprecation warnings are emitted by the **current** Rails version about what the **next** version removes — that is the fix-before-bump list for *this* hop. Running the collector against `Gemfile.next` would be wrong twice over: the API the target removed is already gone (it shows up as a Tier A *crash*, not a warning), and any deprecations you *do* see there are about the version *after* the target, which this skill defers to the next hop (see SKILL.md Step 6).
+
+In short: **boot the target to find what breaks; boot the current version to find what to fix before you bump.**
 
 ---
 
@@ -60,10 +71,12 @@ This catches files whose constant name does not match the path Zeitwerk expects 
 
 ### Tier C: Deprecation collector boot
 
+Run this against the **current** bundle (no `BUNDLE_GEMFILE` — see "Which bundle to boot" above): the current Rails version is the one that emits "X is deprecated, will be removed in [target]" warnings, which are exactly the fix-before-bump items for this hop.
+
 A plain `grep "DEPRECATION WARNING"` over the boot output tells you *what* is deprecated but not *where* — and without the call site you cannot fix it in this hop. Instead, install a deprecation **behavior lambda** that records each message together with its callstack, eager-load, then print each unique message mapped to the app frames that triggered it:
 
 ```bash
-BUNDLE_GEMFILE=Gemfile.next bundle exec rails runner '
+bundle exec rails runner '
   seen = Hash.new { |h, k| h[k] = [] }
 
   # behavior is called once per deprecation. Signature widened over time
