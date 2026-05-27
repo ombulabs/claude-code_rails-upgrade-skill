@@ -58,23 +58,23 @@ upgrade_findings:
       variable_name: "DEFAULT_SCOPE_WITHOUT_BLOCK"
 
     - name: "Association :conditions option"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?conditions(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :conditions from associations — use a lambda with where() instead"
-      fix: "Move conditions into a lambda: has_many :items, -> { where(active: true) }"
+      explanation: "Rails 4.0 moved :conditions out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1. A proc-valued :conditions has a receiver subtlety covered separately by ASSOCIATION_CONDITIONS_PROC"
+      fix: "Move conditions into a scope lambda: has_many :items, -> { where(active: true) }. Works on Rails 3.2 and 4.0+"
       variable_name: "ASSOCIATION_CONDITIONS"
 
     - name: "Association :order option"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*[^_]:?order(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :order from associations — use a lambda with order() instead"
-      fix: "Move order into a lambda: has_many :items, -> { order('position ASC') }"
+      explanation: "Rails 4.0 moved :order out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1"
+      fix: "Move order into a scope lambda: has_many :items, -> { order('position ASC') }. Works on Rails 3.2 and 4.0+"
       variable_name: "ASSOCIATION_ORDER"
 
     - name: "Association :extend option"
@@ -83,18 +83,18 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :extend from associations — use extending() inside a lambda"
-      fix: "Move extend into a lambda: has_many :items, -> { extending SomeExtension }"
+      explanation: "Rails 4.0 removed :extend from associations. Unlike :conditions / :order / :uniq / :readonly, activerecord-deprecated_finders does NOT restore :extend, so this one actually breaks at the 4.0 hop and stays breaking. Use extending() inside a scope lambda"
+      fix: "Move extend into a scope lambda: has_many :items, -> { extending SomeExtension }"
       variable_name: "ASSOCIATION_EXTEND"
 
     - name: "Association :uniq option"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "(has_many|has_and_belongs_to_many).*:?uniq(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :uniq from associations — use a lambda with distinct"
-      fix: "Move uniq into a lambda: has_many :items, -> { distinct }, through: :joins"
+      explanation: "Rails 4.0 moved :uniq out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda with distinct before dropping the gem or moving to 4.1"
+      fix: "Move uniq into a scope lambda: has_many :items, -> { distinct }, through: :joins. Works on Rails 3.2 and 4.0+"
       variable_name: "ASSOCIATION_UNIQ"
 
     - name: "Association :finder_sql option"
@@ -152,13 +152,13 @@ upgrade_findings:
       variable_name: "FIND_LAST_BY"
 
     - name: "Association :readonly option on through"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "(has_many|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :readonly from has_many :through associations"
-      fix: "Remove the readonly option — it is no longer supported"
+      explanation: "Rails 4.0 moved :readonly out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Move it to a scope lambda before dropping the gem or moving to 4.1"
+      fix: "Move readonly into a scope lambda: has_many :items, -> { readonly }, through: :joins. Works on Rails 3.2 and 4.0+"
       variable_name: "ASSOCIATION_READONLY"
 
     - name: "Ruby 1.8 version requirement"
