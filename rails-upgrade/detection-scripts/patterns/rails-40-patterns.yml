@@ -195,22 +195,22 @@ upgrade_findings:
 
     - name: "validates_format_of with multiline anchors (^...$)"
       kind: "breaking"
-      pattern: "validates_format_of.*with:\\s*/[^/]*\\^"
+      pattern: "validates_format_of.*with:\\s*/[^/]*[\\^$]"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4 raises `ArgumentError: regular expression is using multiline anchors (^ or $), which may present a security risk` whenever a `validates_format_of` regex uses `^` / `$`. The validator runs check_options_validity at model class-load, so the error is boot-fatal. Note: the primary regex only catches the literal `validates_format_of` token. The block-options form `validates :col, format: { with: /^.../ }` and method-call regex args (`with: regex_for(:x)`) raise the same error but are not detected by this entry — see fix for secondary grep"
-      fix: "Replace `^...$` with `\\A...\\z` (absolute start/end of string). Ruby's regex engine accepts both forms on every Rails version, so the rewrite ships pre-bump without a NextRails.next? branch. Secondary grep for the block-options form: `grep -rnE \"validates\\s+:\\w+.*format:.*?/[^/]*\\^\" app/ --include=\"*.rb\"`. For method-call regex args, fix at the helper method's return value — one fix covers every caller"
+      explanation: "Rails 4 raises `ArgumentError: The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or forgot to add the :multiline => true option?` whenever a `validates_format_of` regex source STARTS with `^` or ENDS with `$` (unescaped). New in 4.0 — Rails 3.2 does not perform this check. The validator runs check_options_validity at model class-load, so the error is boot-fatal. Detection caveat: this grep flags any `^` or `$` inside the `with:` regex, but Rails only raises on a leading `^` or trailing `$`. A `^` inside a character class (e.g. `/[^@]+/`) or a `$` mid-pattern is a FALSE POSITIVE — confirm the anchor sits at the start/end before fixing. Out of scope for the primary regex: the block-options form `validates :col, format: { with: /^.../ }`, method-call regex args (`with: regex_for(:x)`), and positional / `without:` regexes — see fix for a secondary grep"
+      fix: "Replace a leading `^` with `\\A` and a trailing `$` with `\\z` (absolute start/end of string). Ruby's regex engine accepts both forms on every Rails version, so apply the rewrite directly — it is backwards-compatible and needs no version gate. Secondary grep for the block-options form: `grep -rnE \"validates\\s+:\\w+.*format:.*?/[^/]*[\\^$]\" app/ --include=\"*.rb\"`. For method-call regex args, fix at the helper method's return value — one fix covers every caller"
       variable_name: "VALIDATES_FORMAT_OF_ANCHORS"
 
     - name: "Regex constant built via Regexp.new with multiline anchors"
       kind: "breaking"
-      pattern: "Regexp\\.new\\([^)]*[\\^\\$]"
+      pattern: "Regexp\\.new\\(.*[\\^$]"
       exclude: ""
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Companion to VALIDATES_FORMAT_OF_ANCHORS. A regex constant defined via `Regexp.new(%q{^...$})` (or `Regexp.new(\"^...$\")`) is invisible to the primary anchor grep, which looks for literal `/^.../` regexes inline. Apps commonly extract validation regexes into constants — `EMAIL = Regexp.new(%q{^[^@]+@[^@]+$})` — then reference them by name in `validates_format_of`. Rails 4 still raises at model class-load when check_options_validity examines the constant's compiled regex"
+      explanation: "Companion to VALIDATES_FORMAT_OF_ANCHORS. A regex constant defined via `Regexp.new(%q{^...$})` (or `Regexp.new(\"^...$\")`) is invisible to the primary anchor grep, which looks for literal `/^.../` regexes inline. Apps commonly extract validation regexes into constants — `EMAIL = Regexp.new(%q{^[^@]+@[^@]+$})` — then reference them by name in `validates_format_of`. Rails 4 still raises at model class-load when check_options_validity examines the constant's compiled regex. Same leading/trailing rule as the primary pattern: Rails raises only when the compiled source starts with `^` or ends with `$`. This grep flags any `^` / `$` after `Regexp.new(` (including a `^` inside a character class), so per-match judgment is required"
       fix: "Same rewrite as the primary pattern: `\\A` for `^`, `\\z` for `$`, applied at the constant's definition. One fix covers every caller. Backwards-compatible — Ruby accepts `\\A` / `\\z` on every Rails version. Per-match judgment required: not every `Regexp.new` constant feeds a validator. `String#match` / `String#scan` callers operating on multi-line input may need `^` / `$` for start/end-of-line semantics. Inspect call sites (`grep -rnE \"\\b<CONSTANT_NAME>\\b\" app/ lib/`) and only rewrite when every consumer is OK with absolute-anchor semantics"
       variable_name: "VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND"
 
