@@ -356,14 +356,14 @@ upgrade_findings:
       fix: "Cast dynamic dates to strings: <%= 3.days.ago.to_s(:db) %>"
       variable_name: "FIXTURE_DATES"
 
-    - name: "Association :conditions option with proc — self binding change"
-      kind: "breaking"
+    - name: "Association :conditions option passed a proc"
+      kind: "deprecation"
       pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?conditions.*?(\\bproc\\s*\\{|Proc\\.new\\s*(do|\\{))"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Behavior change on top of the `:conditions` removal: the receiver of a `:conditions` proc changed. On Rails 3.2 the proc was evaluated via `owner.instance_exec`, so `self` was the OWNER (the record declaring the association) and bare attribute names resolved against the owner. On Rails 4 the scope lambda is `instance_exec`'d against the relation (`klass.unscoped`) and the owner is passed as the lambda's argument instead, so `self` is the relation, not the owner. Any bare attribute reference or `self.<attr>` that relied on the owner receiver must move to the lambda parameter. Silent shift otherwise: the lambda still evaluates, but against the relation"
-      fix: "Rewrite to a scope lambda whose parameter is the owner record. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` (on 3.2 `clinic_id` resolved on the owner) becomes `belongs_to :foo, ->(owner) { where(clinic_id: owner.clinic_id) }`. Each proc body needs manual inspection: bare attribute references and `self.x` that targeted the owner become `owner.x`, while local variables and constants stay as-is. The lambda form works on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
+      explanation: "At the 3.2 → 4.0 hop this keeps working, with a deprecation warning, because activerecord-deprecated_finders is a default dependency of Rails 4.0 (removed in 4.1). That gem restores the `:conditions` option and instance_evals a proc value against the owner, so the Rails 3.2 receiver semantics are preserved on 4.0. The hazard is the eventual rewrite, not the bump: the native Rails 4 replacement is a scope lambda that is instance_exec'd against the relation (`klass.unscoped`) with the owner passed as the lambda argument, so `self` is the relation, not the owner. A careless rewrite to a bare `-> { where(x: x) }` resolves `x` against the relation instead of the owner — a silent shift"
+      fix: "Two options. (1) Defer: rely on the bundled activerecord-deprecated_finders through the 4.0 window; the proc keeps working and only warns. (2) Rewrite for forward compatibility (required before dropping the gem or moving to 4.1): convert to a scope lambda whose parameter is the owner. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` becomes `belongs_to :foo, ->(owner) { where(clinic_id: owner.clinic_id) }`. Bare attribute references and `self.x` that targeted the owner become `owner.x`; local variables and constants stay as-is. The lambda form works on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
       variable_name: "ASSOCIATION_CONDITIONS_PROC"
 
     - name: "order(column: :value) with a non-direction value"
@@ -440,7 +440,7 @@ dependencies:
   activerecord_deprecated_finders:
     check: false
     gem_name: "activerecord-deprecated_finders"
-    message: "Temporary bridge gem for find_all_by_* — migrate to where/find_by then remove"
+    message: "Default dependency of Rails 4.0 (removed in 4.1), so these keep working with a deprecation warning on 4.0. Restores dynamic finders (find_all_by_* etc.) and old-style association options (:conditions including a proc, :order, :include, :uniq, :readonly — not :extend). Temporary bridge: migrate off then drop the gem before 4.1"
     url: "https://github.com/rails/activerecord-deprecated_finders"
 
   actionpack_action_caching:
