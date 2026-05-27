@@ -1,6 +1,6 @@
 # Boot Smoke Test Workflow
 
-**When to run:** Step 4.6 of the upgrade workflow, after gem-compat (Step 4.5) and before report generation (Step 5).
+**When to run:** Step 4.6 of the upgrade workflow, after gem-compat (Step 4.5) and before runtime detection (Step 4.7).
 
 **Why this step exists:** Step 4 (codebase grep) only sees the user's own code. Step 4.5 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file.
 
@@ -72,7 +72,7 @@ For each offending gem:
 
 ### 4. Re-run boot
 
-Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Step 5.
+Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Step 4.7 (runtime detection).
 
 ## Output
 

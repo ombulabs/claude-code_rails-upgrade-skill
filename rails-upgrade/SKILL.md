@@ -171,6 +171,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
 - `workflows/gem-compatibility-workflow.md` - **Load in Step 4.5** - Per-lockfile gem compatibility check against the target Rails version. Documents both the primary (`next_rails` `bundle_report compatibility`) and the secondary (railsbump.org API) and the rules for when to escalate.
 - `workflows/boot-smoke-test-workflow.md` - **Load in Step 4.6** - Run a Rails-loading command against `Gemfile.next` to catch gem-level runtime incompat that the resolver can't see (gems calling removed Rails internals or `require`-ing removed files).
+- `workflows/runtime-detection-workflow.md` - **Load in Step 4.7** - Eager-load every app class against `Gemfile.next`, run `zeitwerk:check`, and capture load-time deprecation warnings. Recovers the app-code signal that the lazy boot in 4.6 misses — the only detection layer between static patterns and the test suite on apps with thin or no test coverage.
 - `workflows/ci-sync-workflow.md` - **MANDATORY before opening the upgrade PR** - How to verify CI config matches the upgraded Gemfile
 - `workflows/app-update-preview-workflow.md` - How to generate app:update previews
 - **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding and drops `NextRails.next?` / `NextRails.current?` branches. Deprecation triage stays with this skill for the next hop.
@@ -319,7 +320,28 @@ instead of mid-implementation.
    the offending gem (grep the bundle paths for the missing constant or
    file), check rubygems for a newer version with target-Rails compat,
    and add the bump to the fix-before-bump bucket for Step 5.
-4. Re-run the boot smoke test until it succeeds. Then proceed to Step 5.
+4. Re-run the boot smoke test until it succeeds. Then proceed to Step 4.7.
+```
+
+### Step 4.7: Runtime Detection (Eager-Load + Deprecation Capture)
+```
+The boot smoke test (4.6) boots lazily — almost no app class loads, so app-code
+breakage and app-code deprecations stay invisible. On apps with strong test
+coverage that signal is recovered in Step 6; on apps with thin or no coverage it
+is lost entirely. This step closes the gap by eager-loading every app class.
+
+1. Read: workflows/runtime-detection-workflow.md
+2. Confirm deprecations are not silenced (sweep lives in the dual-boot skill's
+   references/deprecation-tracking.md — do not duplicate it).
+3. Tier A — eager-load boot:
+     BUNDLE_GEMFILE=Gemfile.next bundle exec rails runner "Rails.application.eager_load!; puts 'EAGER OK'"
+4. Tier B — zeitwerk:check (Zeitwerk apps only; skip on classic autoloader).
+5. Tier C — eager-load with deprecation behavior forced loud, grep "DEPRECATION
+   WARNING", de-dupe. These are load-time deprecations only — method-body
+   deprecations still need Step 6 / DeprecationTracker.
+6. Route app-code load failures and kind: deprecation warnings into Step 5's
+   fix-before-bump bucket. Attach the coverage caveat: a clean run is NOT proof
+   of zero deprecations.
 ```
 
 ### Step 5: Load Report Resources & Generate Reports
