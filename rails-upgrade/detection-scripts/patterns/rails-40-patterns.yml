@@ -384,7 +384,7 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 4 dropped Rack::Lock from its default middleware stack. `config.middleware.insert_before Rack::Lock, ...` raises `RuntimeError: No such middleware to insert before: Rack::Lock` at boot. The Rack::Lock reference is removed entirely from the next side; a single declaration that names it cannot satisfy both versions"
+      explanation: "Rails 4.0 is thread-safe by default, so Rack::Lock is only inserted when `cache_classes` is false. In practice that means Rack::Lock is gone from the production and test stacks (cache_classes true) but still present in development (cache_classes false). On Rails 3.2 it was always present. So `config.middleware.insert_before Rack::Lock, ...` raises `RuntimeError: No such middleware to insert before: Rack::Lock` at boot in production/test, while booting fine in development, which makes it easy to miss locally. A single declaration that names Rack::Lock cannot satisfy both versions"
       fix: "Branch the call with NextRails.next?: on the next side use `config.middleware.insert(0, ...)` (top of stack) or `config.middleware.unshift(...)`; on the current side keep `config.middleware.insert_before Rack::Lock, ...`. Example: `if NextRails.next?; config.middleware.insert(0, MyMiddleware); else; config.middleware.insert_before Rack::Lock, MyMiddleware; end`. Marked in-scope-branched, not deferred-to-dual-boot — the branch is pure source and only requires NextRails.next? to be loadable, no Gemfile.next dependency"
       variable_name: "RACK_LOCK_MIDDLEWARE"
 
