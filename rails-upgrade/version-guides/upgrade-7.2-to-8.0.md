@@ -163,9 +163,42 @@ rbenv local 3.3.0
 
 ---
 
+#### 6. `query_constraints:` association option removed (composite foreign keys)
+
+**What Changed:**
+Rails 8.0 **removes** the `query_constraints:` option on associations (`belongs_to`/`has_many`/etc.). It was deprecated in Rails 7.2 and now raises `ActiveRecord::ConfigurationError` **at class load**, so the app fails to boot.
+
+**Detection Pattern:**
+```ruby
+# app/models/*.rb
+belongs_to :activity, query_constraints: [:activity_id, :school_id]
+```
+
+**Error (Rails 8.0):**
+```
+ActiveRecord::ConfigurationError:
+  Setting `query_constraints:` option on `ActivityParticipant.belongs_to :activity`
+  is not allowed. To get the same behavior, use the `foreign_key` option instead.
+```
+
+**Fix — pass the composite key as an `Array` to `foreign_key:`:**
+```ruby
+# BEFORE (7.2 deprecation → 8.0 raises)
+belongs_to :activity, query_constraints: [:activity_id, :school_id]
+
+# AFTER (works on Rails 7.2 AND 8.0)
+belongs_to :activity, foreign_key: [:activity_id, :school_id]
+```
+
+This is **behavior-preserving and version-agnostic**: when `foreign_key:` is given an `Array`, ActiveRecord internally maps it back to `query_constraints` (in both 7.2 and 8.0), so no dual-boot (`NextRails.next?`) branch is needed. On 7.2 it also silences the deprecation warning.
+  
+> ⚠️ Not in the official Rails Upgrade Guide or the 7.2/8.0 release notes — documented only in `activerecord` `CHANGELOG.md` (7.2) and the source. A **boot smoke test** (`bin/rails runner`) is the reliable way to catch it.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. Solid Cache (Optional)
+#### 7. Solid Cache (Optional)
 
 **What Changed:**
 Rails 8.0 defaults to Solid Cache for caching (database-backed).
@@ -198,7 +231,7 @@ config.cache_store = :solid_cache_store
 
 ---
 
-#### 7. Solid Queue (Optional)
+#### 8. Solid Queue (Optional)
 
 **What Changed:**
 Rails 8.0 defaults to Solid Queue for background jobs (database-backed).
@@ -231,7 +264,7 @@ config.active_job.queue_adapter = :solid_queue
 
 ---
 
-#### 8. Solid Cable (Optional)
+#### 9. Solid Cable (Optional)
 
 **What Changed:**
 Rails 8.0 defaults to Solid Cable for WebSockets (database-backed).
@@ -262,7 +295,7 @@ production:
 
 ---
 
-#### 9. Docker/Thruster for Production
+#### 10. Docker/Thruster for Production
 
 **What Changed:**
 Rails 8.0 apps include Dockerfile and Thruster gem.
@@ -281,7 +314,7 @@ Thruster provides:
 
 ---
 
-#### 10. Kamal Deployment
+#### 11. Kamal Deployment
 
 **What Changed:**
 Rails 8.0 includes Kamal configuration for deployment.

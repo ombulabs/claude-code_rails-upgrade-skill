@@ -44,6 +44,16 @@ upgrade_findings:
       fix: "Remove sqlite3_deprecated_warning configuration"
       variable_name: "SQLITE3_WARNING"
 
+    - name: "belongs_to/has_many query_constraints: option"
+      kind: "breaking"
+      pattern: "query_constraints:"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 8.0 removes the `query_constraints:` association option (deprecated in 7.2; activerecord/CHANGELOG.md 7.2: 'Association option `query_constraints` is deprecated in favor of `foreign_key`.'). At 8.0 it raises `ActiveRecord::ConfigurationError` at class load, so the model — and the app — fails to boot. Not mentioned in the official upgrade guide or release notes. Verify the match is an association option, not an unrelated query_constraints: hash key."
+      fix: "Pass the composite key as an Array to `foreign_key:` instead: `belongs_to :activity, foreign_key: [:activity_id, :school_id]`. AR maps an Array `foreign_key` to query_constraints internally on both 7.2 and 8.0, so the change is behavior-preserving and needs no dual-boot branch."
+      variable_name: "QUERY_CONSTRAINTS_OPTION"
+
   medium_priority:
     - name: "Redis cache store"
       kind: "optional"
