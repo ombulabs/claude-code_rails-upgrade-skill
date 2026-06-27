@@ -1,0 +1,37 @@
+# Fixture expectations for rails-40-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-40-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not — a per-line grep + grep -v.
+# File- or project-level exclusion (an `exclude` that depends on another line
+# elsewhere in the file) is not modeled; write those as a match line plus a
+# separate no_match line.
+#
+# The match list doubles as the living scope doc: when you find an uncovered
+# shape, add it to `match` first, watch the test go red, then widen the regex
+# in the pattern file until it passes.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-40-patterns.yml
+#
+# --- Worked example -------------------------------------------------------
+# This file seeds ONE pattern as the template. Replicate the same match /
+# no_match shape for every other variable_name in the pattern file.
+
+SCOPE_WITHOUT_LAMBDA:
+  # Pattern: "scope\\s+:\\w+\\s*,\\s*where"
+  # Rails 4.0 requires every scope to wrap its query in a callable (lambda).
+  match:
+    # bare where() right after the scope name — the breaking form
+    - "  scope :active, where(active: true)"
+    # extra whitespace around the name and comma must still flag
+    - "  scope :recent , where('created_at > ?', 1.week.ago)"
+  no_match:
+    # already wrapped in a stabby lambda — the correct Rails 4 form
+    - "  scope :active, -> { where(active: true) }"
+    # wrapped in an explicit lambda — also correct, must not flag
+    - "  scope :active, lambda { where(active: true) }"

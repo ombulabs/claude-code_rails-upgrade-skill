@@ -6,11 +6,13 @@ on:
     paths:
       - "rails-upgrade/detection-scripts/patterns/*.yml"
       - "bin/validate-patterns"
+      - "bin/test-patterns"
       - ".github/workflows/validate-patterns.yml"
   pull_request:
     paths:
       - "rails-upgrade/detection-scripts/patterns/*.yml"
       - "bin/validate-patterns"
+      - "bin/test-patterns"
       - ".github/workflows/validate-patterns.yml"
 
 permissions:
@@ -26,3 +28,5 @@ jobs:
           ruby-version: "3.3"
       - run: ruby bin/validate-patterns
       - run: ruby bin/validate-patterns --self-test
+      - run: ruby bin/test-patterns
+      - run: ruby bin/test-patterns --self-test

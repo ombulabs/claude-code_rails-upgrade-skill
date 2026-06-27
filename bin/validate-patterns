@@ -160,7 +160,7 @@ end
 
 paths =
   if ARGV.empty?
-    Dir.glob(File.join(PATTERNS_DIR, "*.yml")).sort
+    Dir.glob(File.join(PATTERNS_DIR, "*.yml")).reject { |p| p.end_with?(".expectations.yml") }.sort
   else
     ARGV
   end

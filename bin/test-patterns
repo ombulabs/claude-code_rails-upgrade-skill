@@ -1,0 +1,209 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Runs fixture tests for Rails upgrade detection patterns.
+#
+# Each pattern file may have a sibling expectations file:
+#   patterns/rails-40-patterns.yml
+#   patterns/rails-40-patterns.expectations.yml
+#
+# The expectations file is keyed by variable_name and lists sample lines that
+# the pattern MUST flag (`match`) and lines it MUST NOT flag (`no_match`):
+#
+#   SCOPE_WITHOUT_LAMBDA:
+#     match:
+#       - "scope :active, where(active: true)"
+#     no_match:
+#       - "scope :active, -> { where(active: true) }"
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not. This approximates a per-line
+# `grep | grep -v` over the line. It does NOT model file- or project-level
+# exclusion (e.g. an `exclude` that suppresses a match based on another line in
+# the same file, like propshaft suppressing sprockets) — express those as a
+# matching line plus a separate no_match line, not via cross-line state.
+#
+# Usage:
+#   bin/test-patterns                       # test every pattern file with expectations
+#   bin/test-patterns path/to/file.yml      # test one or more pattern files
+#   bin/test-patterns --self-test           # run built-in fixture assertions
+#
+# Exits 0 if all expectations / assertions pass, 1 otherwise.
+
+require "yaml"
+
+PATTERNS_DIR = File.expand_path("../rails-upgrade/detection-scripts/patterns", __dir__)
+PRIORITY_KEYS = %w[high_priority medium_priority low_priority].freeze
+
+# Returns { variable_name => entry_hash } for a pattern doc.
+def index_patterns(doc)
+  index = {}
+  findings = doc["upgrade_findings"]
+  return index unless findings.is_a?(Hash)
+
+  findings.each do |priority, entries|
+    next unless PRIORITY_KEYS.include?(priority)
+    next unless entries.is_a?(Array)
+
+    entries.each do |entry|
+      next unless entry.is_a?(Hash) && entry["variable_name"]
+
+      index[entry["variable_name"]] = entry
+    end
+  end
+
+  index
+end
+
+# True when `line` would be reported by the skill's grep for this entry.
+def flagged?(line, entry)
+  pattern = entry["pattern"]
+  return false if pattern.nil? || pattern.to_s.empty?
+  return false unless Regexp.new(pattern).match?(line)
+
+  exclude = entry["exclude"]
+  return true if exclude.nil? || exclude.to_s.empty?
+
+  !Regexp.new(exclude).match?(line)
+end
+
+def expectations_path_for(pattern_path)
+  pattern_path.sub(/\.yml\z/, ".expectations.yml")
+end
+
+# Runs every expectation in `exp_doc` against the indexed patterns.
+# Returns [failures, checked_count] where failures is an array of strings.
+def run_expectations(index, exp_doc)
+  failures = []
+  checked = 0
+
+  exp_doc.each do |var, spec|
+    entry = index[var]
+    unless entry
+      failures << "#{var}: no pattern with this variable_name in the pattern file"
+      next
+    end
+
+    spec ||= {}
+
+    Array(spec["match"]).each do |line|
+      checked += 1
+      failures << "#{var}: expected to MATCH but did not: #{line.inspect}" unless flagged?(line, entry)
+    end
+
+    Array(spec["no_match"]).each do |line|
+      checked += 1
+      failures << "#{var}: expected NO match but it flagged: #{line.inspect}" if flagged?(line, entry)
+    end
+  end
+
+  [failures, checked]
+end
+
+# Tests a single pattern file against its expectations sibling.
+# Returns [status, detail] where status is :ok, :skip, or :fail.
+def test_file(pattern_path)
+  exp_path = expectations_path_for(pattern_path)
+  return [:skip, "no expectations file"] unless File.exist?(exp_path)
+
+  begin
+    pattern_doc = YAML.safe_load_file(pattern_path)
+    exp_doc = YAML.safe_load_file(exp_path)
+  rescue Psych::SyntaxError => e
+    return [:fail, "YAML parse error: #{e.message}"]
+  end
+
+  return [:fail, "expectations file is not a Hash"] unless exp_doc.is_a?(Hash)
+
+  index = index_patterns(pattern_doc)
+  covered = (exp_doc.keys & index.keys).size
+
+  failures, checked = run_expectations(index, exp_doc)
+  if failures.empty?
+    [:ok, "#{checked} assertions, #{covered}/#{index.size} patterns covered"]
+  else
+    [:fail, failures]
+  end
+end
+
+def self_test
+  index = index_patterns(
+    "upgrade_findings" => {
+      "high_priority" => [
+        { "variable_name" => "ANCHOR", "pattern" => "with:\\s*/[\\^].*|with:\\s*/.*\\$/", "exclude" => "" },
+        { "variable_name" => "MATCH_VIA", "pattern" => "^\\s*match\\s", "exclude" => "via:" }
+      ]
+    }
+  )
+
+  # Well-formed expectations: pattern + exclude behave as documented.
+  good = {
+    "ANCHOR"    => { "match" => ["with: /^foo/", "with: /foo$/"], "no_match" => ["with: /[a-z]+/"] },
+    "MATCH_VIA" => { "match" => ["match '/x'"], "no_match" => ["match '/x', via: :get"] }
+  }
+  good_failures, good_checked = run_expectations(index, good)
+
+  # Deliberately broken expectations: each should be reported as a failure.
+  bad = {
+    "UNKNOWN" => { "match" => ["whatever"] },
+    "ANCHOR"  => { "match" => ["no anchor here"], "no_match" => ["with: /^foo/"] }
+  }
+  bad_failures, = run_expectations(index, bad)
+
+  assertions = [
+    ["good expectations pass", good_failures.empty?],
+    ["good assertions counted", good_checked == 5],
+    ["unknown variable_name caught", bad_failures.any? { |f| f.include?("UNKNOWN") }],
+    ["missed match caught", bad_failures.any? { |f| f.include?("expected to MATCH") }],
+    ["false flag caught", bad_failures.any? { |f| f.include?("expected NO match") }]
+  ]
+
+  failed = assertions.reject { |_, ok| ok }.map(&:first)
+  total = assertions.size
+  if failed.empty?
+    puts "OK   self-test (#{total}/#{total} passed)"
+    0
+  else
+    puts "FAIL self-test (#{total - failed.size}/#{total} passed)"
+    failed.each { |n| puts "     - #{n}" }
+    1
+  end
+end
+
+if ARGV.include?("--self-test")
+  exit self_test
+end
+
+paths =
+  if ARGV.empty?
+    Dir.glob(File.join(PATTERNS_DIR, "*.yml")).reject { |p| p.end_with?(".expectations.yml") }.sort
+  else
+    ARGV
+  end
+
+if paths.empty?
+  warn "No pattern files to test"
+  exit 1
+end
+
+failed = false
+any_tested = false
+paths.each do |path|
+  status, detail = test_file(path)
+  case status
+  when :ok
+    any_tested = true
+    puts "OK   #{path} (#{detail})"
+  when :skip
+    puts "SKIP #{path} (#{detail})"
+  when :fail
+    any_tested = true
+    failed = true
+    puts "FAIL #{path}"
+    Array(detail).each { |e| puts "     - #{e}" }
+  end
+end
+
+warn "No expectations files found for the given pattern files" unless any_tested
+
+exit(failed ? 1 : 0)
