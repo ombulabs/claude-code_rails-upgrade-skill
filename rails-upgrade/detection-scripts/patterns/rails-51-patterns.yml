@@ -158,7 +158,7 @@ upgrade_findings:
 
     - name: "set_callback / skip_callback string :if / :unless"
       kind: "deprecation"
-      pattern: "(set_callback|skip_callback)\\b[^\\n]*\\b(if|unless):\\s*['\"]"
+      pattern: "(set_callback|skip_callback)\\b[^\\n]*\\b(?:(?:if|unless):|:(?:if|unless)\\s*=>)\\s*['\"]"
       exclude: ""
       search_paths:
         - "app/"
