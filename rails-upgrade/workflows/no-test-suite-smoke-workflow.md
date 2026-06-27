@@ -10,14 +10,18 @@ This workflow is not a replacement for adding tests. It is a minimum boot and ro
 
 ## Step 1: Confirm There Is No Runnable Suite
 
-Check both files and Gemfile entries before declaring "no tests":
+Check for actual test **files**, not just gem presence. `minitest` ships with every Rails app (it is a transitive dependency of `activesupport` in virtually every `Gemfile.lock`), so a gem match alone does not mean a runnable suite exists. Relying on it sends abandoned-test-setup apps back to `test-suite-verification-workflow.md`, which finds nothing to run and bounces them right back here, an infinite loop.
 
 ```bash
-test -d spec || test -d test
-grep -E "rspec-rails|minitest|capybara|factory_bot_rails" Gemfile Gemfile.lock
+# Test file presence (the deciding signal)
+test -d spec && find spec -name "*_spec.rb" | grep -q .
+test -d test && find test -name "*_test.rb" | grep -q .
+
+# Gemfile only (never Gemfile.lock), explicit test gems only
+grep -E "rspec-rails|minitest-rails" Gemfile
 ```
 
-If there are test directories or gems, return to `test-suite-verification-workflow.md` and run the real suite. Use this fallback only when no runnable suite exists.
+Treat the app as having **no runnable suite** unless at least one test file is found. If test files do exist, return to `test-suite-verification-workflow.md` and run the real suite. Use this fallback only when no runnable suite exists.
 
 ---
 
@@ -44,9 +48,11 @@ Record PASS or FAIL and the exact error. A boot failure blocks the upgrade until
 These commands catch common baseline failures without needing a test suite:
 
 ```bash
-bundle exec rails routes >/tmp/rails-routes.txt
+bundle exec rails routes > tmp/rails-routes.txt 2>&1
 bundle exec rails db:migrate:status
 ```
+
+Redirect both stdout and stderr (`2>&1`): routing errors such as a bad constant in `routes.rb` print to stderr, and dropping them lets the command look like it succeeded with an empty output file. Write to the app's own `tmp/` directory rather than `/tmp`, which can be read-only or sandboxed in CI, Docker, and macOS App Sandbox contexts and would fail the check for the wrong reason.
 
 If `db:migrate:status` cannot run because the database is unavailable, report it as "not verified" rather than fabricating a pass. Do not create or migrate a database unless the user asked for that setup.
 
@@ -69,17 +75,18 @@ Pick the app's actual build path from its files (`package.json`, `vite.config.*`
 
 ## Step 5: Optional Manual Smoke URLs
 
-If the app can boot locally, collect the most important URLs from routes:
+If the app can boot locally, start the server in the background, capture its PID, and **always shut it down afterward** so an orphaned server does not hold port 3000 and cause conflicts in later steps:
 
 ```bash
-bundle exec rails server
-```
+bundle exec rails server &
+SERVER_PID=$!
+sleep 5  # wait for boot
 
-Then manually or with curl check only safe read-only endpoints, for example:
-
-```bash
+# Check only safe, read-only endpoints, for example:
 curl -I http://localhost:3000/
 curl -I http://localhost:3000/users/sign_in
+
+kill $SERVER_PID 2>/dev/null
 ```
 
 Do not submit forms, mutate data, or hit admin/customer actions as part of this fallback.
@@ -113,7 +120,6 @@ Stop and report instead of proceeding when:
 
 - Rails cannot boot in the current environment.
 - Routes cannot load.
-- The app has a test suite but it fails to run.
 - A required database or credential is missing and the user has not authorized setup.
 
 If the fallback passes, continue with the upgrade workflow, but mark baseline confidence as `partial` and keep recommending real test coverage.
