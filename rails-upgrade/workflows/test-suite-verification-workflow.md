@@ -157,14 +157,15 @@ Could not find:
 - spec/ directory (RSpec)
 - test/ directory (Minitest)
 
-This is a significant risk for upgrading. Consider:
-1. Adding test coverage before upgrading
-2. Proceeding with extra manual testing (not recommended)
+This is a significant risk for upgrading. Before proceeding:
+1. Run the no-test-suite smoke baseline in `workflows/no-test-suite-smoke-workflow.md`
+2. Record boot, routes, migration-status, and asset/build results
+3. Recommend adding focused test coverage before or during the first upgrade hop
 
-Do you want to proceed without tests? (This is risky)
+Do you want to proceed with only a smoke baseline? (This is risky)
 ```
 
-**Action:** Warn user strongly, but allow them to proceed if they acknowledge the risk.
+**Action:** Load `workflows/no-test-suite-smoke-workflow.md`, run the safe read-only baseline checks, and mark baseline confidence as `partial` if they pass. If any boot/routes check fails, stop the upgrade until the baseline is fixed or the user explicitly accepts the blocker.
 
 #### Tests Take Too Long (> 10 minutes)
 
@@ -351,6 +352,7 @@ Before proceeding past this step:
 - [ ] Test suite executed successfully
 - [ ] All tests pass (0 failures)
 - [ ] Baseline metrics recorded
+- [ ] If no suite exists: no-test-suite smoke baseline recorded as `partial`
 - [ ] User informed of results
 - [ ] If failures: user understands they must fix tests first
 

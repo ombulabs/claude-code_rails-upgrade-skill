@@ -167,6 +167,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 
 ### Workflow Guides (Load when generating deliverables)
 - `workflows/test-suite-verification-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
+- `workflows/no-test-suite-smoke-workflow.md` - **Load from Step 1 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
 - `workflows/direct-detection-workflow.md` - How to run breaking change detection directly
 - `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
 - `workflows/gem-compatibility-workflow.md` - **Load in Step 4.5** - Per-lockfile gem compatibility check against the target Rails version. Documents both the primary (`next_rails` `bundle_report compatibility`) and the secondary (railsbump.org API) and the rules for when to escalate.
@@ -232,12 +233,17 @@ When user requests an upgrade, follow this workflow:
 2. Detect test framework (RSpec, Minitest, or both)
 3. Run test suite with: bundle exec rspec OR bundle exec rails test
 4. Capture results: total tests, passing, failing, pending
-5. If ANY tests fail:
+5. If no runnable test suite exists:
+   - Load: workflows/no-test-suite-smoke-workflow.md
+   - Run the safe read-only smoke baseline: Rails boot, test-env boot when possible, routes load, migration status, and asset/build command if present
+   - Record baseline confidence as partial
+   - Continue only if boot/routes checks pass and the user accepts the risk of proceeding without real tests
+6. If ANY tests fail:
    - STOP the upgrade process
    - Report failing tests to user
    - Offer to help fix failing tests
    - Do NOT proceed until all tests pass
-6. If all tests pass:
+7. If all tests pass:
    - Record baseline metrics (test count, coverage if available)
    - Proceed to Step 2
 ```
