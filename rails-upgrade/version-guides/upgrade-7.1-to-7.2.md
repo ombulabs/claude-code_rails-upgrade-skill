@@ -184,7 +184,7 @@ Rails.application.credentials.dig(:production, :api_key)
 #### 6. `ActiveRecord::Migration.check_pending!` Removed
 
 **What Changed:**
-`ActiveRecord::Migration.check_pending!` was deprecated in Rails 7.1 and is removed in Rails 7.2. Calling it raises `NoMethodError`. When invoked from `test_helper.rb` or `rails_helper.rb` it breaks test-suite startup. Use `check_all_pending!`, which checks every configured database.
+`ActiveRecord::Migration.check_pending!` was deprecated in Rails 7.1 and is removed in Rails 7.2. Calling it raises `NoMethodError`. When invoked from `test_helper.rb` or `rails_helper.rb` it breaks test-suite startup; when configured by a healthcheck gem (e.g. [`rails-healthcheck`](https://github.com/linqueta/rails-healthcheck)) it instead raises at runtime on the `/healthcheck` route in production, even with no pending migration. Use `check_all_pending!`, which checks every configured database.
 
 **Detection Pattern:**
 ```ruby

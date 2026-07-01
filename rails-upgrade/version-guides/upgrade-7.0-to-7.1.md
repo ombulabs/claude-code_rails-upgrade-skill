@@ -290,7 +290,7 @@ config.active_record.attributes_for_inspect = :all
 #### 12. `ActiveRecord::Migration.check_pending!` Deprecated
 
 **What Changed:**
-`ActiveRecord::Migration.check_pending!` is deprecated in favor of `check_all_pending!`, which loops through all configured databases. It still works in 7.1 but emits a deprecation warning, and is removed entirely in Rails 7.2. Commonly found in `test_helper.rb` or `rails_helper.rb`.
+`ActiveRecord::Migration.check_pending!` is deprecated in favor of `check_all_pending!`, which loops through all configured databases. It still works in 7.1 but emits a deprecation warning, and is removed entirely in Rails 7.2. Commonly found in `test_helper.rb` or `rails_helper.rb`, but also set up by healthcheck gems (e.g. [`rails-healthcheck`](https://github.com/linqueta/rails-healthcheck)) to run on every `/healthcheck` request.
 
 **Detection Pattern:**
 ```ruby
