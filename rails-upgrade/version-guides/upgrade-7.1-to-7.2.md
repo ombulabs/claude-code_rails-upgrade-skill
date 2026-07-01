@@ -181,9 +181,31 @@ Rails.application.credentials.dig(:production, :api_key)
 
 ---
 
+#### 6. `ActiveRecord::Migration.check_pending!` Removed
+
+**What Changed:**
+`ActiveRecord::Migration.check_pending!` was deprecated in Rails 7.1 and is removed in Rails 7.2. Calling it raises `NoMethodError`. When invoked from `test_helper.rb` or `rails_helper.rb` it breaks test-suite startup; when configured by a healthcheck gem (e.g. [`rails-healthcheck`](https://github.com/linqueta/rails-healthcheck)) it instead raises at runtime on the `/healthcheck` route in production, even with no pending migration. Use `check_all_pending!`, which checks every configured database.
+
+**Detection Pattern:**
+```ruby
+# test/test_helper.rb, spec/rails_helper.rb, or config/initializers/*.rb (e.g. healthcheck gems)
+ActiveRecord::Migration.check_pending!
+```
+
+**Fix:**
+```ruby
+# BEFORE
+ActiveRecord::Migration.check_pending!
+
+# AFTER
+ActiveRecord::Migration.check_all_pending!
+```
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. serialize Requires Type Parameter
+#### 7. serialize Requires Type Parameter
 
 **What Changed:**
 `serialize` now requires explicit `type:` or `coder:` parameter.
@@ -208,7 +230,7 @@ serialize :preferences, coder: JSON
 
 ---
 
-#### 7. fixture_path → fixture_paths
+#### 8. fixture_path → fixture_paths
 
 **What Changed:**
 Singular `fixture_path` deprecated in favor of plural.
@@ -230,7 +252,7 @@ self.fixture_paths = ["#{Rails.root}/test/fixtures"]
 
 ---
 
-#### 8. query_constraints Deprecated
+#### 9. query_constraints Deprecated
 
 **What Changed:**
 `query_constraints` is deprecated.
@@ -243,7 +265,7 @@ has_many :posts, foreign_key: [:author_id, :author_type]
 
 ---
 
-#### 9. Mailer Test args: → params:
+#### 10. Mailer Test args: → params:
 
 **What Changed:**
 Mailer assertion helpers change `args:` to `params:`.
@@ -265,7 +287,7 @@ assert_enqueued_email_with UserMailer, :welcome, params: { user: user }
 
 ---
 
-#### 10. Queue Adapter Must Support `at:` for Testing
+#### 11. Queue Adapter Must Support `at:` for Testing
 
 **What Changed:**
 Tests now require queue adapters to support scheduling with `at:` option.
@@ -281,7 +303,7 @@ If using custom queue adapter in tests, ensure it supports `at:` option for sche
 
 ---
 
-#### 11. alias_attribute Behavior Change
+#### 12. alias_attribute Behavior Change
 
 **What Changed:**
 `alias_attribute` now applies attribute methods to the aliased attribute too.

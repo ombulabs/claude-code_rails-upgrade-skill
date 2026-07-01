@@ -54,6 +54,19 @@ upgrade_findings:
       variable_name: "LIB_AUTOLOAD"
 
   medium_priority:
+    - name: "ActiveRecord::Migration.check_pending! deprecated"
+      kind: "deprecation"
+      pattern: "Migration\\.check_pending!"
+      exclude: ""
+      search_paths:
+        - "test/"
+        - "spec/"
+        - "config/"
+        - "lib/"
+      explanation: "ActiveRecord::Migration.check_pending! is deprecated in Rails 7.1 in favor of check_all_pending!, which loops through all database configurations. It still works but emits a deprecation warning, and is removed in Rails 7.2. Commonly found in test_helper.rb/rails_helper.rb, but also configured by healthcheck gems (e.g. rails-healthcheck) to run against a /healthcheck route."
+      fix: "Replace ActiveRecord::Migration.check_pending! with ActiveRecord::Migration.check_all_pending!"
+      variable_name: "MIGRATION_CHECK_PENDING"
+
     - name: "SQLite database in db/ directory"
       kind: "optional"
       pattern: "database:\\s*db/.*\\.sqlite3"

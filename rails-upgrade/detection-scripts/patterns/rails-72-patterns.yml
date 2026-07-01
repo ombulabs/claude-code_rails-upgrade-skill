@@ -59,6 +59,19 @@ upgrade_findings:
       fix: "Migrate all secrets to Rails.application.credentials"
       variable_name: "SECRETS_REMOVED"
 
+    - name: "ActiveRecord::Migration.check_pending! removed"
+      kind: "breaking"
+      pattern: "Migration\\.check_pending!"
+      exclude: ""
+      search_paths:
+        - "test/"
+        - "spec/"
+        - "config/"
+        - "lib/"
+      explanation: "ActiveRecord::Migration.check_pending! was deprecated in Rails 7.1 and is removed in Rails 7.2. Calling it raises NoMethodError. When invoked from test_helper.rb or rails_helper.rb it breaks test suite startup; when configured by a healthcheck gem (e.g. rails-healthcheck) it instead raises at runtime on the /healthcheck route in production."
+      fix: "Replace ActiveRecord::Migration.check_pending! with ActiveRecord::Migration.check_all_pending!"
+      variable_name: "MIGRATION_CHECK_PENDING_REMOVED"
+
   medium_priority:
     - name: "serialize syntax change"
       kind: "breaking"
