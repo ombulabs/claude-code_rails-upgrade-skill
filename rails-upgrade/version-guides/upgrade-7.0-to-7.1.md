@@ -294,7 +294,7 @@ config.active_record.attributes_for_inspect = :all
 
 **Detection Pattern:**
 ```ruby
-# test/test_helper.rb or spec/rails_helper.rb
+# test/test_helper.rb, spec/rails_helper.rb, or config/initializers/*.rb (e.g. healthcheck gems)
 ActiveRecord::Migration.check_pending!
 ```
 

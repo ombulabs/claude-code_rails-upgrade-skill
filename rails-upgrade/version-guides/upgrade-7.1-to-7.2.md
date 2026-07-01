@@ -188,7 +188,7 @@ Rails.application.credentials.dig(:production, :api_key)
 
 **Detection Pattern:**
 ```ruby
-# test/test_helper.rb or spec/rails_helper.rb
+# test/test_helper.rb, spec/rails_helper.rb, or config/initializers/*.rb (e.g. healthcheck gems)
 ActiveRecord::Migration.check_pending!
 ```
 
