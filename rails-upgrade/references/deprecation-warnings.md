@@ -18,15 +18,24 @@ Deprecation warnings notify you that a specific feature (method, class, or API) 
 
 ### Check Existing Deprecation Behavior First
 
-Before reading test logs, sweep for places that already override `ActiveSupport::Deprecation` behavior. Otherwise "no deprecation warnings in the log" can mean "they're being silenced", and "every test fails" can mean "they've been raising the whole time, unrelated to the upgrade." `config/application.rb` and `config/environments/*.rb` are not the only places this is configured: RSpec autoloads `-r` requires from `.rspec`, and test helpers can install hooks like `RSpec.configure { |c| c.raise_errors_for_deprecations! }`.
+Before reading test logs, sweep for places that already override deprecation behavior. Otherwise "no deprecation warnings in the log" can mean "they're being silenced", and "every test fails" can mean "they've been raising the whole time, unrelated to the upgrade." `config/application.rb` and `config/environments/*.rb` are not the only places this is configured: apps also use the `config.active_support.deprecation =` env DSL, Rails 7.1+ apps use the `deprecators` registry, RSpec autoloads `-r` requires from `.rspec`, and test helpers can install hooks like `RSpec.configure { |c| c.raise_errors_for_deprecations! }`. Minitest apps wire the same behavior from `test/test_helper.rb` and `test/support/`.
 
 ```bash
-grep -rnE "raise_errors_for_deprecations|ActiveSupport::Deprecation\.(behavior|disallowed_behavior|silenced)\s*=|ActiveSupport::Deprecation\.silence\b" \
+grep -rnE "raise_errors_for_deprecations|(ActiveSupport::Deprecation|Rails\.application\.deprecators|[A-Z]\w*\.deprecator)\.(behavior|disallowed_behavior|silenced)\s*=|(ActiveSupport::Deprecation|Rails\.application\.deprecators|[A-Z]\w*\.deprecator)\.silence\b|config\.active_support\.(deprecation|disallowed_deprecation|disallowed_deprecation_warnings|report_deprecations)\s*=" \
   .rspec spec/.rspec spec/spec_helper.rb spec/rails_helper.rb Rakefile \
-  config/ spec/support/ lib/tasks/ 2>/dev/null
+  config/ spec/support/ lib/tasks/ \
+  test/test_helper.rb test/support/ test/minitest/ 2>/dev/null
 ```
 
 The trailing `silence\b` alternation catches the block form `ActiveSupport::Deprecation.silence do ... end` (or `{ ... }`), which is the recommended way to scope a silence to a single noisy call site. The `\b` word boundary keeps it from matching `silenced` (which is already covered by the assignment branch).
+
+Which forms appear depends on the app's Rails version:
+
+- `config.active_support.deprecation=` / `ActiveSupport::Deprecation.behavior=` — Rails 3+ (classic global config)
+- `.rspec` `-r raise_errors_for_deprecations` / `raise_errors_for_deprecations!` — RSpec hook, any version
+- `Rails.application.deprecators` / `<Framework>.deprecator` (e.g. `ActiveRecord.deprecator`) — Rails 7.1+ (deprecators registry)
+
+Running this against a Rails 5–7.0 app and seeing no `deprecators` hits is expected, not a gap.
 
 A common gotcha is a single line in `.rspec`:
 
