@@ -131,7 +131,30 @@ SKILLS.each_value do |skill_dir|
 end
 
 # ---------------------------------------------------------------------------
-# 6. Pattern catalog filename <-> version sanity
+# 6. Version-guide hop chain is unbroken (each hop's "to" == next hop's "from")
+# ---------------------------------------------------------------------------
+VERSION_GUIDES_DIR = File.join(SKILLS.fetch("rails-upgrade"), "version-guides")
+version_key = ->(v) { v.split(".").map(&:to_i) }
+
+hops = Dir.glob(File.join(VERSION_GUIDES_DIR, "upgrade-*-to-*.md")).sort.filter_map do |f|
+  m = File.basename(f).match(/\Aupgrade-(\d+\.\d+)-to-(\d+\.\d+)\.md\z/)
+  if m.nil?
+    err(f, "filename doesn't match upgrade-<FROM>-to-<TO>.md")
+    next
+  end
+  { file: f, from: m[1], to: m[2] }
+end
+
+hops.sort_by! { |h| version_key.call(h[:from]) }
+
+hops.each_cons(2) do |prev, cur|
+  next if prev[:to] == cur[:from]
+
+  err(cur[:file], "hop starts at #{cur[:from]} but the prior hop (#{File.basename(prev[:file])}) ends at #{prev[:to]} — gap or overlap in the version-guide chain")
+end
+
+# ---------------------------------------------------------------------------
+# 7. Pattern catalog filename <-> version sanity
 # ---------------------------------------------------------------------------
 PATTERNS_DIR = File.join(SKILLS.fetch("rails-upgrade"), "detection-scripts", "patterns")
 
