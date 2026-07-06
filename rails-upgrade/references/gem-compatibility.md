@@ -43,3 +43,19 @@ A common false-blocker pattern: gems that became unnecessary in a specific Rails
 - **Extracted as a back-compat shim**: `protected_attributes` is the *opposite* shape — it was extracted from Rails 4.0 specifically as a transitional shim for the old mass-assignment API and was never re-merged. It still exists as a separate gem, but if your code is moving to `strong_parameters` you can remove it once the controllers are converted.
 
 If `bundle_report` flags one of these, check the target version guide before assuming you need a fork.
+
+---
+
+## Known Gotchas
+
+Real issues hit during actual upgrades, not generic advice. Add to this list as new ones surface.
+
+### `concurrent-ruby` >= 1.3.5 breaks Rails' logger require order on Ruby < 3.5
+
+**Symptom:** `NameError: uninitialized constant ActiveSupport::LoggerThreadSafeLevel::Logger`, raised from `active_support/logger_thread_safe_level.rb` on boot. `bundle install` / `bundle_report` show nothing wrong — this is a pure require-order bug, not a version constraint conflict.
+
+**Cause:** `activesupport/lib/active_support/logger.rb` requires `active_support/logger_thread_safe_level` *before* it requires the stdlib `logger` gem. Versions of `logger_thread_safe_level.rb` prior to the fix reference the bare `Logger` constant without requiring it themselves, relying on something else in the load path having already pulled in `logger` — which `concurrent-ruby` < 1.3.5 happened to do as a side effect, and 1.3.5+ no longer does.
+
+**Confirmed via source diff:** `activesupport/lib/active_support/logger_thread_safe_level.rb` at tag `v7.0.10` has no `require "logger"` at the top (only `require "concurrent"` and `require "fiber"`) — vulnerable. The same file at `v7.1.6` (in practice, the fix landed by Rails' 7.0.x branch reaching this patch level) adds an explicit `require "logger"`. **The fix is per-Rails-patch-release, not per-Rails-minor** — check the specific patch you're on, not just the major.minor. Rails 6.1.7.10 was confirmed vulnerable; Rails 7.0.10 was confirmed fixed, both checked directly against GitHub source for that tag.
+
+**Fix:** Pin `gem "concurrent-ruby", "< 1.3.5"` in the Gemfile. Safe to apply unconditionally across a dual-boot Gemfile (both sides) even if only the older side actually needs it — confirmed empirically that Rails 7.0.10 boots fine with either the pin or `concurrent-ruby` 1.3.7.
