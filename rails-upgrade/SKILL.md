@@ -361,6 +361,8 @@ This is **not** a contradiction of fix-before-bump. The `kind: deprecation` patt
 
 Triaging tomorrow's deprecation warnings now expands the scope of the current hop and risks shipping a half-finished change.
 
+**"Latest patch of the target minor" and "compatible with the app's current Ruby" are not the same claim.** A gem-level `gem "rails", "~> X.Y.0"` plus `bundle update rails` floats to the newest patch in that series — but a later patch within the same minor can raise Rails' *actual* Ruby floor (via language syntax, not just API calls) without the gemspec's declared `ruby_version` changing to match. `bundle install` will succeed either way; only booting (Step 4.6's boot smoke test) catches the mismatch, as a `SyntaxError` rather than the `LoadError`/`NoMethodError` shapes that workflow's examples focus on. Real case: `activerecord` 7.1.4 introduced `def method_missing(name, ...)`, Ruby 3.0+ only syntax, while the 7.1.6 gemspec still advertised `>= 2.7.0`. If the boot smoke test fails this way on an app that isn't also upgrading Ruby this hop, cap the Gemfile below the offending patch (e.g. `gem "rails", ">= X.Y.0", "< X.Y.Z"`) rather than concluding the hop itself requires a Ruby upgrade — see `workflows/boot-smoke-test-workflow.md` for the full example.
+
 ### Step 7: Align load_defaults
 ```
 ⚠️  THIS STEP HAPPENS AFTER THE UPGRADE IS COMPLETE
