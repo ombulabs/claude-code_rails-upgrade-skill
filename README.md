@@ -172,6 +172,7 @@ We welcome contributions! Here's how you can help:
 - Keep content factual and based on official Rails documentation
 - Include code examples with BEFORE/AFTER patterns
 - Test detection patterns against real codebases when possible
+- New detection pattern? Add a `match`/`no_match` fixture to its `*.expectations.yml` file and run `bin/test-patterns` before opening a PR
 - Attribute sources appropriately
 
 ## License

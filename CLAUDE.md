@@ -11,6 +11,13 @@ This file captures project-specific conventions Claude should follow when workin
   - Checks: YAML parses, required top-level keys present, the eight required pattern keys present on each entry, every `pattern` / `exclude` regex compiles, and the `kind:` value is one of the allowed enum values (`breaking`, `deprecation`, `migration`, `optional`)
   - Exits 0 on success, 1 on any failure with a per-file error report
 
+- `bin/test-patterns` runs fixture tests for a pattern file against its sibling `*.expectations.yml` (e.g. `rails-40-patterns.yml` + `rails-40-patterns.expectations.yml`). It confirms a pattern's regex actually matches what its explanation claims and skips what it shouldn't — `validate-patterns` only confirms the regex compiles, not that it's correct. Pure-stdlib Ruby, same shape as `bin/validate-patterns`.
+  - `bin/test-patterns` tests every pattern file that has an expectations sibling; files without one are reported `SKIP`, not a failure
+  - `bin/test-patterns path/to/file.yml` tests one or more specific files
+  - `bin/test-patterns --self-test` runs built-in fixture assertions. CI runs this alongside the fixture-test step
+  - Expectations are keyed by `variable_name` and list `match` (lines the pattern MUST flag) and `no_match` (lines it MUST NOT flag) — see the worked example in `rails-40-patterns.expectations.yml`
+  - Exits 0 on success, 1 on any failure with a per-pattern error report
+
 ## Version guides (`rails-upgrade/version-guides/*.md`)
 
 - **Do NOT include "Difficulty" or "Estimated Time" in the header.** These are subjective, application-dependent, and drift out of date. Keep the header minimal: title, Ruby requirement, and the attribution line.
@@ -26,6 +33,7 @@ This file captures project-specific conventions Claude should follow when workin
 - Each pattern needs: `name`, `kind` (one of `breaking` / `deprecation` / `migration` / `optional` — see "Assigning kind" below), `pattern` (regex), `exclude` (regex, empty string if none), `search_paths`, `explanation`, `fix`, `variable_name`. Place `kind:` immediately after `name:` for visual scannability.
 - Include a `dependencies` section for any bridge/compatibility gems mentioned in the guide.
 - **Required before committing any change to a detection pattern file:** run `bin/validate-patterns` (or `bin/validate-patterns path/to/file.yml` for the file you touched). Do not commit a pattern change without a clean run; broken YAML or schema drift in this directory breaks the skill at runtime. See the `## Repository tooling` section above for what the script checks.
+- **New pattern? Add a fixture expectation.** Every new `variable_name` needs a `match`/`no_match` entry in the sibling `*.expectations.yml` file (create the file if the version doesn't have one yet), then run `bin/test-patterns path/to/file.yml` clean before committing. Exception: a pattern whose `pattern` is `""` (pure path-based detection, e.g. `VENDOR_PLUGINS`) can never flag a line and should stay uncovered — note why in a comment instead of forcing a fixture.
 
 ## Assigning priority (🔴 HIGH / 🟡 MEDIUM / 🟢 LOW)
 
