@@ -59,3 +59,16 @@ Real issues hit during actual upgrades, not generic advice. Add to this list as 
 **Confirmed via source diff:** `activesupport/lib/active_support/logger_thread_safe_level.rb` at tag `v7.0.10` has no `require "logger"` at the top (only `require "concurrent"` and `require "fiber"`) — vulnerable. The same file at `v7.1.6` (in practice, the fix landed by Rails' 7.0.x branch reaching this patch level) adds an explicit `require "logger"`. **The fix is per-Rails-patch-release, not per-Rails-minor** — check the specific patch you're on, not just the major.minor. Rails 6.1.7.10 was confirmed vulnerable; Rails 7.0.10 was confirmed fixed, both checked directly against GitHub source for that tag.
 
 **Fix:** Pin `gem "concurrent-ruby", "< 1.3.5"` in the Gemfile. Safe to apply unconditionally across a dual-boot Gemfile (both sides) even if only the older side actually needs it — confirmed empirically that Rails 7.0.10 boots fine with either the pin or `concurrent-ruby` 1.3.7.
+
+### Accidentally narrow legacy Gemfile pins
+
+Distinct from "gem has no compatible version" above: these are gems where a *compatible* version genuinely exists, but the app's own Gemfile pins below it — usually a leftover constraint from years earlier that nobody has revisited. `bundle_report` may not flag these clearly since the gem itself isn't the blocker; the app's own version constraint is. Bundler's resolver error will look like a normal dependency conflict, e.g.:
+
+```
+font-awesome-rails was resolved to 4.7.0.7, which depends on
+  railties (>= 3.2, < 7)
+```
+
+Check the Gemfile for pins that predate the target Rails version's release by years — `~> 1.8.2` on a gem now at `1.15.x`, an unpinned gem still resolving to a several-years-old version because nothing forced a re-resolve. Bump the floor (`bundle lock --update <gem>`) rather than assuming it's a real blocker requiring a fork/replace.
+
+Real example (fastruby/audit, 6.1 -> 7.0): `nokogiri "~> 1.8.2"` (pinned circa 2018) blocked resolution once `loofah`/`rails-html-sanitizer` needed a newer `nokogiri` for Rails 7.0. `font-awesome-rails` (unpinned, but locked at `4.7.0.7` since nothing had bumped it) capped `railties < 7`; `4.7.0.9` relaxed that to `< 9.0`. Neither gem was actually incompatible with Rails 7.0 — the lockfile just hadn't moved in years.
