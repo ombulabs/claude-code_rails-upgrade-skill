@@ -110,7 +110,28 @@ SKILLS.each_value do |skill_dir|
 end
 
 # ---------------------------------------------------------------------------
-# 5. Pattern catalog filename <-> version sanity
+# 5. SKILL.md frontmatter `name:` matches its parent directory name
+# ---------------------------------------------------------------------------
+SKILLS.each_value do |skill_dir|
+  skill_md = File.join(skill_dir, "SKILL.md")
+  next unless File.exist?(skill_md)
+
+  content = File.read(skill_md)
+  frontmatter = content[/\A---\n(.*?)\n---/m, 1]
+
+  if frontmatter.nil?
+    err(skill_md, "missing YAML frontmatter (--- name: ... ---)")
+    next
+  end
+
+  name = YAML.safe_load(frontmatter)["name"]
+  expected = File.basename(skill_dir)
+
+  err(skill_md, "frontmatter name `#{name}` does not match parent directory `#{expected}`") if name != expected
+end
+
+# ---------------------------------------------------------------------------
+# 6. Pattern catalog filename <-> version sanity
 # ---------------------------------------------------------------------------
 PATTERNS_DIR = File.join(SKILLS.fetch("rails-upgrade"), "detection-scripts", "patterns")
 
