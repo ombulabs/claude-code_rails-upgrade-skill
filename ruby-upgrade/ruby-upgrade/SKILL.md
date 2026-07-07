@@ -1,70 +1,176 @@
 ---
 name: ruby-upgrade
-description: Plan and execute Ruby version upgrades one minor version at a time. Use when upgrading a Ruby application's Ruby version, planning a multi-hop Ruby upgrade, or auditing a Gemfile for Ruby-version blockers. Based on FastRuby.io methodology -- the same sequential, one-hop-at-a-time philosophy as the rails-upgrade skill, applied to Ruby itself.
+description: Plan and execute Ruby version upgrades one minor version at a time. Use when upgrading a Ruby application's Ruby version, planning a multi-hop Ruby upgrade, or auditing a Gemfile for Ruby-version blockers. Based on FastRuby.io methodology -- incremental, one hop at a time, verify before moving on.
 ---
 
 # Ruby Upgrade Skill
 
-Companion to the `rails-upgrade` plugin. Same FastRuby.io philosophy — **incremental, one version at a time, verify before moving on** — applied to Ruby itself instead of Rails.
+## Skill Identity
 
-## Why this is a separate skill from rails-upgrade
+- **Name:** Ruby Upgrade Assistant
+- **Purpose:** Plan and execute Ruby interpreter version upgrades, one minor version at a time
+- **Skill Type:** Modular with external workflows, version guides, and reference material
+- **Upgrade Strategy:** Sequential only (no version skipping, by default)
+- **Methodology:** FastRuby.io upgrade philosophy — incremental, deprecation-first, verify before moving on — applied to the Ruby interpreter itself rather than to Rails
 
-Ruby and Rails version floors move independently (Rails 7.2 needs Ruby >= 3.1, Rails 8.0/8.1 need >= 3.2), so a Ruby upgrade is frequently its own project, not a side effect of a Rails hop. Treat them as two independently-sequenced tracks that occasionally force each other's hand — a Rails hop's Ruby floor can require a Ruby upgrade first (see `rails-upgrade`'s `references/gem-compatibility.md` → "Dev-only gems with an independent Ruby floor" for the reverse case: a dev gem needing newer Ruby than the current Rails hop targets).
+This skill is self-contained. It does not assume you have read or loaded any other skill. If a Ruby version bump is happening as part of a Rails upgrade project, that's useful context, but every step below works from a plain Ruby app's Gemfile and test suite alone.
 
-## CRITICAL: Sequential Upgrade Strategy — Skipping Versions Is Not Allowed
+---
 
-Exactly the same rule as `rails-upgrade`, applied to Ruby minors:
+## Core Methodology
+
+1. **Latest patch first.** Before any minor hop, get onto the latest patch of the *current* minor. See "Why latest patch, specifically" below — the reason is different from why you'd do the same thing for a Rails patch bump.
+2. **One minor version at a time.** Never jump two or more minors in a single hop, except as an explicit, user-approved exception for low-stakes apps.
+3. **Deprecation warnings before the bump.** Ruby silently accumulates warnings about next-minor removals; turn them on and clear them before touching the Gemfile.
+4. **Gemfile audit for Ruby-floor blockers**, both the kind Bundler can see (declared `required_ruby_version`) and the kind it can't (a gem's actual code calling something the target Ruby removed).
+5. **Boot smoke test on the target Ruby**, because gems can pass every static check and still crash at runtime.
+6. **Test suite as the gate**, at every step — never move to the next step on a red suite.
+
+---
+
+## Why Latest Patch, Specifically
+
+This is the one place Ruby's Step 0 differs in *reasoning* from a similar-looking step in other upgrade skills, and it's worth stating explicitly so it doesn't get treated as generic "always update patches" advice:
+
+**For Ruby, the latest patch of a minor is where that minor's accumulated deprecation warnings for the *next* minor's removals live.** Ruby's release process adds deprecation warnings to patch releases within a minor series as the *next* minor's removals get finalized — a `2.7.z` patch late in that series warns about more soon-to-be-3.0-removed behavior than `2.7.0` did. Being behind on patches means Step 2's deprecation sweep (below) runs against a Ruby that hasn't been told yet about everything the next hop will break. You can pass Step 2 clean on an old patch and still hit fresh breakage on the target minor, purely because the warning that would have caught it hadn't been backported to the patch you were running.
+
+This is a different rationale from "bump to the latest patch because it has security and bug fixes," which is also true but is a generically-applicable reason that doesn't depend on the upgrade project at all — every app should stay on the latest patch of its current minor regardless of whether an upgrade is planned. The deprecation-surfacing property is specific to *why this matters for the upgrade project specifically*: skipping it means Step 2 gives a false sense of a clean baseline.
+
+---
+
+## CRITICAL: Sequential Upgrade Strategy
+
+### Skipping Versions Is Not the Default
 
 ```
-2.7 → 3.0 → 3.1 → 3.2 → 3.3 → 3.4
+✅ Correct: 2.7 → 3.0 → 3.1 → 3.2 → 3.3 → 3.4
+❌ Wrong:   2.7 → 3.2 (skipping 3.0 and 3.1)
 ```
 
-**You CANNOT skip versions in the skill's default methodology.** Each hop's own deprecation warnings are what prepare you for the *next* hop — jumping straight from 2.7 to 3.2 means the 2.7-era deprecation warnings for 3.0-era removals were never surfaced, and the 3.0/3.1-era warnings for 3.1/3.2-era removals never fired either. You only find out about all of it at once, at the hop with the least ability to isolate which change broke what.
+Each minor's own deprecation warnings are what prepare an app for the *next* minor's removals. Skipping 3.0 and 3.1 to jump straight from 2.7 to 3.2 means the 2.7-era warnings for 3.0-era removals never ran, and the 3.0/3.1-era warnings for 3.1/3.2-era removals never ran either — every removal across three minors surfaces simultaneously, at the hop with the least ability to isolate which change broke what.
 
-**Exception, and only when the user explicitly says so:** a small application, a spike/exercise, or an app the user has already fully audited by other means, where they've explicitly asked to jump multiple minors in one hop. Multi-hop is the same story as `rails-upgrade`'s multi-hop pattern — explain the sequential default, confirm the user wants to skip it, then proceed with extra scrutiny (the boot smoke test and gem-floor audit below become load-bearing for *every* skipped hop's changes at once, not just one).
+### The Exception
+
+Multi-hop is allowed **only when the user explicitly asks for it**, typically because the app is small, a spike/exercise, or has already been audited by other means. When that happens:
+
+1. Explain the sequential default and what skipping trades away (see above).
+2. Confirm the user still wants to skip ahead.
+3. Proceed, but raise scrutiny everywhere a single hop's step normally has to catch only one minor's worth of change — Step 2's deprecation sweep and Step 5's boot smoke test are now standing in for *every skipped hop's* changes at once, not just one, so treat any warning or failure there as potentially compound (multiple independent causes bundled into one error message) rather than assuming a single root cause.
+
+---
+
+## Ruby Version Timeline (for planning multi-hop distance)
+
+| From | To | Notable removals / floor-relevant changes |
+|------|-----|--------------------------------------------|
+| 2.6.x | 2.7.x | Deprecation warnings added for most of what 3.0 removes; keyword-argument separation warnings begin |
+| 2.7.x | 3.0.x | Keyword arguments fully separated from positional hashes; `Proc.new` with no block removed; `$SAFE` removed; bundled default gems begin moving out of implicit stdlib |
+| 3.0.x | 3.1.x | `Time#+`/`Time#-` behavior tightened around fractional seconds; more stdlib libraries become bundled (not default) gems; `Struct.new` keyword_init inference changes |
+| 3.1.x | 3.2.x | `Data.define` added; `it` block-arg experiment introduced later in the series; WeakMap/WeakRef changes; further bundled-gem migrations |
+| 3.2.x | 3.3.x | New default Prism parser groundwork; `it` implicit block parameter stabilizes; YJIT becomes more broadly production-viable |
+| 3.3.x | 3.4.x | Prism becomes the default parser; further stdlib-to-bundled-gem migrations |
+
+This table is for rough hop-distance planning only. Always check the specific version's own release notes and `NEWS.md` for the authoritative removal list before relying on anything here — Ruby's release notes are the ground truth, this table is a map, not the territory.
+
+---
+
+## Available Resources
+
+### Core Documentation
+- `SKILL.md` — this file (entry point)
+
+### Version-Specific Guides (load as needed)
+- `version-guides/upgrade-2.7-to-3.0.md`
+- `version-guides/upgrade-3.0-to-3.1.md`
+- `version-guides/upgrade-3.1-to-3.2.md`
+- `version-guides/upgrade-3.2-to-3.3.md`
+- `version-guides/upgrade-3.3-to-3.4.md`
+
+### Workflow Guides (load when executing each step)
+- `workflows/test-suite-verification-workflow.md` — **MANDATORY FIRST STEP**
+- `workflows/no-test-suite-smoke-workflow.md` — fallback when no runnable test suite exists
+- `workflows/deprecation-warning-sweep-workflow.md` — Step 2
+- `workflows/gemfile-ruby-floor-audit-workflow.md` — Step 3
+- `workflows/boot-smoke-test-workflow.md` — Step 5
+- `workflows/landing-workflow.md` — Step 7
+
+### Reference Materials
+- `references/ruby-patch-versions.md` — latest patch per minor, and how to check
+- `references/deprecation-warnings.md` — how to turn on and read Ruby's own deprecation warnings
+- `references/known-gotchas.md` — real, verified issues found upgrading Ruby in production apps
+- `references/multi-hop-strategy.md` — planning a multi-hop Ruby upgrade
+
+### Report Templates
+- `templates/upgrade-report-template.md`
+
+### Examples
+- `examples/simple-upgrade.md` — single-hop upgrade example
+- `examples/multi-hop-upgrade.md` — multi-hop upgrade example (the explicit-exception case)
+
+---
 
 ## High-Level Workflow
 
 ### Step 0: Verify Latest Patch Version (MANDATORY PRE-STEP)
 
-Same reasoning as `rails-upgrade`'s Step 0: patch releases carry security fixes and bug fixes with no compatibility cost. Read `.ruby-version` / the Gemfile's `ruby "X.Y.Z"` line for the current version, then check the latest patch for that minor:
-
-```bash
-# List available patches for a minor (works with asdf's ruby plugin)
-asdf list all ruby | grep "^3\.2\."
+```
+1. Read .ruby-version / the Gemfile's `ruby "X.Y.Z"` line for the current version
+2. Read: references/ruby-patch-versions.md for how to find the latest patch of that minor
+3. If current version < latest patch:
+   - INFORM the user: "Your app is on Ruby X.Y.Z but the latest patch is X.Y.W"
+   - Guide through the patch bump (.ruby-version, Gemfile, Dockerfile base image if any)
+   - Run the test suite after the patch bump
+   - Treat the patch bump as its own small, low-risk deploy, before starting the minor hop
+   - Do NOT proceed to the minor hop until on the latest patch
+4. If current version == latest patch:
+   - Proceed to Step 1
 ```
 
-If not on the latest patch of the current minor, bump to it first, run the test suite, and treat that as its own small, low-risk deploy before starting the version hop.
+See "Why Latest Patch, Specifically" above for the reasoning — it is not the same rationale as a Rails patch bump.
 
 ### Step 1: Run Test Suite (MANDATORY FIRST STEP)
 
-Same as `rails-upgrade` Step 1 — do not proceed on a red baseline. If there's no test suite, see that skill's `workflows/no-test-suite-smoke-workflow.md` for the smoke-test fallback; the same approach applies here.
+```
+1. Read: workflows/test-suite-verification-workflow.md
+2. Detect test framework (RSpec, Minitest, or both)
+3. Run the test suite
+4. Capture results: total tests, passing, failing, pending
+5. If no runnable test suite exists:
+   - Read: workflows/no-test-suite-smoke-workflow.md
+   - Run the safe, read-only smoke baseline: syntax/load check, boot, any build step
+   - Record baseline confidence as partial
+   - Continue only if the smoke baseline passes and the user accepts the risk
+6. If ANY tests fail:
+   - STOP. Report failing tests. Offer to help fix them.
+   - Do NOT proceed until the suite is green.
+```
 
 ### Step 2: Surface Deprecation Warnings on the CURRENT Ruby (MANDATORY)
 
-**This is the Ruby-upgrade equivalent of checking Rails deprecation warnings before a Rails hop, and it is the step most likely to get skipped.** Ruby's own deprecation warnings for the *next* minor's removals are silent by default. Turn them on before touching the Gemfile:
-
-```bash
-# Run the test suite with deprecation warnings enabled
-RUBYOPT="-W:deprecated" bundle exec rspec
-# or, inside the app / an initializer, for a narrower scope:
-# Warning[:deprecated] = true
+```
+1. Read: workflows/deprecation-warning-sweep-workflow.md
+2. Read: references/deprecation-warnings.md
+3. Run the test suite with RUBYOPT="-W:deprecated" (and -W:experimental where relevant)
+4. Dedupe and triage every warning: app code (fix now) vs. gem code (check for a newer
+   gem release, a maintained fork, or defer to the next hop if it's not yet breaking)
+5. Fix every app-code warning before moving on
 ```
 
-Read `references/deprecation-warnings.md` for the full technique, what each hop's warnings tend to look like, and how to triage app-code warnings vs. warnings coming from inside a gem you don't control (report upstream / pin below the gem version that introduced the warning / ignore if the gem's own newer release already fixed it).
-
-**Every warning surfaced here belongs in fix-before-bump**, same rubric as `rails-upgrade`'s `kind: deprecation` — it works today and breaks at the next hop.
+This is the step most likely to get skipped, because Ruby's own deprecation warnings are silent by default (unlike Rails, which prints its deprecations to the log at normal verbosity). Skipping it converts a one-warning-at-a-time triage into an all-at-once breakage on the target Ruby.
 
 ### Step 3: Audit the Gemfile for Ruby-Version Blockers
 
-Two distinct failure modes, both real, both found in production use of this skill's sibling (`rails-upgrade`):
+```
+1. Read: workflows/gemfile-ruby-floor-audit-workflow.md
+2. Check every gem's declared `required_ruby_version` against the target Ruby
+   (cheap, static — bundler enforces this at `bundle lock` time)
+3. Read: references/known-gotchas.md for gems with a *undeclared* floor — code that
+   calls a removed API despite an honest-looking `required_ruby_version`
+4. For any blocker, check the gem's CHANGELOG for a release that fixes it, a maintained
+   fork, or whether the gem can be dropped/replaced
+```
 
-1. **A gem's declared `required_ruby_version` already exceeds the target.** Cheap to check, bundler enforces it at resolve time — you'll find out immediately when you bump the Gemfile's `ruby` directive and run `bundle lock`.
-2. **A gem's declared minimum is honest but its *actual* code isn't** — it calls a Ruby API that was removed, or uses syntax only valid on a newer Ruby than it claims. Static checks and `bundle install` both say "compatible"; only running the code proves it. See `references/known-gotchas.md` for two confirmed real examples (aws-sdk v2, an ancient `paperclip`) and `rails-upgrade`'s `references/gem-compatibility.md` → "Accidentally narrow legacy Gemfile pins" for the general pattern (that reference is about Rails hops, but the mechanism — declared constraint vs. actual runtime behavior — is identical for Ruby).
-
-Grep every gem's actual usage of removed APIs is impractical; the boot smoke test (Step 5) is what actually catches class 2. Use this step for class 1 (cheap, static) and for reading each gem's CHANGELOG when `bundle lock` reports a conflict — the error names the exact gem and required version.
-
-### Step 4: Bump the Gemfile's `ruby` Directive and Re-lock
+### Step 4: Bump the Version Pin and Re-lock
 
 ```ruby
 # Gemfile
@@ -76,31 +182,62 @@ bundle lock
 bundle install
 ```
 
-If `bundle lock` reports a conflict, it names the blocking gem and its requirement directly — resolve per Step 3's two failure modes before moving on.
+If `bundle lock` reports a conflict, it names the blocking gem and its requirement directly — resolve per Step 3 before moving on.
 
-### Step 5: Boot Smoke Test (MANDATORY, mirrors rails-upgrade Step 4.6)
+### Step 5: Boot Smoke Test (MANDATORY)
 
-```bash
-bundle exec rails runner "puts RUBY_VERSION"
+```
+1. Read: workflows/boot-smoke-test-workflow.md
+2. Run a command that actually loads the app under the target Ruby
+   (e.g. `bundle exec rails runner "puts RUBY_VERSION"`, or the app's own boot entrypoint
+   for a non-Rails app)
+3. If it fails, the trace names the offending gem's file directly. Check that gem's
+   CHANGELOG, bump it, and retry.
+4. Re-run until it succeeds.
 ```
 
-This is the step that catches class 2 above — a gem whose `required_ruby_version` was honest on paper but whose code calls something Ruby actually removed. Confirmed real example this session: `aws-sdk-core` 2.3.23 declared no problematic floor but called `Proc.new` relying on implicit block capture from the caller — a Ruby feature fully removed in 3.0 — and raised `ArgumentError` on first boot. See `references/known-gotchas.md`.
-
-If it fails, the trace names the offending gem's file directly (unlike the Rails-hop version of this same step, there's no resolver ambiguity to untangle — the stack trace points straight at the `require` chain). Check the gem's CHANGELOG for a release that drops the removed API, bump, and retry.
+This is the step that catches gems whose declared Ruby floor was honest on paper but whose code calls something the target Ruby actually removed — see `references/known-gotchas.md` for confirmed real examples. Static analysis and `bundle install` cannot see this class of bug; only running the code does.
 
 ### Step 6: Fix Findings, Run Test Suite, Repeat Until Clean
 
-Apply Step 2's and Step 5's findings, then run the full suite. Don't fix *next*-hop deprecation warnings that appear only now as a side effect of the bump you just made (e.g., a warning about a 3.1-era removal surfacing only once you're on 3.0) — same "don't triage tomorrow's deprecations today" rule as `rails-upgrade` Step 6. Note them for the next hop's own Step 2 sweep instead.
+```
+1. Apply every finding from Step 2 and Step 5
+2. Run the full test suite
+3. Repeat Steps 4-6 until the suite is green on the target Ruby
+```
+
+Do not fix deprecation warnings that appear only *now*, as a side effect of the bump you just made, and that describe removals scheduled for the *next* minor past your current target. Note them for that next hop's own Step 2 sweep instead of expanding the scope of the hop in progress.
 
 ### Step 7: Land It
 
-Update `.ruby-version`, the Dockerfile's base image (if any — check whether the OS base itself needs to move too, see `references/known-gotchas.md`'s Debian-base-image entry), CI's Ruby version, and any `ruby/setup-ruby`-style GitHub Actions config. Run the full suite one more time in the actual deploy-shaped environment (Docker/CI), not just locally, before calling the hop done.
+```
+1. Read: workflows/landing-workflow.md
+2. Update .ruby-version, Gemfile's `ruby` directive, Dockerfile base image (if any),
+   CI's Ruby version config
+3. Run the full suite one more time in the actual deploy-shaped environment
+   (Docker/CI), not just locally
+4. Commit and open the PR
+```
 
-## Available Resources
+### Step 8: Plan the Next Hop (or Stop)
 
-- `references/known-gotchas.md` — real, verified issues found upgrading Ruby, not generic advice. Add to this file as new ones surface.
-- `references/deprecation-warnings.md` — how to turn on and read Ruby's own deprecation warnings before a hop, and how to triage what they turn up.
+If the target Rails/framework version (or any other floor-setting dependency) needs a higher Ruby than the one just landed, plan the next Ruby hop before it's needed rather than discovering the floor mismatch mid-upgrade of that dependency. Otherwise, this hop is done — repeat from Step 0 whenever the next hop is scheduled.
 
-## Relationship to the Rails-Version Floor
+---
 
-Check `rails-upgrade`'s version guide table (`rails-upgrade/SKILL.md` → "Supported Upgrade Paths") for the Ruby floor of the Rails version currently in use and any upcoming Rails hop. If a planned Rails hop's Ruby floor is higher than the current Ruby, the Ruby hop(s) needed to reach it should be planned and landed **before** that Rails hop starts — don't let a Rails upgrade force an unplanned multi-hop Ruby jump to "catch up" in a single step.
+## Quality Checklist
+
+Before calling a hop done:
+
+- [ ] Started from the latest patch of the *current* minor (Step 0)
+- [ ] Test suite was green before starting (Step 1), or the no-suite fallback ran and the user accepted the risk
+- [ ] Deprecation sweep ran and every app-code warning was fixed (Step 2)
+- [ ] Gemfile was audited for both declared and undeclared Ruby-floor blockers (Step 3)
+- [ ] Boot smoke test passed on the target Ruby (Step 5)
+- [ ] Test suite is green on the target Ruby (Step 6)
+- [ ] `.ruby-version`, Gemfile, Dockerfile, and CI all agree on the new version (Step 7)
+- [ ] Only one minor was bumped, or the multi-hop exception was explicitly confirmed with the user
+
+## Success Criteria
+
+A hop is successful when: the app boots and the full test suite passes on the target Ruby, patch and minor version are pinned consistently everywhere (`.ruby-version`, Gemfile, Dockerfile, CI), no unresolved deprecation warnings about the target minor's own removals remain in app code, and the change has been verified in a deploy-shaped environment (not just a local shell) at least once before merging.

@@ -1,14 +1,12 @@
 # Ruby Deprecation Warnings Guide
 
-Ruby's own equivalent of `rails-upgrade`'s deprecation-warnings sweep — surfacing what the *current* Ruby already warns about regarding removals scheduled for the *next* minor, before you bump.
+How to surface what the *current* Ruby already warns about regarding removals scheduled for the *next* minor, before you bump the version.
 
 ---
 
 ## Why This Matters
 
 Ruby doesn't print deprecation warnings by default — `$VERBOSE` (equivalently `Warning[:deprecated]`) is off in a normal run. That means an app can be silently accumulating calls to soon-to-be-removed APIs with zero visibility, right up until the version bump turns every one of them into a hard failure at once. Turning warnings on *before* bumping converts "discover N breakages simultaneously on the new Ruby" into "fix N warnings one at a time on the Ruby you're already running, with a green test suite as ground truth the whole way."
-
-This is the direct Ruby-level analog of `rails-upgrade`'s Rails deprecation warnings — same idea, different framework layer.
 
 ---
 
@@ -27,7 +25,7 @@ Common culprits:
 - `RUBYOPT=-W0` set in a shell profile, CI env var, or `.env` — silences all warnings globally
 - A wrapper script or Rake task that redirects/filters stderr, where Ruby's own deprecation warnings are written
 
-If you find one of these, understand why it was added before removing it — but removing it (or scoping it more narrowly) is usually the right call before an upgrade, same as `rails-upgrade`'s guidance on `ActiveSupport::Deprecation.silence` blocks.
+If you find one of these, understand why it was added before removing it. Removing it (or scoping it more narrowly, e.g. silencing only around the one noisy call site instead of process-wide) is usually the right call before an upgrade.
 
 ---
 
@@ -38,6 +36,8 @@ If you find one of these, understand why it was added before removing it — but
 RUBYOPT="-W:deprecated" bundle exec rspec
 # or
 RUBYOPT="-W:deprecated" bin/rails test
+# or, for a non-Rails app, whatever runs its suite/boots it:
+RUBYOPT="-W:deprecated" bundle exec rake test
 
 # Narrower: just Ruby's own experimental-feature warnings
 RUBYOPT="-W:experimental" bundle exec rspec
@@ -81,10 +81,10 @@ RUBYOPT="-W:deprecated" bundle exec rspec 2>&1 >/dev/null \
 
 Every warning names a file. Two buckets:
 
-- **App code** (`app/`, `lib/`, `config/` paths) — yours to fix directly. Goes in fix-before-bump, same rubric as `rails-upgrade`'s `kind: deprecation` (works today, becomes a hard break at the actual version bump).
+- **App code** (`app/`, `lib/`, `config/` paths) — yours to fix directly. Treat as fix-before-bump: it works today, it becomes a hard break at the actual version bump.
 - **Gem code** (paths under `vendor/bundle` / the gem install path) — not yours to fix in place. Check:
-  1. Does a newer release of that gem fix it? (`gem_name`'s CHANGELOG, or diff the warning's source location across versions on GitHub — same technique as `rails-upgrade`'s `references/gem-compatibility.md` "Known Gotchas" entries.)
-  2. If no fix exists yet, is the gem still needed, or does `known-gotchas.md` already document a maintained fork?
+  1. Does a newer release of that gem fix it? Check the gem's CHANGELOG, or diff the warning's source location across versions on GitHub.
+  2. If no fix exists yet, is the gem still needed, or is there a maintained fork that fixes it? (See `known-gotchas.md` for confirmed real examples of this pattern.)
   3. If neither, this becomes a blocker for the *next* hop, not necessarily this one — the warning means it still works today. Note it and move on unless it's already failing.
 
 ---
@@ -94,15 +94,13 @@ Every warning names a file. Two buckets:
 The single most consequential Ruby deprecation sweep in recent history, because Ruby 2.7 was deliberately built to warn about most of what 3.0 would break. Two categories dominate:
 
 1. **Keyword argument / positional hash separation.** By far the largest volume of warnings on most codebases. A method call passing a trailing hash where the method itself declares keyword arguments (or vice versa) prints a warning naming the exact call site. This is *the* headline Ruby 3.0 change — budget real time for it on any app that hasn't already been swept.
-2. **Everything else scheduled for removal in 3.0** — `Proc.new` with no explicit block, `$SAFE`, `Fixnum`/`Bignum` (already unified into `Integer`, but old code referencing the constants directly warns), and others. See `known-gotchas.md` for confirmed real examples of what happens when these aren't caught before the bump (`Proc.new`, `URI.escape` — the latter deprecated since 2.7 without a `-W:deprecated`-category warning in all Ruby patches, so also grep gem source directly per that file's detection tip).
+2. **Everything else scheduled for removal in 3.0** — `Proc.new` with no explicit block, `$SAFE`, `Fixnum`/`Bignum` (already unified into `Integer`, but old code referencing the constants directly warns), and others. See `known-gotchas.md` for confirmed real examples of what happens when these aren't caught before the bump. Note: `URI.escape`/`URI.unescape` were deprecated since 2.7 but did **not** consistently emit a `-W:deprecated`-category warning across all 2.7 patches — grep gem source directly for these two method names if you suspect an old gem in your dependency tree does file/URL handling, rather than relying on the warning sweep alone to catch them.
 
-Later hops (3.0→3.1, 3.1→3.2, etc.) have their own, smaller deprecation surfaces — repeat this same sweep at every hop rather than assuming 2.7→3.0's warnings were a one-time special case.
+Later hops (3.0→3.1, 3.1→3.2, etc.) have their own, smaller deprecation surfaces — repeat this same sweep at every hop rather than assuming 2.7→3.0's warnings were a one-time special case. See the relevant `version-guides/upgrade-X.Y-to-X.Z.md` file for what each specific hop's own sweep tends to surface.
 
 ---
 
 ## Output Format for the Upgrade Report
-
-Mirrors `rails-upgrade`'s boot-smoke-test report block:
 
 ```
 Ruby deprecation sweep (Step 2):
@@ -119,4 +117,4 @@ Gem-code warnings (tracked, not directly fixable):
   - ...
 ```
 
-If the sweep comes back completely clean, record that explicitly — it's a real signal that this hop's app-code surface is already 3.0-ready (or whatever the target minor is), not an absence of effort.
+If the sweep comes back completely clean, record that explicitly — it's a real signal that this hop's app-code surface is already ready for the target minor, not an absence of effort.
