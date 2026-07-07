@@ -88,3 +88,15 @@ Ruby has been steadily moving stdlib libraries from "always loaded" to "bundled 
 **Why boot smoke and the suite both miss it:** neither runs the linter — this is *static analysis of your source against a version table*, orthogonal to whether the code runs. Only the lint step catches it, so on a project with a CI lint job, treat "bump the analyzer that pins TargetRubyVersion" as part of the hop, not an afterthought.
 
 **Generalizes beyond RuboCop:** any tool that keys off a Ruby-version table — `rubocop` and its plugins, `standard`, `steep`/RBS tooling, some `brakeman`/`reek` versions — can reject a just-bumped Ruby as unknown. When bumping Ruby, bump the analyzers in the same hop and run each one once. The fix is always "move the tool forward," never "pin the Ruby back."
+
+## Bundler 4 deprecates the per-OS windows platform symbols (`:mingw` / `:mswin` / `:x64_mingw`)
+
+**Not a Ruby-version issue** — it fires on adopting **Bundler 4**, which frequently rides along with Ruby-upgrade work (a new Ruby ships a newer default bundler, or you bump bundler while you're in the lockfile anyway). Called out here because that's when people hit it.
+
+**Symptom:** `bundle install` under Bundler 4 prints `[DEPRECATED] Platform :mingw, :mswin, :x64_mingw will be removed in the future. Please use platform :windows instead.` The usual trigger is the generated `tzinfo-data` line: `gem "tzinfo-data", platforms: [:mingw, :mswin, :x64_mingw, :jruby]`.
+
+**Cause:** Bundler consolidated the three separate Windows platform symbols into a single `:windows` umbrella. The old symbols still work but are deprecated as of Bundler 4.
+
+**Fix:** `gem "tzinfo-data", platforms: [:windows, :jruby]`. `:windows` covers mingw/mswin/x64_mingw; behavior-preserving, and clears the warning. (`:windows` has been accepted since Bundler 2.x, so it's safe even if some environment still runs an older bundler.)
+
+**Reminder on scope:** Bundler-major mechanics like this belong to a *Bundler* upgrade, not a *Ruby* one — captured here only because the two commonly travel together. A Bundler-major bump deserves its own PR (see `workflows/landing-workflow.md` on why a Bundler major is independent of the Ruby major).

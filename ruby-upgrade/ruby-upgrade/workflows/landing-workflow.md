@@ -51,6 +51,8 @@ Bundle the version-pin changes together with whatever Step 2/6 fixes were needed
 
 Expect the relocked `Gemfile.lock` (and any `Gemfile.next.lock`) to also show a `BUNDLED WITH` bump — relocking on the target Ruby uses the bundler that Ruby ships, so the recorded bundler version moves forward on its own. That's a legitimate part of this diff, not scope creep. Confirm `PLATFORMS` still reads `ruby` only if you locked on a non-Linux host (see `references/known-gotchas.md` on platform pollution).
 
+That incidental `BUNDLED WITH` bump is *not* the same as deliberately jumping Bundler a **major** version, and the two shouldn't be conflated. **Bundler's major version tracks RubyGems, not the Ruby language major** — a new Bundler major has its own `required_ruby_version` / `required_rubygems_version` floors and does *not* require a matching new Ruby major. Confirmed real example: Bundler 4.0.15 requires only Ruby ≥ 3.2.0 and RubyGems ≥ 3.4.1, so it runs fine on Ruby 3.4 (no "need Ruby 4" coupling). So don't hold a Bundler-major bump hostage to a Ruby-major hop, and don't smuggle one into a Ruby hop either — a deliberate Bundler-major bump is its own change with its own breaking-change surface (see `references/known-gotchas.md` on the Bundler-4 windows-platform deprecation), so give it its own PR.
+
 ## Step 5: Note What's Next
 
 If a future dependency bump (a Rails hop, another framework upgrade) will need a higher Ruby floor than the one just landed, note it now rather than rediscovering the floor mismatch mid-upgrade of that dependency later. This hop itself is done at this point — the next Ruby hop only starts when it's actually scheduled, back at `SKILL.md` Step 0.
