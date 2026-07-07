@@ -164,6 +164,16 @@ upgrade_findings:
       fix: "Drop `.mb_chars` from method chains: `str.mb_chars.upcase` → `str.upcase`. Modern Ruby's String methods handle multibyte correctly without the wrapper. For ActiveSupport::Multibyte::Chars instantiations, switch to plain String"
       variable_name: "MB_CHARS"
 
+    - name: "Schema dumper reorders columns alphabetically (8.1)"
+      kind: "optional"
+      pattern: "ActiveRecord::Schema\\[(?:[0-7]\\.\\d+|8\\.0)\\]"
+      exclude: ""
+      search_paths:
+        - "db/schema.rb"
+      explanation: "Rails 8.1's schema dumper emits each create_table's columns in alphabetical order rather than the previous creation/ordinal order. The first `db:schema:dump` (or any `db:migrate`) under 8.1 rewrites db/schema.rb with every table's columns reordered, plus the version header bumped (e.g. `ActiveRecord::Schema[8.0]` -> `[8.1]`). Purely cosmetic -- column order in schema.rb has no runtime effect -- but it produces a large, noisy one-time diff that reads as alarming in a version-bump PR. The pattern matches a schema still pinned below 8.1, i.e. one that will reorder on the next dump. Confirmed on a live 8.0 -> 8.1 upgrade (fastruby/audit)."
+      fix: "Expected churn, not a bug. Regenerate the schema under 8.1 and commit the reordered file at the cutover (when the current boot reaches 8.1) so future dumps are stable; don't hand-fight the ordering back to creation order. Watch for *unrelated* column-type churn riding along in the same dump (e.g. a gem's migration helper emitting bigint where the committed schema had integer) and treat that as a separate, deliberate decision rather than accepting it silently."
+      variable_name: "SCHEMA_DUMP_ALPHABETICAL"
+
 dependencies:
   bundler_audit:
     check: true
