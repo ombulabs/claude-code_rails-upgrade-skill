@@ -79,6 +79,10 @@ Ruby has been steadily moving stdlib libraries from "always loaded" to "bundled 
 
 **Fix:** add the explicit `require` for whatever stdlib class your code uses directly, rather than relying on some other gem to have required it first. Cheap, safe regardless of Ruby version, and exactly the kind of thing that should be true regardless of whether this specific instance was actually caused by the Ruby bump or a coincident gem bump.
 
+**Confirmed real example — `ostruct` at Ruby 4.0 (fastruby/audit, 3.4.9 → 4.0.4):** `ostruct` *leaves the default gems* in Ruby 4.0 (becomes a bundled gem). Under Bundler that means `require "ostruct"` is no longer satisfied unless the gem is in the Gemfile — and it's not app code that requires it here, it's **Rails' own boot path** (`zeitwerk` requires `ostruct`), so the app fails to *boot* on 4.0, not just at some app call site. Two things worth noting about how it was caught and fixed:
+- **The pre-bump sweep on 3.4.9 caught it** as a warning (`ostruct ... will no longer be part of the default gems starting from Ruby 4.0.0`), emitted from inside zeitwerk. This is the payoff of Step 2's sweep running on the *current* minor: the removal is announced one minor ahead.
+- **Fix is `gem "ostruct"` in the Gemfile** (not an app-code `require`), because the consumer is a dependency, not your own code. Harmless on the current Ruby, required on the target — so add it unconditionally, no `NextRails.next?` needed. This generalizes: when the thing that needs the now-bundled gem is a *gem* (especially a framework), the fix is a Gemfile entry, not a `require` in your app.
+
 ## A pinned linter/analyzer rejects the *new* Ruby as an unknown target (RuboCop)
 
 **Symptom:** the app boots fine and the whole test suite is green, but the CI **lint** job dies with `RuboCop found unknown Ruby version: 3.4` (substitute whatever version you just bumped to), typically from `rubocop/runner.rb`.

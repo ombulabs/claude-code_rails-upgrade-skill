@@ -69,6 +69,7 @@ Multi-hop is allowed **only when the user explicitly asks for it**, typically be
 | 3.1.x | 3.2.x | `Data.define` added; `it` block-arg experiment introduced later in the series; WeakMap/WeakRef changes; further bundled-gem migrations |
 | 3.2.x | 3.3.x | New default Prism parser groundwork; `it` implicit block parameter stabilizes; YJIT becomes more broadly production-viable |
 | 3.3.x | 3.4.x | Prism becomes the default parser; further stdlib-to-bundled-gem migrations |
+| 3.4.x | 4.0.x | **Major.** No 3.5-3.9 exists -- 3.4 goes straight to 4.0. `ostruct` leaves the default gems (boot-blocker under Bundler if a dependency needs it -- Rails/zeitwerk does); more stdlib-to-bundled-gem migrations |
 
 This table is for rough hop-distance planning only. Always check the specific version's own release notes and `NEWS.md` for the authoritative removal list before relying on anything here — Ruby's release notes are the ground truth, this table is a map, not the territory.
 
@@ -85,6 +86,7 @@ This table is for rough hop-distance planning only. Always check the specific ve
 - `version-guides/upgrade-3.1-to-3.2.md`
 - `version-guides/upgrade-3.2-to-3.3.md`
 - `version-guides/upgrade-3.3-to-3.4.md`
+- `version-guides/upgrade-3.4-to-4.0.md`
 
 ### Workflow Guides (load when executing each step)
 - `workflows/test-suite-verification-workflow.md` — **MANDATORY FIRST STEP**
