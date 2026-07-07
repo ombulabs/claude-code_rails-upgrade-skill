@@ -26,7 +26,7 @@ We've encountered (and solved) edge cases that don't appear in any documentation
 
 ### Installation
 
-This skill depends on two companion skills: [rails-load-defaults](https://github.com/ombulabs/claude-code_rails-load-defaults-skill) and [dual-boot](https://github.com/ombulabs/claude-code_dual-boot-skill). A fourth sibling plugin, `upgrade-cleanup`, lives in this repo and runs the post-upgrade scaffolding teardown. The marketplace install handles all four.
+This skill depends on two companion skills: [rails-load-defaults](https://github.com/ombulabs/claude-code_rails-load-defaults-skill) and [dual-boot](https://github.com/ombulabs/claude-code_dual-boot-skill). Two more sibling plugins live in this repo: `upgrade-cleanup` (post-upgrade scaffolding teardown) and `ruby-upgrade` (the same sequential, one-version-at-a-time methodology applied to Ruby itself, since a Ruby version floor can force its own upgrade project independent of any Rails hop). The marketplace install handles all of them.
 
 **From inside the Claude Code CLI prompt (recommended):**
 
