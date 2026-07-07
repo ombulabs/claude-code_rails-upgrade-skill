@@ -10,6 +10,7 @@
 
 1. **Declared floor exceeds the target.** Cheap to check, and Bundler enforces it automatically at `bundle lock` time — you'll find out the moment you bump the Gemfile's `ruby` directive.
 2. **Declared floor is honest, but the gem's actual code isn't.** It calls a Ruby API that was removed, or uses syntax only valid on a newer Ruby than it claims. Static checks and `bundle install` both say "compatible"; only running the code proves otherwise. This is what `boot-smoke-test-workflow.md` (Step 5) exists to catch — this workflow's job is to catch what it *can* see cheaply and to flag known-risky gems for extra attention at the boot smoke test.
+3. **The gem installs and runs fine, but refuses to *analyze* against the new Ruby.** Linters/analyzers (RuboCop and its plugins, `standard`, RBS/`steep` tooling) key off an internal Ruby-version table; a version released before your target Ruby existed rejects it as unknown (`RuboCop found unknown Ruby version: 3.4`) and aborts. Neither `bundle install`, the boot smoke test, nor the test suite catches this — only a CI **lint** step does, so it's a common "everything green locally, CI lint red" surprise. Fix: bump the analyzer(s) in the same hop (see `references/known-gotchas.md`, "A pinned linter/analyzer rejects the new Ruby").
 
 ---
 

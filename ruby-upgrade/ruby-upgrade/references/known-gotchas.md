@@ -78,3 +78,13 @@ Ruby has been steadily moving stdlib libraries from "always loaded" to "bundled 
 **Confirmed real example:** a re-lock during a Ruby upgrade (unrelated gem version bumps, not the Ruby bump itself) caused `OpenStruct` to no longer be implicitly available in a file that used it directly (`NameError: uninitialized constant OpenStruct`) — something else in the dependency chain had previously pulled in `require "ostruct"` as a side effect, and a version bump removed that transitive path.
 
 **Fix:** add the explicit `require` for whatever stdlib class your code uses directly, rather than relying on some other gem to have required it first. Cheap, safe regardless of Ruby version, and exactly the kind of thing that should be true regardless of whether this specific instance was actually caused by the Ruby bump or a coincident gem bump.
+
+## A pinned linter/analyzer rejects the *new* Ruby as an unknown target (RuboCop)
+
+**Symptom:** the app boots fine and the whole test suite is green, but the CI **lint** job dies with `RuboCop found unknown Ruby version: 3.4` (substitute whatever version you just bumped to), typically from `rubocop/runner.rb`.
+
+**Cause:** a distinct failure mode from the two in the Gemfile-floor audit — the gem *installs and runs fine*; it just refuses to *analyze* against a Ruby it's too old to know about. RuboCop derives `TargetRubyVersion` (from `.ruby-version` / the Gemfile `ruby` directive when not set explicitly in `.rubocop.yml`), and a version of RuboCop released before your target Ruby existed has no entry for it and aborts rather than guessing. Confirmed real example (Ruby 3.3 → 3.4, fastruby/audit): `rubocop 1.59.0` (Dec 2023) predates Ruby 3.4 and failed exactly this way; `bundle update rubocop rubocop-ast rubocop-rails rubocop-rails-omakase` (→ rubocop 1.88.1) fixed it, and the newer cops flagged no existing code.
+
+**Why boot smoke and the suite both miss it:** neither runs the linter — this is *static analysis of your source against a version table*, orthogonal to whether the code runs. Only the lint step catches it, so on a project with a CI lint job, treat "bump the analyzer that pins TargetRubyVersion" as part of the hop, not an afterthought.
+
+**Generalizes beyond RuboCop:** any tool that keys off a Ruby-version table — `rubocop` and its plugins, `standard`, `steep`/RBS tooling, some `brakeman`/`reek` versions — can reject a just-bumped Ruby as unknown. When bumping Ruby, bump the analyzers in the same hop and run each one once. The fix is always "move the tool forward," never "pin the Ruby back."

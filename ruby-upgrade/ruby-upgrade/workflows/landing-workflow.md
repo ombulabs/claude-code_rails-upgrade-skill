@@ -29,6 +29,13 @@ Every one of these needs to match the target version. A mismatch here is a commo
 - `Dockerfile`'s base image tag, if the app runs in Docker. Re-check whether the new Ruby's base image also changed its underlying OS release (see `references/known-gotchas.md`'s Docker-base-image entry) — a Ruby bump and an OS-base bump are two different things that happen to travel together in the official Ruby images.
 - CI config (`ruby/setup-ruby`'s `ruby-version:` in GitHub Actions, the equivalent in CircleCI/other CI).
 
+**Better than updating every mismatch: eliminate the mismatches.** The fewer places the literal version lives, the fewer a future hop can forget. Make `.ruby-version` the single source of truth and have the others *read* it:
+- `Gemfile`: `ruby file: ".ruby-version"` instead of `ruby "X.Y.Z"` (Bundler ≥ 2.2).
+- CI (`ruby/setup-ruby`): `ruby-version-file: ".ruby-version"` instead of a hardcoded `ruby-version:`.
+- Drop `.ruby-version.sample` and its `bin/setup` copy step entirely once `.ruby-version` is tracked — a committed `.ruby-version` is always present on a fresh clone, so the sample is dead weight.
+
+Two pins usually *can't* be collapsed and must still be bumped by hand: `.tool-versions` (asdf reads it directly, and can't reliably be pointed at `.ruby-version` without per-machine `~/.asdfrc` config) and the `Dockerfile` base image tag (`FROM ruby:X.Y.Z` can't read a file). Confirmed real example (fastruby/audit) went from 6 pinned locations to 3 (`.ruby-version` + `.tool-versions` + `Dockerfile`) this way.
+
 ## Step 3: Verify in a Deploy-Shaped Environment
 
 Local verification (Steps 1-6) is necessary but not sufficient — it doesn't catch environment differences (OS package versions, locale settings, resource limits) that only show up in Docker or CI. Run the full test suite one more time in whichever of these the app actually deploys through:
