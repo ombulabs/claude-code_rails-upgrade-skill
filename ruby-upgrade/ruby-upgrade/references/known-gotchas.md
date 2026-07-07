@@ -53,6 +53,24 @@ Not Ruby-version-specific, but very likely to happen *during* Ruby upgrade work 
 
 **Fix:** force ruby-platform resolution on the host too, matching whatever the deploy image already does: `bundle config set --local force_ruby_platform true` before running `bundle lock`, then `bundle lock --add-platform ruby --remove-platform <the-polluting-platform>` if it already got added. Re-check `Gemfile.lock`'s `PLATFORMS` section reads `ruby` only before committing.
 
+## `Kernel#open` on a URL (open-uri's monkeypatch) — behavior silently changes across Ruby/open-uri versions
+
+**Symptom:** varies by Ruby/open-uri version, which is the trap — grepping for one exact error message from an old bug report will miss this on a different Ruby. Confirmed variants:
+- Ruby 3.2.11 (open-uri 0.3.0): `Errno::ENOENT (No such file or directory @ rb_sysopen - https://...)` — `Kernel#open` falls all the way through to a literal file open on the URL string.
+- Older Ruby/open-uri (seen in the wild on this same codebase, 2022 and 2023): `ArgumentError (bad argument (expected URI object or URI string))`, raised one frame further in, from open-uri's own deprecation-warning shim.
+
+**Cause:** `open-uri` has, for years, monkeypatched `Kernel#open` so that `open("https://...")` transparently fetches the URL instead of opening a local file — a very old, once-idiomatic Ruby pattern. That monkeypatch has been progressively weakened and eventually removed across Ruby's stdlib open-uri releases (0.3.0, bundled with Ruby 3.2 in this case, no longer patches `Kernel#open` for URL strings at all). `URI.open` (the explicit, always-supported form) keeps working the whole time — only the implicit `Kernel#open` shortcut degrades.
+
+**Confirmed real example (fastruby/audit, Ruby 2.7.2 → 3.2.11):** `app/models/gemfile.rb` called `open(uri).read` to fetch a user-uploaded `Gemfile.lock` from S3. This exact line had already been reported broken twice before, in 2022 and again in 2023 (two separate GitHub issues, both showing the identical `ArgumentError` above, both apparently closed without a real fix landing) — then the Ruby 2.7 → 3.2 bump changed the symptom to `Errno::ENOENT` and it was reported a third time. Three bug reports, one un-fixed root cause, across four years.
+
+**Why the test suite and boot smoke test both missed it, three times:** two independent reasons stacked here, not just one — worth checking both when a bug like this survives an upgrade's verification steps:
+1. The boot smoke test only boots the app; it never invokes this controller action at all.
+2. Less obvious: the *feature's own test suite was green* the whole time because the test environment's file-attachment storage backend is local filesystem, not S3 — and the method containing the `open(uri)` call has an early return specifically for non-remote (non-`//`-prefixed) URLs. The buggy line is **structurally unreachable** under the test environment's config, regardless of how thorough the tests around it look. A green suite only proves the code paths it actually reaches were fine.
+
+**Fix:** use `URI.open(uri)` explicitly — never bare `open(url_string)`. This works across all Ruby/open-uri versions, past and future.
+
+**Detection tip:** grep for bare `open(` (not `File.open`, not `URI.open`, not `.open`) with a URL-shaped argument (a variable literally named `uri`/`url`, or a string starting with `http`). This pattern is a holdover from pre-2015-era Rails tutorials and shows up more often in older codebases than you'd expect. If the app has any history of "mysterious 500s on file download/upload that seem to fix themselves," this is worth checking even outside of an active version-upgrade — it can lie dormant for years and resurface on totally unrelated deploys.
+
 ## Default/bundled gems that stop being implicitly available
 
 Ruby has been steadily moving stdlib libraries from "always loaded" to "bundled gem, needs an explicit `require`" across the 3.x series (`net-smtp`, `net-pop`, `net-imap`, and others made this move around Ruby 3.1; more libraries continue to move this direction in later releases — check the specific Ruby version's release notes rather than assuming a library seen here is still safe).
