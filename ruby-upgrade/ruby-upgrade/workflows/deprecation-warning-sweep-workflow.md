@@ -25,10 +25,11 @@ Substitute the app's actual test command (`bin/rails test`, `bundle exec rake te
 
 ## Step 3: Triage Every Warning
 
-Split into two buckets by file path:
+Split into three buckets by file path:
 
 - **App code** (`app/`, `lib/`, `config/`) — fix now, this hop.
 - **Gem code** (the gem install path / `vendor/bundle`) — check for a newer gem release or maintained fork (see `references/known-gotchas.md` for confirmed real examples of this exact situation); if none exists and it's not yet breaking, defer to the next hop.
+- **Tooling / bundler itself** (paths under bundler's own install, e.g. `.../gems/bundler-X.Y.Z/lib/bundler/vendor/...`) — not app code and not one of *your* gems, so it belongs in neither bucket above. An outdated bundler is its own source of Ruby-deprecation noise. Confirmed real example (Ruby 3.2 → 3.3): bundler `2.2.21`'s vendored Thor triggered `warning: constant DidYouMean::SPELL_CHECKERS is deprecated` on every command. The fix is to move to the bundler shipped with (or supported by) the target Ruby — which usually happens for free when you relock on the target Ruby: `bundle lock` / `bundle install` rewrites `BUNDLED WITH` to the newer bundler and the warning disappears. Don't chase these as if they were app or app-gem issues.
 
 ## Step 4: Fix Every App-Code Warning
 
