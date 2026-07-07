@@ -53,6 +53,16 @@ upgrade_findings:
       fix: "Replace manual autoload_paths/eager_load_paths with config.autoload_lib(ignore: %w[assets tasks])"
       variable_name: "LIB_AUTOLOAD"
 
+    - name: "cache_format_version 6.1 deprecated"
+      kind: "deprecation"
+      pattern: "cache_format_version\\s*=\\s*6\\.1"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "config.active_support.cache_format_version = 6.1 is implied by config.load_defaults 5.1/6.0/6.1 and is not usually set explicitly. Rails 7.1 deprecates support for the 6.1 cache format and removes it in 7.2, so apps that have not yet aligned load_defaults past 6.1 will see this warning on every boot once on Rails 7.1, even with no explicit cache_format_version line in the codebase."
+      fix: "Add config.active_support.cache_format_version = 7.0 to config/application.rb (after load_defaults) ahead of the full load_defaults alignment, or complete the load_defaults bump to 7.0+ during Step 7"
+      variable_name: "CACHE_FORMAT_VERSION"
+
   medium_priority:
     - name: "ActiveRecord::Migration.check_pending! deprecated"
       kind: "deprecation"
