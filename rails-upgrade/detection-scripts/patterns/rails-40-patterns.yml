@@ -195,31 +195,31 @@ upgrade_findings:
 
     - name: "Duplicate root route declarations across constraints"
       kind: "breaking"
-      pattern: "^\\s*root\\s+(to:|=>)"
+      pattern: "^\\s*root\\s+(to:|=>|['\"])"
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 4 raises `ArgumentError: Invalid route name, already in use: 'root'` when the routes file has more than one `root` declaration (typically one per constraint block). Rails 3.2 was lenient about duplicate names with different constraints"
+      explanation: "Only actionable when the routes file has 2+ `root` declarations (typically one per constraint block); a single root is fine, so treat a lone hit as noise. Rails 4 raises `ArgumentError: Invalid route name, already in use: 'root'` on the second and later `root` declarations. Rails 3.2 was lenient about duplicate names with different constraints. Matches all three forms: `root to:`, `root =>`, and the Rails 4 string shorthand `root \"home#index\"`"
       fix: "Keep the FIRST `root` declaration as the default `:root` name; add `as: :<unique_name>` to the SECOND and subsequent declarations. Renaming all of them (giving the first an `as:` too) silently breaks every `root_path` / `root_url` call site because the `:root` name is no longer registered. Real apps have dozens to hundreds of these helper calls. Verification step: `grep -rnE \"\\b(root_path|root_url)\\b\" app/ config/ lib/` and confirm no caller targets a constraint-bound root that was renamed"
       variable_name: "DUPLICATE_ROOT_ROUTES"
 
     - name: "Hyphenated or CamelCase controller name in routes to: value"
       kind: "breaking"
-      pattern: "to:\\s*\"[^\"]*(-|[A-Z])[^\"]*#"
+      pattern: "\\bto:\\s*['\"][^'\"]*(-|[A-Z])[^'\"]*#"
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 4 validates controller names in `to:` clauses with strict rules: no hyphens, no CamelCase. Hyphenated values raise `ArgumentError: 'foo-bar' is not a supported controller name`; the CamelCase form raises the same error. Rails 3.2 was lenient. URL paths (the route path itself) can keep hyphens — only the controller class reference in `to:` needs to be snake_case"
+      explanation: "Rails 4 validates controller names in `to:` clauses with strict rules: no hyphens, no CamelCase. Hyphenated values raise `ArgumentError: 'foo-bar' is not a supported controller name`; the CamelCase form raises the same error. Rails 3.2 was lenient. URL paths (the route path itself) can keep hyphens — only the controller class reference in `to:` needs to be snake_case. Detects both single- and double-quoted `to:` values; a hyphen in the URL path (before `to:`) does not trigger it"
       fix: "Replace hyphens with underscores and CamelCase with snake_case in `to:` values. URL paths keep their original form. The snake_case form resolves to the same controller class on Rails 3.2, so the rewrite ships pre-bump and is backwards-compatible. Example: `to: \"my-pages#show\"` → `to: \"my_pages#show\"`; `to: \"MyPages#show\"` → `to: \"my_pages#show\"`"
       variable_name: "ROUTES_CONTROLLER_NAMES"
 
     - name: "Top-level module defined in a route file (autoload-on-reload boundary)"
       kind: "breaking"
       pattern: "^\\s*module\\s+[A-Z]\\w*"
-      exclude: "RSpec::|Constraints::"
+      exclude: ""
       search_paths:
         - "config/routes/"
-      explanation: "Rails 4's route loader does not reliably persist top-level module definitions across the routes-reload boundary. A pattern like `module Constraints; class Admin; ...; end; end` defined inside a `config/routes/*.rb` file may evaluate at boot but the `Constraints` constant does not survive subsequent reloads — downstream uses (e.g. `constraints Constraints::Admin do ... end`) raise `NameError: uninitialized constant Constraints`. Rails 3.2 was more lenient — modules defined in route files persisted across reload boundaries"
+      explanation: "Rails 4's route loader does not reliably persist top-level module definitions across the routes-reload boundary. A pattern like `module Constraints; class Admin; ...; end; end` defined inside a `config/routes/*.rb` file may evaluate at boot but the `Constraints` constant does not survive subsequent reloads — downstream uses (e.g. `constraints Constraints::Admin do ... end`) raise `NameError: uninitialized constant Constraints`. Rails 3.2 was more lenient — modules defined in route files persisted across reload boundaries. Matches module definitions including the compact-nested `module Constraints::Admin` form; option lines like `scope module: \"admin\"` are not definitions and do not match"
       fix: "Two-part fix, gated by `if NextRails.next?`. (1) Move the module's class definitions to convention paths (e.g. `config/routes/constraints/admin.rb` for `Constraints::Admin`) so Rails autoload finds them. (2) Add the parent directory to `config.autoload_paths` in `config/application.rb`: `if NextRails.next?; config.autoload_paths += [Rails.root.join(\"config/routes\")]; end`. Do NOT move the files unconditionally — Rails 3.2 still wants them at the original path inside the route file. Branching the autoload_paths assignment without moving the files means the modules load via Rails convention on the next side and route-file evaluation on the current side"
       variable_name: "ROUTES_TOP_LEVEL_MODULE_AUTOLOAD"
 

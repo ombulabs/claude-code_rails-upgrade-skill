@@ -35,3 +35,56 @@ SCOPE_WITHOUT_LAMBDA:
     - "  scope :active, -> { where(active: true) }"
     # wrapped in an explicit lambda — also correct, must not flag
     - "  scope :active, lambda { where(active: true) }"
+
+DUPLICATE_ROOT_ROUTES:
+  # Pattern: "^\\s*root\\s+(to:|=>|['\"])"
+  # Rails 4 rejects a second `root`; flag every root declaration so a human can
+  # count them (a lone hit is noise, 2+ is the breaking case).
+  match:
+    # hash form with to:
+    - "  root to: \"home#index\""
+    # legacy hash-rocket form
+    - "  root => \"home#index\""
+    # Rails 4 double-quoted string shorthand
+    - "  root \"home#index\""
+    # Rails 4 single-quoted string shorthand
+    - "  root 'home#index'"
+  no_match:
+    # a root_path helper call is not a declaration
+    - "    redirect_to root_path"
+    # a non-root route must not flag
+    - "  get \"/\", to: \"home#index\""
+
+ROUTES_CONTROLLER_NAMES:
+  # Pattern: "\\bto:\\s*['\"][^'\"]*(-|[A-Z])[^'\"]*#"
+  # Rails 4 rejects hyphen/CamelCase controller names in to:; both quote styles.
+  match:
+    # double-quoted hyphenated controller
+    - "  get \"widgets\", to: \"my-pages#show\""
+    # double-quoted CamelCase controller
+    - "  get \"widgets\", to: \"MyPages#show\""
+    # single-quoted hyphenated controller
+    - "  get \"widgets\", to: 'my-pages#show'"
+    # single-quoted CamelCase controller
+    - "  get \"widgets\", to: 'MyPages#show'"
+  no_match:
+    # hyphen only in the URL path, controller is fine
+    - "  get \"my-widgets\", to: \"pages#show\""
+    # already snake_case controller
+    - "  get \"widgets\", to: \"my_pages#show\""
+
+ROUTES_TOP_LEVEL_MODULE_AUTOLOAD:
+  # Pattern: "^\\s*module\\s+[A-Z]\\w*"
+  # Top-level module definitions inside config/routes/ break on reload.
+  match:
+    # the canonical constraints module definition
+    - "  module Constraints"
+    # any single-segment module definition
+    - "module Api"
+    # compact-nested definition must also flag
+    - "  module Constraints::Admin"
+  no_match:
+    # scope module: option is not a module definition
+    - "  scope module: \"admin\" do"
+    # using a constant is not defining a module
+    - "  constraints Constraints::Admin do"
