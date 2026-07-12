@@ -58,23 +58,23 @@ upgrade_findings:
       variable_name: "DEFAULT_SCOPE_WITHOUT_BLOCK"
 
     - name: "Association :conditions option"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?conditions(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :conditions from associations — use a lambda with where() instead"
-      fix: "Move conditions into a lambda: has_many :items, -> { where(active: true) }"
+      explanation: "Rails 4.0 moved :conditions out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1. A proc-valued :conditions has a receiver subtlety covered separately by ASSOCIATION_CONDITIONS_PROC"
+      fix: "Move conditions into a scope lambda: has_many :items, -> { where(active: true) }. Works on Rails 3.2 and 4.0+"
       variable_name: "ASSOCIATION_CONDITIONS"
 
     - name: "Association :order option"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*[^_]:?order(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :order from associations — use a lambda with order() instead"
-      fix: "Move order into a lambda: has_many :items, -> { order('position ASC') }"
+      explanation: "Rails 4.0 moved :order out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1"
+      fix: "Move order into a scope lambda: has_many :items, -> { order('position ASC') }. Works on Rails 3.2 and 4.0+"
       variable_name: "ASSOCIATION_ORDER"
 
     - name: "Association :extend option"
@@ -83,18 +83,18 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :extend from associations — use extending() inside a lambda"
-      fix: "Move extend into a lambda: has_many :items, -> { extending SomeExtension }"
+      explanation: "Rails 4.0 removed :extend from associations. Unlike :conditions / :order / :uniq / :readonly, activerecord-deprecated_finders does NOT restore :extend, so this one actually breaks at the 4.0 hop and stays breaking. Use extending() inside a scope lambda"
+      fix: "Move extend into a scope lambda: has_many :items, -> { extending SomeExtension }"
       variable_name: "ASSOCIATION_EXTEND"
 
     - name: "Association :uniq option"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "(has_many|has_and_belongs_to_many).*:?uniq(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :uniq from associations — use a lambda with distinct"
-      fix: "Move uniq into a lambda: has_many :items, -> { distinct }, through: :joins"
+      explanation: "Rails 4.0 moved :uniq out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda with distinct before dropping the gem or moving to 4.1"
+      fix: "Move uniq into a scope lambda: has_many :items, -> { distinct }, through: :joins. Works on Rails 3.2 and 4.0+"
       variable_name: "ASSOCIATION_UNIQ"
 
     - name: "Association :finder_sql option"
@@ -152,13 +152,13 @@ upgrade_findings:
       variable_name: "FIND_LAST_BY"
 
     - name: "Association :readonly option on through"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "(has_many|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :readonly from has_many :through associations"
-      fix: "Remove the readonly option — it is no longer supported"
+      explanation: "Rails 4.0 moved :readonly out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Move it to a scope lambda before dropping the gem or moving to 4.1"
+      fix: "Move readonly into a scope lambda: has_many :items, -> { readonly }, through: :joins. Works on Rails 3.2 and 4.0+"
       variable_name: "ASSOCIATION_READONLY"
 
     - name: "Ruby 1.8 version requirement"
@@ -448,6 +448,36 @@ upgrade_findings:
       fix: "Cast dynamic dates to strings: <%= 3.days.ago.to_s(:db) %>"
       variable_name: "FIXTURE_DATES"
 
+    - name: "Association :conditions option passed a proc"
+      kind: "deprecation"
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?conditions.*?(\\bproc\\s*\\{|Proc\\.new\\s*(do|\\{))"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "At the 3.2 → 4.0 hop this keeps working, with a deprecation warning, because activerecord-deprecated_finders is a default dependency of Rails 4.0 (removed in 4.1). That gem restores the `:conditions` option and instance_evals a proc value against the owner, so the Rails 3.2 receiver semantics are preserved on 4.0. The hazard is the eventual rewrite, not the bump: the native Rails 4 replacement is a scope lambda that is instance_exec'd against the relation (`klass.unscoped`) with the owner passed as the lambda argument, so `self` is the relation, not the owner. A careless rewrite to a bare `-> { where(x: x) }` resolves `x` against the relation instead of the owner — a silent shift"
+      fix: "Two options. (1) Defer: rely on the bundled activerecord-deprecated_finders through the 4.0 window; the proc keeps working and only warns. (2) Rewrite for forward compatibility (required before dropping the gem or moving to 4.1): convert to a scope lambda whose parameter is the owner. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` becomes `belongs_to :foo, ->(owner) { where(clinic_id: owner.clinic_id) }`. Bare attribute references and `self.x` that targeted the owner become `owner.x`; local variables and constants stay as-is. The lambda form works on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
+      variable_name: "ASSOCIATION_CONDITIONS_PROC"
+
+    - name: "order(column: :value) with a non-direction value"
+      kind: "breaking"
+      pattern: "order\\(\\s*:?\\w+\\s*(:|=>)\\s*:\\w+"
+      exclude: ":asc|:desc"
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.0 added the `order(column: :direction)` hash syntax together with strict validation: `validate_order_args` raises `ArgumentError: Direction should be :asc or :desc` for any hash value other than `:asc` / `:desc`. Plain ActiveRecord 3.2 had no hash-order syntax, so a pre-existing `order(event: :start)` on 3.2 came from an extension like Squeel (which read the hash as joined_table => column). On Rails 4 that same call raises regardless of whether Squeel is loaded. The exclude regex filters legitimate direction hashes (`order(name: :asc)`, `order(id: :desc)`)"
+      fix: "Branch to literal SQL on the next side: `if NextRails.next?; relation.order(\"events.start ASC\"); else; relation.order(event: :start); end` (or duplicate the chain inside an `if NextRails.next?` block). The choice of which join table to name in the SQL depends on the receiver chain — operator judgment per site. Forward-compat note for Rails 5.2+: bare-string `.order(\"events.start ASC\")` triggers a `Dangerous query method` warning; wrap with `Arel.sql(...)` (`Arel.sql(\"events.start ASC\")`) for forward compatibility. `Arel.sql` exists since Rails 3.0, so the wrap is backwards-compatible"
+      variable_name: "SQUEEL_ORDER_JOINED_TABLE"
+
+    - name: "has_many / has_one / belongs_to with string association name"
+      kind: "breaking"
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many)\\s+\"[^\"]+\""
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4 raises `ArgumentError: association names must be a Symbol` when the first argument to has_many / has_one / belongs_to / HABTM is a string. Rails 3.2 accepts a string and uses it as-is (String and Symbol are interchangeable in the underlying define_method); Rails 4 added a strict Symbol type check. Note: the primary regex matches only a literal `\"...\"` first argument. Method-chain shapes like `has_many type.tableize, dependent: :destroy` (inside a `types.each` loop) also raise the same error at class-load but the chain result is invisible to grep — a broader regex would generate too many false positives from options-keyword method calls. Recovery for method-chain shapes is via boot smoke: Rails 4's error ships with a stack trace pointing at the offending has_* line; append `.to_sym` to the computed expression"
+      fix: "Convert string association names to symbols. For dynamic names (e.g. `has_many \"name_#{x}\"`), add `.to_sym` at the end of the expression. Symbols work on Rails 3.2 identically, so the rewrite ships pre-bump and is backwards-compatible"
+      variable_name: "ASSOC_NAME_STRING"
+
     - name: "update_all with hash/string/array conditions (two-arg form)"
       kind: "deprecation"
       pattern: "update_all\\([^)]*,\\s*[\\{\"'\\[]"
@@ -515,7 +545,7 @@ dependencies:
   activerecord_deprecated_finders:
     check: false
     gem_name: "activerecord-deprecated_finders"
-    message: "Temporary bridge gem for find_all_by_* — migrate to where/find_by then remove"
+    message: "Default dependency of Rails 4.0 (removed in 4.1), so these keep working with a deprecation warning on 4.0. Restores dynamic finders (find_all_by_* etc.) and old-style association options (:conditions including a proc, :order, :include, :uniq, :readonly — not :extend). Temporary bridge: migrate off then drop the gem before 4.1"
     url: "https://github.com/rails/activerecord-deprecated_finders"
 
   actionpack_action_caching:
