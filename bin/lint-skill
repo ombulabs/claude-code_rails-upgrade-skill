@@ -1,0 +1,198 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Consistency linter for the rails-upgrade and upgrade-cleanup skills.
+#
+# Catches drift classes that are easy to introduce by hand and easy to miss
+# in review: broken file-path references in prose, orphaned reference /
+# workflow / version-guide files, SKILL.md index rows that don't match what's
+# on disk, gaps in "Step N" header numbering, and pattern-catalog filenames
+# whose derived version disagrees with their own `version:` key.
+#
+# Usage: ruby bin/lint-skill   (exits 1 on any error)
+
+require "yaml"
+
+ROOT = File.expand_path("..", __dir__)
+
+SKILLS = {
+  "rails-upgrade" => File.join(ROOT, "rails-upgrade"),
+  "upgrade-cleanup" => File.join(ROOT, "upgrade-cleanup", "upgrade-cleanup")
+}.freeze
+
+$errors = []
+
+def err(file, detail)
+  $errors << "#{file.sub("#{ROOT}/", "")}: #{detail}"
+end
+
+def markdown_files_for(skill_dir)
+  Dir.glob(File.join(skill_dir, "**", "*.md")).sort
+end
+
+# ---------------------------------------------------------------------------
+# 1. File-path tokens in prose resolve to real files on disk
+# ---------------------------------------------------------------------------
+PATH_TOKEN = %r{(?:references|workflows|version-guides|templates|examples|detection-scripts/patterns)/[A-Za-z0-9_./-]+\.(?:md|yml)}
+
+SKILLS.each_value do |skill_dir|
+  markdown_files_for(skill_dir).each do |f|
+    next if File.basename(f) == "CHANGELOG.md" # historical record — old paths intentionally no longer exist
+
+    File.read(f).each_line.with_index(1) do |line, ln|
+      next if line.include?(".github/") # e.g. `.github/workflows/ci.yml` — CI config, not a skill path
+      next if line.include?("dual-boot") # cross-plugin reference into the external dual-boot skill repo
+
+      line.scan(PATH_TOKEN) do |token|
+        next if token.include?("{") || token.include?("<") || token.include?("*")
+
+        path = File.join(skill_dir, token)
+        err(f, "line #{ln}: path `#{token}` does not exist") unless File.exist?(path)
+      end
+    end
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 2. No orphaned reference / workflow / version-guide / template / example files
+# ---------------------------------------------------------------------------
+ORPHAN_CHECK_DIRS = %w[references workflows version-guides templates examples].freeze
+
+SKILLS.each do |skill_name, skill_dir|
+  corpus = markdown_files_for(skill_dir).map { |f| [f, File.read(f)] }
+
+  ORPHAN_CHECK_DIRS.each do |dir|
+    Dir.glob(File.join(skill_dir, dir, "*.md")).sort.each do |file|
+      base = File.basename(file)
+      mentioned = corpus.any? { |f, content| f != file && content.include?(base) }
+      err(file, "orphaned — no inbound pointer from any file in the #{skill_name} skill") unless mentioned
+    end
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 3. SKILL.md bullet index matches files on disk (workflows/references/examples)
+# ---------------------------------------------------------------------------
+INDEX_CHECK_DIRS = %w[workflows references examples].freeze
+
+SKILLS.each do |skill_name, skill_dir|
+  skill_md = File.join(skill_dir, "SKILL.md")
+  next unless File.exist?(skill_md)
+
+  content = File.read(skill_md).each_line.reject { |l| l.include?("dual-boot") }.join
+
+  INDEX_CHECK_DIRS.each do |dir|
+    on_disk = Dir.glob(File.join(skill_dir, dir, "*.md")).map { |f| File.basename(f) }.sort
+    next if on_disk.empty?
+
+    listed = content.scan(%r{`#{dir}/([A-Za-z0-9_./-]+\.md)`}).flatten.sort.uniq
+
+    (on_disk - listed).each do |missing|
+      err(skill_md, "#{dir}/#{missing} exists on disk but is not listed in SKILL.md")
+    end
+    (listed - on_disk).each do |stale|
+      err(skill_md, "SKILL.md lists `#{dir}/#{stale}` but the file does not exist on disk")
+    end
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 4. "Step N" headers run 1..N per workflow file, no gaps or duplicates
+# ---------------------------------------------------------------------------
+SKILLS.each_value do |skill_dir|
+  Dir.glob(File.join(skill_dir, "workflows", "*.md")).sort.each do |f|
+    steps = File.read(f).scan(/^(?:##|###)\s+Step (\d+)[:\s]/).flatten.map(&:to_i)
+    next if steps.empty?
+
+    expected = (1..steps.length).to_a
+    err(f, "step headers are #{steps.inspect}, expected #{expected.inspect}") unless steps == expected
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 5. SKILL.md frontmatter `name:` matches its parent directory name
+# ---------------------------------------------------------------------------
+SKILLS.each_value do |skill_dir|
+  skill_md = File.join(skill_dir, "SKILL.md")
+  next unless File.exist?(skill_md)
+
+  content = File.read(skill_md)
+  frontmatter = content[/\A---\n(.*?)\n---/m, 1]
+
+  if frontmatter.nil?
+    err(skill_md, "missing YAML frontmatter (--- name: ... ---)")
+    next
+  end
+
+  name = YAML.safe_load(frontmatter)["name"]
+  expected = File.basename(skill_dir)
+
+  err(skill_md, "frontmatter name `#{name}` does not match parent directory `#{expected}`") if name != expected
+end
+
+# ---------------------------------------------------------------------------
+# 6. Version-guide hop chain is unbroken (each hop's "to" == next hop's "from")
+# ---------------------------------------------------------------------------
+VERSION_GUIDES_DIR = File.join(SKILLS.fetch("rails-upgrade"), "version-guides")
+version_key = ->(v) { v.split(".").map(&:to_i) }
+
+hops = Dir.glob(File.join(VERSION_GUIDES_DIR, "upgrade-*-to-*.md")).sort.filter_map do |f|
+  m = File.basename(f).match(/\Aupgrade-(\d+\.\d+)-to-(\d+\.\d+)\.md\z/)
+  if m.nil?
+    err(f, "filename doesn't match upgrade-<FROM>-to-<TO>.md")
+    next
+  end
+  { file: f, from: m[1], to: m[2] }
+end
+
+hops.sort_by! { |h| version_key.call(h[:from]) }
+
+hops.each_cons(2) do |prev, cur|
+  next if prev[:to] == cur[:from]
+
+  err(cur[:file], "hop starts at #{cur[:from]} but the prior hop (#{File.basename(prev[:file])}) ends at #{prev[:to]} — gap or overlap in the version-guide chain")
+end
+
+# ---------------------------------------------------------------------------
+# 7. Pattern catalog filename <-> version sanity
+# ---------------------------------------------------------------------------
+PATTERNS_DIR = File.join(SKILLS.fetch("rails-upgrade"), "detection-scripts", "patterns")
+
+Dir.glob(File.join(PATTERNS_DIR, "rails-*-patterns.yml")).sort.each do |f|
+  digits = File.basename(f)[/rails-(\d+)-patterns\.yml/, 1]
+
+  if digits.nil?
+    err(f, "filename doesn't match rails-<MAJORMINOR>-patterns.yml")
+    next
+  end
+
+  if digits.length != 2
+    err(f, "cannot derive a dotted version from #{digits.length} digits (#{digits}) — update the MAJORMINOR mapping in bin/lint-skill")
+    next
+  end
+
+  derived_version = "#{digits[0]}.#{digits[1]}"
+
+  begin
+    doc = YAML.safe_load_file(f)
+  rescue Psych::SyntaxError => e
+    err(f, "YAML parse error: #{e.message}")
+    next
+  end
+
+  next unless doc.is_a?(Hash)
+
+  declared_version = doc["version"]
+  if declared_version && declared_version.to_s != derived_version
+    err(f, "filename implies version #{derived_version} but `version:` key says #{declared_version.inspect}")
+  end
+end
+
+# ---------------------------------------------------------------------------
+if $errors.empty?
+  puts "lint-skill: OK"
+else
+  $errors.each { |e| puts "ERROR #{e}" }
+  puts "lint-skill: #{$errors.length} error(s)"
+  exit 1
+end

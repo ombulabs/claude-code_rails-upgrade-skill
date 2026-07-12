@@ -288,6 +288,44 @@ Date.today.to_fs(:short)
 
 ---
 
+#### 10. redirect_to Open Redirect Protection
+
+**What Changed:**
+`load_defaults 7.0` sets `config.action_controller.raise_on_open_redirects = true`. With it on, `redirect_to` and `redirect_back_or_to` to a host different from the current one raise `ActionController::Redirecting::UnsafeRedirectError` instead of redirecting. This is not a deprecation, there is no warning phase, and it is gated by `load_defaults 7.0`, so an app only sees it once `load_defaults` reaches 7.0, which is often a later hop than the Rails 7.0 bump itself. Internal path/url helpers and model records are unaffected; only dynamic or external destinations break.
+
+**Detection Pattern:**
+```ruby
+redirect_to params[:return_to]
+redirect_back_or_to session[:forward_url]
+redirect_to request.referer
+redirect_to "https://example.com"
+```
+
+**Fix:**
+```ruby
+# BEFORE (raises UnsafeRedirectError under load_defaults 7.0)
+redirect_to "https://example.com"
+
+# AFTER: allow the external host explicitly
+redirect_to "https://example.com", allow_other_host: true
+```
+
+For destinations built from untrusted input, validate against an allowlist before allowing the external host. Passing `allow_other_host: true` on a raw `params`/`session`/`request.referer` value defeats the protection:
+
+```ruby
+# BEFORE (open redirect vulnerability if left unchecked)
+redirect_to params[:return_to]
+
+# AFTER: keep it internal, or validate before allowing other hosts
+redirect_to params[:return_to], allow_other_host: false
+# or rewrite an internal target as a path helper so no flag is needed
+redirect_to safe_path_for(params[:return_to])
+```
+
+If you are not ready to audit every call site at this hop, you can keep the old behavior by leaving `config.action_controller.raise_on_open_redirects = false` in `config/application.rb`, then adopt it later. See the `rails-load-defaults` skill for the incremental `load_defaults` walkthrough.
+
+---
+
 ## Migration Steps
 
 ### Phase 1: Preparation

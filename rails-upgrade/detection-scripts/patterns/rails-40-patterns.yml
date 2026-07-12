@@ -103,8 +103,8 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 deprecated :finder_sql with no direct replacement"
-      fix: "Rewrite using standard associations with scopes or custom query methods"
+      explanation: "Rails 4.0 deprecated `:finder_sql` with no direct in-place replacement. The Rails-4-canonical form is `has_many :name, -> { where(...) }, class_name: ...`, but the lambda-as-second-arg signature on `has_many` raises `ArgumentError: wrong number of arguments (given 3, expected 1..2)` on Rails 3.2 — verified on 3.2.22.5. A naive pre-bump rewrite breaks 3.2 boot"
+      fix: "Defer to dual-boot and branch the association definition with `NextRails.next?`. Common 3.2 use case is `finder_sql: \"SELECT id FROM x WHERE id IS NULL\"` as a deliberate always-empty stub for `accepts_nested_attributes_for`; preserve that intent in the dual-boot branch. FK gotcha: the scope-form replacement (`has_many :foo, -> { none }, class_name: \"Foo\"`) restores Rails' default FK predicate. Rails 4 computes `<owner_class_name>_id` as the FK column on the associated table — for self-referential associations or any case where the implied FK column does not exist, accessing the association raises an unknown-column SQL error even when the scope returns no rows. Pin `foreign_key:` and `primary_key:` to existing columns on both sides; for an always-empty stub used purely by `accepts_nested_attributes_for`, `foreign_key: :id, primary_key: :id` is a safe default"
       variable_name: "FINDER_SQL"
 
     - name: "Dynamic finders (find_all_by_*)"
@@ -195,23 +195,95 @@ upgrade_findings:
 
     - name: "has_paper_trail with string :versions / :version option"
       kind: "breaking"
-      pattern: "has_paper_trail.*versions?:\\s*[\"']"
-      exclude: ""
+      pattern: "has_paper_trail.*\\bversions?\\s*(?::|=>)\\s*[\"']"
+      exclude: "^\\s*#"
       search_paths:
         - "app/models/"
       explanation: "has_paper_trail forwards the `versions:` / `version:` option value straight into an internal `has_many` / `has_one` call as the association name, with no `to_sym`. This surfaces when paper_trail is bumped on the next side of a dual-boot (`gem \"paper_trail\", \"3.0.0\"` when next?, else `\"~> 2\"`): 2.7.2 pins to Rails-3 ActiveRecord, but 3.0.0 runs against Rails-4 ActiveRecord, which raises `ArgumentError: association names must be a Symbol` (the check ActiveRecord added in 4.0.0) when the name is a string. Boot-fatal on the next side for any model carrying the string form"
-      fix: "Change the option value to a symbol: `versions: \"audits\"` becomes `versions: :audits` (same for `version:`). Symbols are accepted on paper_trail 2.x and 3.0.0, so the rewrite ships pre-bump and is backwards-compatible. Single- and double-quoted strings both need rewriting"
+      fix: "Change the option value to a symbol: `versions: \"audits\"` becomes `versions: :audits` (same for `version:`). Symbols are accepted on paper_trail 2.x and 3.0.0, so the rewrite ships pre-bump and is backwards-compatible. Single- and double-quoted strings both need rewriting. Matches both the 1.9 hash syntax `versions: \"x\"` and the Ruby-1.8 hash-rocket `:versions => \"x\"` common in 3.2-era code"
       variable_name: "PAPER_TRAIL_STRING_VERSIONS"
 
     - name: "validates_as_paranoid (rails3_acts_as_paranoid DSL)"
       kind: "breaking"
       pattern: "\\bvalidates_as_paranoid\\b"
-      exclude: ""
+      exclude: "^\\s*#"
       search_paths:
         - "app/models/"
       explanation: "`validates_as_paranoid` is a class-method DSL provided by `rails3_acts_as_paranoid` (Rails-3-only soft-delete gem). When that gem is gated `unless next?` in the Gemfile — the typical disposition because the gem is unmaintained on Rails 4+ — call sites raise `NoMethodError: undefined method 'validates_as_paranoid' for ...` at model class-load on the next side. Boot-fatal, surfaced by an eager-load smoke test. The `paranoia` replacement gem (the standard Rails-4-compatible soft-delete replacement that pairs with `acts_as_paranoid`) does NOT provide `validates_as_paranoid` — its default_scope automatically excludes soft-deleted records from `Model.where(...)` uniqueness validations, so the explicit declaration is unnecessary on the next side"
       fix: "Guard the call with `unless NextRails.next?`: `validates_as_paranoid unless NextRails.next?`. With paranoia's default_scope, uniqueness validators using `Model.where(...)` automatically skip soft-deleted records, so the explicit declaration is redundant on Rails 4+. Same guard applies if the codebase keeps `rails3_acts_as_paranoid` gated `unless next?` without swapping to paranoia — the call site is a no-op on the next side either way"
       variable_name: "VALIDATES_AS_PARANOID"
+
+    - name: "Modern JS-compressor gem requires newer Sprockets than Rails 4 ships"
+      kind: "breaking"
+      pattern: "gem\\s+['\"](terser|closure-compiler)['\"]"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+      explanation: "Only fires when terser or closure-compiler is in the Gemfile — apps on plain uglifier never see this entry. Modern JS-compressor gems (terser, closure-compiler) declare a runtime dependency on `sprockets/digest_utils`, which exists only in Sprockets >= 3. Rails 4.0 locks Sprockets to the 2.x line via sprockets-rails. On Rails 4.0's next side the bundle resolves cleanly (gemspec passes railsbump's check) but the gem's railtie loads at boot and raises `LoadError: cannot load such file -- sprockets/digest_utils`. Invisible to railsbump because the failure is at require-time, after the bundle is locked. Apps reach for terser deliberately (modern JS the abandoned uglifier 4.2.0 cannot compile: ES2020 optional chaining `?.`, UTF-8 source), so you cannot simply swap it for uglifier on the next side without losing those assets. For uglifier itself the breaking versions are 4.x+, so a hit on a bare `gem \"uglifier\"` needs a version-pin check"
+      fix: "Keep terser on the next side but stop its railtie from auto-loading on Sprockets 2.x: `gem \"terser\", require: false` (require: false is mandatory or boot dies with the LoadError). Add `gem \"uglifier\", \">= 1.3.0\"` on the next side too, only so the `:uglifier` symbol resolves in environment configs, then register Terser as the real compressor at compile time via a rake task hooked on assets:environment. The current (Rails 3.2) side keeps plain `gem \"terser\"` (its railtie is harmless there). Full recipe with Gemfile, env-config, and rake-task examples: rails-upgrade/references/js-compressor-sprockets-mismatch.md"
+      variable_name: "JS_COMPRESSOR_GEM_MISMATCH"
+
+    - name: "validates_format_of with multiline anchors (^...$)"
+      kind: "breaking"
+      pattern: "validates_format_of.*\\bwith(?::|\\s*=>)\\s*/[^/]*[\\^$]"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4 raises `ArgumentError: The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or forgot to add the :multiline => true option?` whenever a `validates_format_of` regex source STARTS with `^` or ENDS with `$` (unescaped). New in 4.0 — Rails 3.2 does not perform this check. The validator runs check_options_validity at model class-load, so the error is boot-fatal. Matches both the 1.9 hash syntax `with: /.../` and the Ruby-1.8 hash-rocket `:with => /.../` still common in Rails 3.2-era code. Detection caveat: this grep flags any `^` or `$` inside the `with:` regex, but Rails only raises on a leading `^` or trailing `$`. A `^` inside a character class (e.g. `/[^@]+/`) or a `$` mid-pattern is a FALSE POSITIVE — confirm the anchor sits at the start/end before fixing. Out of scope for the primary regex: the block-options form `validates :col, format: { with: /^.../ }`, method-call regex args (`with: regex_for(:x)`), and positional / `without:` regexes — see fix for a secondary grep"
+      fix: "Replace a leading `^` with `\\A` and a trailing `$` with `\\z` (absolute start/end of string). Ruby's regex engine accepts both forms on every Rails version, so apply the rewrite directly — it is backwards-compatible and needs no version gate. Secondary grep for the block-options form: `grep -rnE \"validates\\s+:\\w+.*format:.*?/[^/]*[\\^$]\" app/ --include=\"*.rb\"`. For method-call regex args, fix at the helper method's return value — one fix covers every caller"
+      variable_name: "VALIDATES_FORMAT_OF_ANCHORS"
+
+    - name: "Regex constant built via Regexp.new with multiline anchors"
+      kind: "breaking"
+      pattern: "Regexp\\.new\\(.*[\\^$]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Companion to VALIDATES_FORMAT_OF_ANCHORS. A regex constant defined via `Regexp.new(%q{^...$})` (or `Regexp.new(\"^...$\")`) is invisible to the primary anchor grep, which looks for literal `/^.../` regexes inline. Apps commonly extract validation regexes into constants — `EMAIL = Regexp.new(%q{^[^@]+@[^@]+$})` — then reference them by name in `validates_format_of`. Rails 4 still raises at model class-load when check_options_validity examines the constant's compiled regex. Same leading/trailing rule as the primary pattern: Rails raises only when the compiled source starts with `^` or ends with `$`. This grep flags any `^` / `$` after `Regexp.new(` (including a `^` inside a character class), so per-match judgment is required"
+      fix: "Same rewrite as the primary pattern: `\\A` for `^`, `\\z` for `$`, applied at the constant's definition. One fix covers every caller. Backwards-compatible — Ruby accepts `\\A` / `\\z` on every Rails version. Per-match judgment required: not every `Regexp.new` constant feeds a validator. `String#match` / `String#scan` callers operating on multi-line input may need `^` / `$` for start/end-of-line semantics. Inspect call sites (`grep -rnE \"\\b<CONSTANT_NAME>\\b\" app/ lib/`) and only rewrite when every consumer is OK with absolute-anchor semantics"
+      variable_name: "VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND"
+
+    - name: "accepts_nested_attributes_for reflection lost to a parallel gem bump"
+      kind: "breaking"
+      pattern: "accepts_nested_attributes_for\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+        - "lib/"
+      explanation: "`accepts_nested_attributes_for :foo` raises `ArgumentError: No association found for name \\`foo'. Has it been defined yet?` at model class-load whenever `:foo` has no association reflection. This raise is not new in Rails 4.0 — it fires on any Rails version when the reflection is absent at class-load, so a genuinely-missing association is not a 3.2 → 4.0 regression (it would already have failed boot on 3.2). The way it surfaces as a NEW, next-side-only boot failure during a dual-boot hop: the reflection is provided by INHERITANCE from a gem-supplied base class, and a parallel gem bump in Gemfile.next silently removes it. Example: paper_trail 2.x defines a top-level `Version` carrying `belongs_to :item`; 3.x namespaces it to `PaperTrail::Version` and drops the top-level constant, so app models declared `< Version` that call `accepts_nested_attributes_for :item` lose the inherited reflection on the next side only. Operator filter — the primary regex matches ALL `accepts_nested_attributes_for` calls; a match is breaking ONLY when (a) the association is inherited from a gem-provided base class AND (b) that gem is being version-bumped in Gemfile.next. A same-file declared association is safe"
+      fix: "Restore the lost reflection on the next side; leave the current side untouched. Two ways. (1) ROOT-CAUSE, preferred when a gem namespace / inheritance move is the cause: re-point the inherited base class in ONE place under the gate, leaving every subclass and reference unchanged. For the paper_trail example: `if NextRails.next?\\n  Version = PaperTrail::Version\\nend` in config/initializers/paper_trail.rb. (2) PER-MODEL, when the loss is per-model rather than a shared base class: re-declare the association on each affected model under the gate — `belongs_to :foo, polymorphic: true if NextRails.next?` (or the matching has_one / has_many). Why gate it: declaring unconditionally adds a duplicate auto-generated reader+writer on the current side, where the reflection still arrives via inheritance. A hand-rolled `def foo` override is preserved either way — Ruby resolves the explicit method before the generated reader. After cutover, drop the `NextRails.next?` gate"
+      variable_name: "ACCEPTS_NESTED_NO_REFLECTION"
+
+    - name: "Duplicate root route declarations across constraints"
+      kind: "breaking"
+      pattern: "^\\s*root\\s+(to:|=>|['\"])"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Only actionable when the routes file has 2+ `root` declarations (typically one per constraint block); a single root is fine, so treat a lone hit as noise. Rails 4 raises `ArgumentError: Invalid route name, already in use: 'root'` on the second and later `root` declarations. Rails 3.2 was lenient about duplicate names with different constraints. Matches all three forms: `root to:`, `root =>`, and the Rails 4 string shorthand `root \"home#index\"`"
+      fix: "Keep the FIRST `root` declaration as the default `:root` name; add `as: :<unique_name>` to the SECOND and subsequent declarations. Renaming all of them (giving the first an `as:` too) silently breaks every `root_path` / `root_url` call site because the `:root` name is no longer registered. Real apps have dozens to hundreds of these helper calls. Verification step: `grep -rnE \"\\b(root_path|root_url)\\b\" app/ config/ lib/` and confirm no caller targets a constraint-bound root that was renamed"
+      variable_name: "DUPLICATE_ROOT_ROUTES"
+
+    - name: "Hyphenated or CamelCase controller name in routes to: value"
+      kind: "breaking"
+      pattern: "\\bto:\\s*['\"][^'\"]*(-|[A-Z])[^'\"]*#"
+      exclude: "^\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "Rails 4 validates controller names in `to:` clauses with strict rules: no hyphens, no CamelCase. Hyphenated values raise `ArgumentError: 'foo-bar' is not a supported controller name`; the CamelCase form raises the same error. Rails 3.2 was lenient. URL paths (the route path itself) can keep hyphens — only the controller class reference in `to:` needs to be snake_case. Detects both single- and double-quoted `to:` values; a hyphen in the URL path (before `to:`) does not trigger it. Unlike the root/module patterns this one is not line-anchored (a `to:` value sits mid-line), so the `exclude` skips whole-line comments (`^\\s*#`) to avoid flagging commented-out routes; a trailing comment on a live route line still flags"
+      fix: "Replace hyphens with underscores and CamelCase with snake_case in `to:` values. URL paths keep their original form. The snake_case form resolves to the same controller class on Rails 3.2, so the rewrite ships pre-bump and is backwards-compatible. Example: `to: \"my-pages#show\"` → `to: \"my_pages#show\"`; `to: \"MyPages#show\"` → `to: \"my_pages#show\"`"
+      variable_name: "ROUTES_CONTROLLER_NAMES"
+
+    - name: "Top-level module defined in a route file (autoload-on-reload boundary)"
+      kind: "breaking"
+      pattern: "^\\s*module\\s+[A-Z]\\w*"
+      exclude: ""
+      search_paths:
+        - "config/routes/"
+      explanation: "Rails 4's route loader does not reliably persist top-level module definitions across the routes-reload boundary. A pattern like `module Constraints; class Admin; ...; end; end` defined inside a `config/routes/*.rb` file may evaluate at boot but the `Constraints` constant does not survive subsequent reloads — downstream uses (e.g. `constraints Constraints::Admin do ... end`) raise `NameError: uninitialized constant Constraints`. Rails 3.2 was more lenient — modules defined in route files persisted across reload boundaries. Matches module definitions including the compact-nested `module Constraints::Admin` form; option lines like `scope module: \"admin\"` are not definitions and do not match"
+      fix: "Extract the inline module out of the route file into a conventional autoload path so the constant is loaded the same way on both Rails versions. This fix is version-agnostic — no `NextRails.next?` branch is needed, because an autoloaded constant survives the routes-reload boundary on 4.0 and loads identically on 3.2. Steps: (1) Move the definition into an autoload location that mirrors the constant name, e.g. `Constraints::Admin` → `app/constraints/constraints/admin.rb`. Every directory under `app/` is on the autoload path by default on both 3.2 and 4.0, so no config change is needed; only if you place the file under `lib/` do you add `config.autoload_paths += [Rails.root.join(\"lib\")]` in `config/application.rb`. (2) Delete the `module ... end` wrapper from the route file, leaving only the usage. BEFORE (config/routes/admin.rb): `module Constraints; class Admin; def matches?(req); ...; end; end; end` followed by the `Rails.application.routes.draw` block that calls `constraints Constraints::Admin.new do ... end`. AFTER: the `module`/`class` block lives in `app/constraints/constraints/admin.rb`; the route file keeps only the `constraints Constraints::Admin.new do ... end` usage and no longer defines the constant"
+      variable_name: "ROUTES_TOP_LEVEL_MODULE_AUTOLOAD"
 
   medium_priority:
     - name: "rescue_action method"
@@ -401,6 +473,19 @@ upgrade_findings:
       explanation: "find(:first/:all/:last, conditions: ..., order: ..., ...) is the legacy ARel-1.0-style finder. Deprecated in Rails 3.2 (still works), removed in Rails 4.1. On Rails 4.0 it continues to work because activerecord-deprecated_finders ships as a default dependency — the gem is removed at 4.1, at which point the form must be rewritten"
       fix: "Two valid paths. (1) Defer: leave the calls in place for the 3.2 → 4.0 hop and rely on the bundled activerecord-deprecated_finders gem; rewrite at the 4.0 → 4.1 hop. (2) Pre-bump cleanup: lift each hash key into a chained relation method. Class.find(:first, conditions: c) → Class.where(c).first; Class.find(:first, conditions: c, order: o) → Class.where(c).order(o).first; Class.find(:all, conditions: c) → Class.where(c); Class.find(:last, conditions: c) → Class.where(c).last. All recipes work on Rails 3.2 and 4.0+ natively. Important semantic shift for the :all form: find(:all, ...) returned an Array; where(...) returns an ActiveRecord::Relation. Most call sites just iterate, so the bare where(c) rewrite is fine; add .to_a only when downstream uses Array-specific methods. False-positive watch: Enumerable#find(ifnone) accepts a positional argument as the default if no block matches, so array.find(:all) / hash.find(:first) etc. would technically match — verify the receiver is an ActiveRecord class or relation (not a plain Array/Hash/Range). Also watch for Capybara page.find(..., match: :first) — different API, leave alone"
       variable_name: "OLD_FINDER"
+
+    - name: "Class.scoped (deprecated, returns base relation)"
+      kind: "deprecation"
+      pattern: "\\bscoped\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "Two related Rails-3-only deprecations share the `.scoped` name: bare `Model.scoped` (returns base Relation, replaced by `Model.all`/`where(nil)`) and `Model.scoped(conditions: ..., include: ..., order: ...)` (the with-args ad-hoc scope constructor, replaced by chained relation methods). Both deprecated in Rails 4.0, removed in 4.1. On Rails 4.0 the bundled activerecord-deprecated_finders gem keeps both forms working — rewrite is mandatory before the 4.0 → 4.1 hop. The pattern matches `scoped` as a whole word so it also catches the bare in-model form (implicit `self`, e.g. `scope :foo, -> { scoped.where(...) }`), not just `Receiver.scoped`; the `\\b` boundaries already exclude look-alikes such as `unscoped`, `default_scoped`, `scoped_ids`, `reset_scope`, and `def x_scoped`, so no exclude regex is needed"
+      fix: "Form A — bare `Model.scoped` (no args). Pick per call-site by looking at what comes after. A1 (terminal, no further chaining): `Model.scoped` → `Model.all`. On Rails 3.2 `.all` materializes to an Array; on 4.0+ it returns a Relation. Iteration via `.each`/`.map` works on both. A2 (chained, followed by `.joins`/`.where`/`.merge`): `Model.scoped` → `Model.where(nil)`. `where(nil)` returns a Relation with no conditions on both 3.2 and 4.0+, preserving chaining. Example: `scope :foo, -> { scoped.joins(:bar) }` → `scope :foo, -> { where(nil).joins(:bar) }`. Form B — `Model.scoped(hash)`. Break the hash into chained methods: `conditions:` → `.where`, `include:` → `.includes`, `order:` → `.order`, `joins:` → `.joins`, `select:` → `.select`, `limit:` → `.limit`, `offset:` → `.offset`, `group:` → `.group`, `having:` → `.having`, `readonly: true` → `.readonly(true)`. All chains work on Rails 3.2 and 4.0+. False-positive watch: a local variable, symbol, or string literally named `scoped` (rare) — `\\b` boundaries already rule out `unscoped` / `default_scoped` / `scoped_ids` / `x_scoped`, so the residual noise is only a bare `scoped` token that is not the AR method"
+      variable_name: "CLASS_SCOPED"
 
   low_priority:
     - name: "request.env.merge! in tests"
