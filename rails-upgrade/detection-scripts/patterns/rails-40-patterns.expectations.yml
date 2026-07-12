@@ -341,11 +341,17 @@ VALIDATES_FORMAT_OF_ANCHORS:
     - '  validates_format_of :email, with: /^[a-z]+$/'
     # trailing $ only still flags
     - '  validates_format_of :name, with: /foo$/'
+    # Ruby-1.8 hash-rocket syntax common in 3.2-era code
+    - '  validates_format_of :email, :with => /^[a-z]+$/'
   no_match:
     # already rewritten to \A / \z — the correct Rails 4 form
     - '  validates_format_of :email, with: /\A[a-z]+\z/'
+    # hash-rocket form, already rewritten — must not flag
+    - '  validates_format_of :email, :with => /\Afoo\z/'
     # block-options form is out of scope for the primary regex
     - '  validates :email, format: { with: /^x$/ }'
+    # without: is a different option, out of scope
+    - '  validates_format_of :x, without: /^foo$/'
 
 VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND:
   # Pattern: "Regexp\\.new\\(.*[\\^$]"
