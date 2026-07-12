@@ -126,6 +126,18 @@ upgrade_findings:
       fix: "Remove rails-ujs. Use Turbo for remote forms and Stimulus for JavaScript."
       variable_name: "RAILS_UJS"
 
+    - name: "redirect_to open redirect protection"
+      kind: "breaking"
+      pattern: "redirect_(to|back_or_to)\\s+(params\\[|session\\[|request\\.refer|[\"'][^\"']*(https?://|#\\{))"
+      exclude: "allow_other_host"
+      search_paths:
+        - "app/controllers/"
+        - "app/"
+        - "lib/"
+      explanation: "load_defaults 7.0 sets config.action_controller.raise_on_open_redirects = true. With it on, redirect_to and redirect_back_or_to to a host different from the current one raise ActionController::Redirecting::UnsafeRedirectError instead of redirecting. This is not a deprecation and there is no warning phase; it is gated by load_defaults 7.0, so apps only see it once they bump load_defaults to 7.0 (which is why it often surfaces during a later hop). Redirects to dynamic or external destinations (params, session, request.referer, or a literal/interpolated URL) are the ones that break; redirects to path helpers and model records are unaffected"
+      fix: "For each intentional external redirect, pass allow_other_host: true, e.g. redirect_to \"https://example.com\", allow_other_host: true. Never pass allow_other_host: true on a destination built from untrusted input (params, session, request.referer) without validating it against an allowlist first, or the open-redirect protection is defeated. If a redirect target is internal, rewrite it as a path/url helper so it passes without the flag"
+      variable_name: "OPEN_REDIRECT_PROTECTION"
+
     - name: "to_s(:format) deprecation"
       kind: "deprecation"
       pattern: "\\.to_s\\(:"

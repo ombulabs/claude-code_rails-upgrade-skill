@@ -18,9 +18,27 @@
 # Run with:
 #   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-40-patterns.yml
 #
-# --- Worked example -------------------------------------------------------
-# This file seeds ONE pattern as the template. Replicate the same match /
-# no_match shape for every other variable_name in the pattern file.
+# VENDOR_PLUGINS is intentionally uncovered: its pattern is "" (path-only
+# detection via search_paths), so flagged? always returns false and no
+# match line could ever pass.
+
+ATTR_ACCESSIBLE:
+  match:
+    - "  attr_accessible :name, :email"
+  no_match:
+    - "  attr_accessor :name, :email"
+
+ATTR_PROTECTED:
+  match:
+    - "  attr_protected :admin"
+  no_match:
+    - "  attr_accessor :admin"
+
+REQUIRE_STRONG_PARAMS:
+  match:
+    - "require 'strong_parameters'"
+  no_match:
+    - "require 'strong_password'"
 
 SCOPE_WITHOUT_LAMBDA:
   # Pattern: "scope\\s+:\\w+\\s*,\\s*where"
@@ -59,3 +77,258 @@ CLASS_SCOPED:
     - "  user.scoped_ids"
     # a method name ending in _scoped is not the AR method
     - "  def user_scoped"
+
+DEFAULT_SCOPE_WITHOUT_BLOCK:
+  match:
+    - "  default_scope where(active: true)"
+    - "  default_scope :order => 'created_at'"
+  no_match:
+    - "  default_scope { where(active: true) }"
+
+ASSOCIATION_CONDITIONS:
+  match:
+    - "  has_many :items, :conditions => \"active = 1\""
+  no_match:
+    - "  has_many :items, -> { where(active: true) }"
+
+ASSOCIATION_ORDER:
+  match:
+    - "  has_many :items, :order => 'position ASC'"
+  no_match:
+    # underscore before "order" (sort_order) must not trip the [^_] guard
+    - "  has_many :items, :sort_order => 'asc'"
+
+ASSOCIATION_EXTEND:
+  match:
+    - "  has_many :items, :extend => ItemsExtension"
+  no_match:
+    - "  has_many :items, -> { extending ItemsExtension }"
+
+ASSOCIATION_UNIQ:
+  match:
+    - "  has_many :items, :uniq => true"
+  no_match:
+    - "  has_many :items, -> { distinct }"
+
+FINDER_SQL:
+  match:
+    - "  has_many :items, :finder_sql => 'SELECT * FROM items'"
+  no_match:
+    - "  has_many :items, -> { where(active: true) }"
+
+FIND_ALL_BY:
+  match:
+    - "User.find_all_by_email(email)"
+  no_match:
+    - "User.where(email: email)"
+
+FIND_OR_CREATE_BY:
+  match:
+    - "User.find_or_create_by_email(email)"
+  no_match:
+    - "User.find_or_create_by(email: email)"
+
+FIND_OR_INITIALIZE_BY:
+  match:
+    - "User.find_or_initialize_by_email(email)"
+  no_match:
+    - "User.find_or_initialize_by(email: email)"
+
+FIND_LAST_BY:
+  match:
+    - "User.find_last_by_email(email)"
+  no_match:
+    - "User.where(email: email).last"
+
+ASSOCIATION_READONLY:
+  match:
+    - "  has_many :items, :through => :orders, :readonly => true"
+  no_match:
+    - "  has_many :items, :through => :orders"
+
+RUBY_VERSION:
+  match:
+    - "ruby '1.8.7'"
+  no_match:
+    - "ruby '2.0.0'"
+
+MATCH_WITHOUT_VIA:
+  match:
+    - "  match '/users', to: 'users#index'"
+  no_match:
+    # via: present — the exclude regex must suppress this
+    - "  match '/users', to: 'users#index', via: :get"
+    # not a `match` route at all
+    - "  get '/users', to: 'users#index'"
+
+WHINY_NILS:
+  match:
+    - "  config.whiny_nils = true"
+  no_match:
+    - "  config.active_record.whiny_nils = true"
+
+RESCUE_ACTION:
+  match:
+    - "  def rescue_action(exception)"
+  no_match:
+    - "  rescue_from StandardError do |e|"
+
+OBSERVERS:
+  match:
+    - "class UserObserver < ActiveRecord::Observer"
+    - "  config.active_record.observers = :user_observer"
+  no_match:
+    - "class UserPolicy"
+
+SWEEPERS:
+  match:
+    - "class ProductSweeper < ActionController::Caching::Sweeper"
+  no_match:
+    - "class ProductObserver < ActiveRecord::Observer"
+
+ACTION_CACHING:
+  match:
+    - "  caches_action :index"
+    - "  caches_page :show"
+  no_match:
+    - "  fragment_cache_key 'products'"
+
+ACTIVE_RESOURCE:
+  match:
+    - "class Product < ActiveResource::Base"
+  no_match:
+    - "class Product < ApplicationRecord"
+
+CACHE_KEY_FORMAT:
+  match:
+    - "self.cache_timestamp_format = :number"
+    - "  def cache_key; \"#{id}-#{updated_at}\"; end"
+  no_match:
+    - "  def display_name; name; end"
+
+BUFFERED_LOGGER:
+  match:
+    - "config.logger = ActiveSupport::BufferedLogger.new(log_path)"
+  no_match:
+    - "config.logger = ActiveSupport::Logger.new(log_path)"
+
+ASSETS_COMPRESS:
+  match:
+    - "  config.assets.compress = true"
+  no_match:
+    - "  config.assets.js_compressor = :uglifier"
+
+CONFIG_ROUTES_PATH:
+  match:
+    - "  config.paths[\"config/routes\"].concat %w(lib/custom_routes)"
+  no_match:
+    # exclude: routes.rb — a comment/reference to routes.rb on the same line
+    # suppresses the match even though "config/routes" is present too
+    - "  config.paths[\"config/routes\"].concat(Dir[Rails.root.join('config/routes.rb')])"
+
+ASSIGN_ATTRIBUTES_OPTIONS:
+  match:
+    - "  obj.assign_attributes(params, as: :admin)"
+  no_match:
+    - "  obj.assign_attributes(params)"
+
+RUN_VALIDATION_CALLBACKS:
+  match:
+    - "  _run_validation_callbacks"
+  no_match:
+    - "  run_callbacks(:validation)"
+
+SELECT_DISTINCT_PLUCK:
+  match:
+    - "User.select('distinct email').pluck(:email)"
+  no_match:
+    - "User.distinct.pluck(:email)"
+
+IMMUTABLE_RELATION:
+  match:
+    - "User.where(active: true).count('distinct email')"
+  no_match:
+    - "User.distinct.count"
+
+FIXTURE_DATES:
+  match:
+    - "created_at: <%= 3.days.ago %>"
+  no_match:
+    - "created_at: <%= 3.days.ago.to_s(:db) %>"
+
+UPDATE_ALL_TWO_ARG:
+  match:
+    - "User.update_all(\"active = false\", [\"id = ?\", 1])"
+  no_match:
+    - "User.where(id: 1).update_all(active: false)"
+
+OLD_FINDER:
+  match:
+    - "User.find(:first, conditions: { active: true })"
+  no_match:
+    - "User.where(active: true).first"
+
+REQUEST_ENV_MERGE:
+  match:
+    - "request.env.merge!('HTTP_AUTHORIZATION' => token)"
+  no_match:
+    - "request.headers.merge!('HTTP_AUTHORIZATION' => token)"
+
+DUPLICATE_ROOT_ROUTES:
+  # Pattern: "^\\s*root\\s+(to:|=>|['\"])"
+  # Rails 4 rejects a second `root`; flag every root declaration so a human can
+  # count them (a lone hit is noise, 2+ is the breaking case).
+  match:
+    # hash form with to:
+    - "  root to: \"home#index\""
+    # legacy hash-rocket form
+    - "  root => \"home#index\""
+    # Rails 4 double-quoted string shorthand
+    - "  root \"home#index\""
+    # Rails 4 single-quoted string shorthand
+    - "  root 'home#index'"
+  no_match:
+    # a root_path helper call is not a declaration
+    - "    redirect_to root_path"
+    # a non-root route must not flag
+    - "  get \"/\", to: \"home#index\""
+    # a commented-out root declaration is not live (line-anchored pattern)
+    - "  # root to: \"home#index\""
+
+ROUTES_CONTROLLER_NAMES:
+  # Pattern: "\\bto:\\s*['\"][^'\"]*(-|[A-Z])[^'\"]*#"
+  # Rails 4 rejects hyphen/CamelCase controller names in to:; both quote styles.
+  match:
+    # double-quoted hyphenated controller
+    - "  get \"widgets\", to: \"my-pages#show\""
+    # double-quoted CamelCase controller
+    - "  get \"widgets\", to: \"MyPages#show\""
+    # single-quoted hyphenated controller
+    - "  get \"widgets\", to: 'my-pages#show'"
+    # single-quoted CamelCase controller
+    - "  get \"widgets\", to: 'MyPages#show'"
+    # a trailing comment on a live route line still flags
+    - "  get \"widgets\", to: \"MyPages#show\" # legacy alias"
+  no_match:
+    # hyphen only in the URL path, controller is fine
+    - "  get \"my-widgets\", to: \"pages#show\""
+    # already snake_case controller
+    - "  get \"widgets\", to: \"my_pages#show\""
+    # a commented-out route must not flag (excluded via ^\\s*#)
+    - "  # get \"widgets\", to: \"MyPages#show\""
+
+ROUTES_TOP_LEVEL_MODULE_AUTOLOAD:
+  # Pattern: "^\\s*module\\s+[A-Z]\\w*"
+  # Top-level module definitions inside config/routes/ break on reload.
+  match:
+    # the canonical constraints module definition
+    - "  module Constraints"
+    # any single-segment module definition
+    - "module Api"
+    # compact-nested definition must also flag
+    - "  module Constraints::Admin"
+  no_match:
+    # scope module: option is not a module definition
+    - "  scope module: \"admin\" do"
+    # using a constant is not defining a module
+    - "  constraints Constraints::Admin do"

@@ -1,0 +1,38 @@
+# Fixture expectations for rails-70-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-70-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-70-patterns.yml
+#
+# Only OPEN_REDIRECT_PROTECTION is covered so far; the other patterns in this
+# file predate the expectations tooling. Add entries as they are revisited.
+
+OPEN_REDIRECT_PROTECTION:
+  match:
+    # dynamic destination straight from user input, the classic open redirect
+    - "    redirect_to params[:return_to]"
+    - "    redirect_back_or_to session[:forward_url]"
+    # redirecting to the referer, the common replacement for redirect_to :back
+    - "    redirect_to request.referer"
+    # literal external URL, both quote styles
+    - "    redirect_to \"https://example.com\""
+    - "    redirect_to 'http://example.com/callback'"
+    # interpolated destination built from a host
+    - "    redirect_to \"#{other_host}/path\""
+  no_match:
+    # internal path/url helpers and records are unaffected, must not flag
+    - "    redirect_to root_path"
+    - "    redirect_to @user, notice: \"Saved\""
+    - "    redirect_to edit_post_path(@post)"
+    # params nested inside a path helper is a safe internal redirect, not the
+    # dangerous `redirect_to params[...]` shape
+    - "    redirect_to user_path(params[:id])"
+    # already opted in, the exclude regex must suppress it
+    - "    redirect_to \"https://example.com\", allow_other_host: true"
