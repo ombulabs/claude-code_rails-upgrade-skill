@@ -206,10 +206,10 @@ upgrade_findings:
     - name: "Hyphenated or CamelCase controller name in routes to: value"
       kind: "breaking"
       pattern: "\\bto:\\s*['\"][^'\"]*(-|[A-Z])[^'\"]*#"
-      exclude: ""
+      exclude: "^\\s*#"
       search_paths:
         - "config/"
-      explanation: "Rails 4 validates controller names in `to:` clauses with strict rules: no hyphens, no CamelCase. Hyphenated values raise `ArgumentError: 'foo-bar' is not a supported controller name`; the CamelCase form raises the same error. Rails 3.2 was lenient. URL paths (the route path itself) can keep hyphens — only the controller class reference in `to:` needs to be snake_case. Detects both single- and double-quoted `to:` values; a hyphen in the URL path (before `to:`) does not trigger it"
+      explanation: "Rails 4 validates controller names in `to:` clauses with strict rules: no hyphens, no CamelCase. Hyphenated values raise `ArgumentError: 'foo-bar' is not a supported controller name`; the CamelCase form raises the same error. Rails 3.2 was lenient. URL paths (the route path itself) can keep hyphens — only the controller class reference in `to:` needs to be snake_case. Detects both single- and double-quoted `to:` values; a hyphen in the URL path (before `to:`) does not trigger it. Unlike the root/module patterns this one is not line-anchored (a `to:` value sits mid-line), so the `exclude` skips whole-line comments (`^\\s*#`) to avoid flagging commented-out routes; a trailing comment on a live route line still flags"
       fix: "Replace hyphens with underscores and CamelCase with snake_case in `to:` values. URL paths keep their original form. The snake_case form resolves to the same controller class on Rails 3.2, so the rewrite ships pre-bump and is backwards-compatible. Example: `to: \"my-pages#show\"` → `to: \"my_pages#show\"`; `to: \"MyPages#show\"` → `to: \"my_pages#show\"`"
       variable_name: "ROUTES_CONTROLLER_NAMES"
 

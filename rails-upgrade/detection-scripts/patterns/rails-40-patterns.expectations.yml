@@ -268,6 +268,8 @@ DUPLICATE_ROOT_ROUTES:
     - "    redirect_to root_path"
     # a non-root route must not flag
     - "  get \"/\", to: \"home#index\""
+    # a commented-out root declaration is not live (line-anchored pattern)
+    - "  # root to: \"home#index\""
 
 ROUTES_CONTROLLER_NAMES:
   # Pattern: "\\bto:\\s*['\"][^'\"]*(-|[A-Z])[^'\"]*#"
@@ -281,11 +283,15 @@ ROUTES_CONTROLLER_NAMES:
     - "  get \"widgets\", to: 'my-pages#show'"
     # single-quoted CamelCase controller
     - "  get \"widgets\", to: 'MyPages#show'"
+    # a trailing comment on a live route line still flags
+    - "  get \"widgets\", to: \"MyPages#show\" # legacy alias"
   no_match:
     # hyphen only in the URL path, controller is fine
     - "  get \"my-widgets\", to: \"pages#show\""
     # already snake_case controller
     - "  get \"widgets\", to: \"my_pages#show\""
+    # a commented-out route must not flag (excluded via ^\\s*#)
+    - "  # get \"widgets\", to: \"MyPages#show\""
 
 ROUTES_TOP_LEVEL_MODULE_AUTOLOAD:
   # Pattern: "^\\s*module\\s+[A-Z]\\w*"
