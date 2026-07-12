@@ -4,15 +4,21 @@ on:
   push:
     branches: [main]
     paths:
+      - "rails-upgrade/**/*.md"
       - "rails-upgrade/detection-scripts/patterns/*.yml"
+      - "upgrade-cleanup/**/*.md"
       - "bin/validate-patterns"
       - "bin/test-patterns"
+      - "bin/lint-skill"
       - ".github/workflows/validate-patterns.yml"
   pull_request:
     paths:
+      - "rails-upgrade/**/*.md"
       - "rails-upgrade/detection-scripts/patterns/*.yml"
+      - "upgrade-cleanup/**/*.md"
       - "bin/validate-patterns"
       - "bin/test-patterns"
+      - "bin/lint-skill"
       - ".github/workflows/validate-patterns.yml"
 
 permissions:
@@ -30,3 +36,4 @@ jobs:
       - run: ruby bin/validate-patterns --self-test
       - run: ruby bin/test-patterns
       - run: ruby bin/test-patterns --self-test
+      - run: ruby bin/lint-skill
