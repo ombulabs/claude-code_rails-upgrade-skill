@@ -411,3 +411,50 @@ VALIDATES_AS_PARANOID:
     - '  validates_as_paranoid_extra'
     # commented-out call is inert
     - '  # validates_as_paranoid'
+
+COLLECTION_PROXY_ENUMERABLE_GUARD:
+  # Pattern: "(?:is_a\\?|kind_of\\?)\\s*\\(?\\s*Enumerable\\b"
+  # is_a?/kind_of? Enumerable guard, with or without parens; \b avoids Enumerable-prefixed names.
+  match:
+    - '  return true if value.is_a?(Enumerable)'
+    - '  return true if value.kind_of?(Enumerable)'
+    - '  return true if value.is_a? Enumerable'
+  no_match:
+    # a longer constant name is not Enumerable
+    - '  return true if value.is_a?(EnumerableThing)'
+    # commented-out line is inert
+    - '  # value.is_a?(Enumerable)'
+
+HWIA_CONVERT_VALUE_OVERRIDE:
+  # Pattern: "def convert_value\\(\\s*\\w+\\s*\\)"
+  # 1-arg override of HashWithIndifferentAccess#convert_value, any param name.
+  match:
+    - '  def convert_value(value)'
+    - '  def convert_value(v)'
+  no_match:
+    # the correct 2-arg form must not flag
+    - '  def convert_value(value, _options = {})'
+    # a different method with a _for suffix
+    - '  def convert_value_for(x)'
+    # commented-out line is inert
+    - '  # def convert_value(v)'
+
+RACK_LOCK_MIDDLEWARE:
+  # Pattern: "config\\.middleware\\.(insert|insert_before|insert_after|swap)[\\s(]+[\"']?(?:::)?Rack::Lock"
+  # Positioning calls naming Rack::Lock as target; excludes index-insert / delete / use.
+  match:
+    - '    config.middleware.insert_before Rack::Lock, Foo'
+    - '    config.middleware.insert_after(Rack::Lock, Foo)'
+    - '    config.middleware.swap Rack::Lock, Bar'
+    # leading :: qualified target
+    - '    config.middleware.insert_before ::Rack::Lock, Foo'
+    # string target form
+    - '    config.middleware.insert_before "Rack::Lock", Foo'
+  no_match:
+    # integer-index insert names no middleware target
+    - '    config.middleware.insert(0, Foo)'
+    # delete / use do not raise on a missing target
+    - '    config.middleware.delete Rack::Lock'
+    - '    config.middleware.use Rack::Lock'
+    # commented-out line is inert
+    - '    # config.middleware.insert_before Rack::Lock'
