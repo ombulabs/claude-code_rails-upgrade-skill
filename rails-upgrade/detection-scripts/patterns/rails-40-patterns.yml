@@ -193,6 +193,26 @@ upgrade_findings:
       fix: "Delete the config.whiny_nils = true line entirely. No replacement — Ruby's own nil-method errors are sufficient. False-positive watch: matches in comments documenting the removal; verify the hit is an actual assignment, not a comment"
       variable_name: "WHINY_NILS"
 
+    - name: "has_paper_trail with string :versions / :version option"
+      kind: "breaking"
+      pattern: "has_paper_trail.*\\bversions?\\s*(?::|=>)\\s*[\"']"
+      exclude: "^\\s*#"
+      search_paths:
+        - "app/models/"
+      explanation: "has_paper_trail forwards the `versions:` / `version:` option value straight into an internal `has_many` / `has_one` call as the association name, with no `to_sym`. This surfaces when paper_trail is bumped on the next side of a dual-boot (`gem \"paper_trail\", \"3.0.0\"` when next?, else `\"~> 2\"`): 2.7.2 pins to Rails-3 ActiveRecord, but 3.0.0 runs against Rails-4 ActiveRecord, which raises `ArgumentError: association names must be a Symbol` (the check ActiveRecord added in 4.0.0) when the name is a string. Boot-fatal on the next side for any model carrying the string form"
+      fix: "Change the option value to a symbol: `versions: \"audits\"` becomes `versions: :audits` (same for `version:`). Symbols are accepted on paper_trail 2.x and 3.0.0, so the rewrite ships pre-bump and is backwards-compatible. Single- and double-quoted strings both need rewriting. Matches both the 1.9 hash syntax `versions: \"x\"` and the Ruby-1.8 hash-rocket `:versions => \"x\"` common in 3.2-era code"
+      variable_name: "PAPER_TRAIL_STRING_VERSIONS"
+
+    - name: "validates_as_paranoid (rails3_acts_as_paranoid DSL)"
+      kind: "breaking"
+      pattern: "\\bvalidates_as_paranoid\\b"
+      exclude: "^\\s*#"
+      search_paths:
+        - "app/models/"
+      explanation: "`validates_as_paranoid` is a class-method DSL provided by `rails3_acts_as_paranoid` (Rails-3-only soft-delete gem). When that gem is gated `unless next?` in the Gemfile — the typical disposition because the gem is unmaintained on Rails 4+ — call sites raise `NoMethodError: undefined method 'validates_as_paranoid' for ...` at model class-load on the next side. Boot-fatal, surfaced by an eager-load smoke test. The `paranoia` replacement gem (the standard Rails-4-compatible soft-delete replacement that pairs with `acts_as_paranoid`) does NOT provide `validates_as_paranoid` — its default_scope automatically excludes soft-deleted records from `Model.where(...)` uniqueness validations, so the explicit declaration is unnecessary on the next side"
+      fix: "Guard the call with `unless NextRails.next?`: `validates_as_paranoid unless NextRails.next?`. With paranoia's default_scope, uniqueness validators using `Model.where(...)` automatically skip soft-deleted records, so the explicit declaration is redundant on Rails 4+. Same guard applies if the codebase keeps `rails3_acts_as_paranoid` gated `unless next?` without swapping to paranoia — the call site is a no-op on the next side either way"
+      variable_name: "VALIDATES_AS_PARANOID"
+
     - name: "Modern JS-compressor gem requires newer Sprockets than Rails 4 ships"
       kind: "breaking"
       pattern: "gem\\s+['\"](terser|closure-compiler)['\"]"
@@ -304,8 +324,8 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/controllers/"
-      explanation: "Page and action caching were extracted from Rails 4.0"
-      fix: "Add gem 'actionpack-action_caching' to Gemfile"
+      explanation: "Page and action caching were extracted from Rails 4.0 into two separate gems: caches_page moved to actionpack-page_caching, caches_action moved to actionpack-action_caching"
+      fix: "Add gem 'actionpack-page_caching' for caches_page and/or gem 'actionpack-action_caching' for caches_action, matching the methods the app actually uses"
       variable_name: "ACTION_CACHING"
 
     - name: "ActiveResource usage"
@@ -501,11 +521,23 @@ dependencies:
   actionpack_action_caching:
     check: false
     gem_name: "actionpack-action_caching"
-    message: "Required if using caches_page or caches_action"
+    message: "Required if using caches_action — extracted from Rails core at 4.0"
     url: "https://github.com/rails/actionpack-action_caching"
+
+  actionpack_page_caching:
+    check: false
+    gem_name: "actionpack-page_caching"
+    message: "Required if using caches_page — extracted from Rails core at 4.0 (separate gem from actionpack-action_caching)"
+    url: "https://github.com/rails/actionpack-page_caching"
 
   activeresource:
     check: false
     gem_name: "activeresource"
     message: "Required if using ActiveResource"
     url: "https://github.com/rails/activeresource"
+
+  paper_trail:
+    check: false
+    gem_name: "paper_trail"
+    message: "If the app uses paper_trail, pin it per side on the dual-boot: `gem \"paper_trail\", \"3.0.0\"` when next?, else `\"~> 2\"`. 3.0.0 runs on Rails-4 ActiveRecord, which requires symbol association names — see the PAPER_TRAIL_STRING_VERSIONS finding"
+    url: "https://github.com/paper-trail-gem/paper_trail"

@@ -379,3 +379,35 @@ ACCEPTS_NESTED_NO_REFLECTION:
     - '  has_many :items, dependent: :destroy'
     # \b boundary: a longer identifier with the _for_ suffix is not the macro
     - '  def accepts_nested_attributes_for_stuff'
+
+PAPER_TRAIL_STRING_VERSIONS:
+  # Pattern: "has_paper_trail.*\\bversions?\\s*(?::|=>)\\s*[\"']"
+  # String association name in has_paper_trail's versions:/version: option;
+  # matches 1.9 and hash-rocket syntax, both quote styles. Symbol form is the fix.
+  match:
+    # 1.9 hash, plural
+    - '  has_paper_trail versions: "audits"'
+    # 1.9 hash, singular
+    - '  has_paper_trail version: "audit"'
+    # hash-rocket, common in 3.2-era code
+    - '  has_paper_trail :versions => "audits"'
+    # other options before the string versions:
+    - '  has_paper_trail class_name: "PT", versions: "audits"'
+  no_match:
+    # symbol value — the fixed, backwards-compatible form
+    - '  has_paper_trail versions: :audits'
+    # hash-rocket symbol value — also fixed
+    - '  has_paper_trail :versions => :audits'
+    # commented-out declaration is inert
+    - '  # has_paper_trail versions: "audits"'
+
+VALIDATES_AS_PARANOID:
+  # Pattern: "\\bvalidates_as_paranoid\\b"
+  # rails3_acts_as_paranoid DSL; \b avoids longer identifiers.
+  match:
+    - '  validates_as_paranoid'
+  no_match:
+    # a longer identifier is not the DSL call
+    - '  validates_as_paranoid_extra'
+    # commented-out call is inert
+    - '  # validates_as_paranoid'
