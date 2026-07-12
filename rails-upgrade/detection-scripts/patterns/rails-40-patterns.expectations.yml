@@ -332,3 +332,50 @@ ROUTES_TOP_LEVEL_MODULE_AUTOLOAD:
     - "  scope module: \"admin\" do"
     # using a constant is not defining a module
     - "  constraints Constraints::Admin do"
+
+VALIDATES_FORMAT_OF_ANCHORS:
+  # Pattern: "validates_format_of.*with:\\s*/[^/]*[\\^$]"
+  # Flags a leading ^ / trailing $ in a validates_format_of `with:` regex.
+  match:
+    # leading ^ and trailing $ — the boot-fatal form on Rails 4
+    - '  validates_format_of :email, with: /^[a-z]+$/'
+    # trailing $ only still flags
+    - '  validates_format_of :name, with: /foo$/'
+    # Ruby-1.8 hash-rocket syntax common in 3.2-era code
+    - '  validates_format_of :email, :with => /^[a-z]+$/'
+  no_match:
+    # already rewritten to \A / \z — the correct Rails 4 form
+    - '  validates_format_of :email, with: /\A[a-z]+\z/'
+    # hash-rocket form, already rewritten — must not flag
+    - '  validates_format_of :email, :with => /\Afoo\z/'
+    # block-options form is out of scope for the primary regex
+    - '  validates :email, format: { with: /^x$/ }'
+    # without: is a different option, out of scope
+    - '  validates_format_of :x, without: /^foo$/'
+
+VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND:
+  # Pattern: "Regexp\\.new\\(.*[\\^$]"
+  # Flags a ^ / $ inside a Regexp.new(...) constant definition.
+  match:
+    # %q-quoted source with leading ^ and trailing $
+    - '  EMAIL = Regexp.new(%q{^[^@]+@[^@]+$})'
+    # double-quoted source with a leading ^
+    - '  RE = Regexp.new("^foo")'
+  no_match:
+    # no anchors at all
+    - '  RE = Regexp.new("foo")'
+    # already rewritten to \A / \z
+    - '  RE = Regexp.new(%q{\Afoo\z})'
+
+ACCEPTS_NESTED_NO_REFLECTION:
+  # Pattern: "accepts_nested_attributes_for\\b"
+  # Flags every accepts_nested_attributes_for call; the breaking case is an
+  # operator judgment (inherited-from-bumped-gem association), not regex-decidable.
+  match:
+    - '  accepts_nested_attributes_for :items'
+    - '  accepts_nested_attributes_for :items, allow_destroy: true'
+  no_match:
+    # an unrelated association declaration
+    - '  has_many :items, dependent: :destroy'
+    # \b boundary: a longer identifier with the _for_ suffix is not the macro
+    - '  def accepts_nested_attributes_for_stuff'

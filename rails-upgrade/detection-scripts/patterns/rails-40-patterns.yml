@@ -193,6 +193,38 @@ upgrade_findings:
       fix: "Delete the config.whiny_nils = true line entirely. No replacement — Ruby's own nil-method errors are sufficient. False-positive watch: matches in comments documenting the removal; verify the hit is an actual assignment, not a comment"
       variable_name: "WHINY_NILS"
 
+    - name: "validates_format_of with multiline anchors (^...$)"
+      kind: "breaking"
+      pattern: "validates_format_of.*\\bwith(?::|\\s*=>)\\s*/[^/]*[\\^$]"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4 raises `ArgumentError: The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or forgot to add the :multiline => true option?` whenever a `validates_format_of` regex source STARTS with `^` or ENDS with `$` (unescaped). New in 4.0 — Rails 3.2 does not perform this check. The validator runs check_options_validity at model class-load, so the error is boot-fatal. Matches both the 1.9 hash syntax `with: /.../` and the Ruby-1.8 hash-rocket `:with => /.../` still common in Rails 3.2-era code. Detection caveat: this grep flags any `^` or `$` inside the `with:` regex, but Rails only raises on a leading `^` or trailing `$`. A `^` inside a character class (e.g. `/[^@]+/`) or a `$` mid-pattern is a FALSE POSITIVE — confirm the anchor sits at the start/end before fixing. Out of scope for the primary regex: the block-options form `validates :col, format: { with: /^.../ }`, method-call regex args (`with: regex_for(:x)`), and positional / `without:` regexes — see fix for a secondary grep"
+      fix: "Replace a leading `^` with `\\A` and a trailing `$` with `\\z` (absolute start/end of string). Ruby's regex engine accepts both forms on every Rails version, so apply the rewrite directly — it is backwards-compatible and needs no version gate. Secondary grep for the block-options form: `grep -rnE \"validates\\s+:\\w+.*format:.*?/[^/]*[\\^$]\" app/ --include=\"*.rb\"`. For method-call regex args, fix at the helper method's return value — one fix covers every caller"
+      variable_name: "VALIDATES_FORMAT_OF_ANCHORS"
+
+    - name: "Regex constant built via Regexp.new with multiline anchors"
+      kind: "breaking"
+      pattern: "Regexp\\.new\\(.*[\\^$]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Companion to VALIDATES_FORMAT_OF_ANCHORS. A regex constant defined via `Regexp.new(%q{^...$})` (or `Regexp.new(\"^...$\")`) is invisible to the primary anchor grep, which looks for literal `/^.../` regexes inline. Apps commonly extract validation regexes into constants — `EMAIL = Regexp.new(%q{^[^@]+@[^@]+$})` — then reference them by name in `validates_format_of`. Rails 4 still raises at model class-load when check_options_validity examines the constant's compiled regex. Same leading/trailing rule as the primary pattern: Rails raises only when the compiled source starts with `^` or ends with `$`. This grep flags any `^` / `$` after `Regexp.new(` (including a `^` inside a character class), so per-match judgment is required"
+      fix: "Same rewrite as the primary pattern: `\\A` for `^`, `\\z` for `$`, applied at the constant's definition. One fix covers every caller. Backwards-compatible — Ruby accepts `\\A` / `\\z` on every Rails version. Per-match judgment required: not every `Regexp.new` constant feeds a validator. `String#match` / `String#scan` callers operating on multi-line input may need `^` / `$` for start/end-of-line semantics. Inspect call sites (`grep -rnE \"\\b<CONSTANT_NAME>\\b\" app/ lib/`) and only rewrite when every consumer is OK with absolute-anchor semantics"
+      variable_name: "VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND"
+
+    - name: "accepts_nested_attributes_for reflection lost to a parallel gem bump"
+      kind: "breaking"
+      pattern: "accepts_nested_attributes_for\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+        - "lib/"
+      explanation: "`accepts_nested_attributes_for :foo` raises `ArgumentError: No association found for name \\`foo'. Has it been defined yet?` at model class-load whenever `:foo` has no association reflection. This raise is not new in Rails 4.0 — it fires on any Rails version when the reflection is absent at class-load, so a genuinely-missing association is not a 3.2 → 4.0 regression (it would already have failed boot on 3.2). The way it surfaces as a NEW, next-side-only boot failure during a dual-boot hop: the reflection is provided by INHERITANCE from a gem-supplied base class, and a parallel gem bump in Gemfile.next silently removes it. Example: paper_trail 2.x defines a top-level `Version` carrying `belongs_to :item`; 3.x namespaces it to `PaperTrail::Version` and drops the top-level constant, so app models declared `< Version` that call `accepts_nested_attributes_for :item` lose the inherited reflection on the next side only. Operator filter — the primary regex matches ALL `accepts_nested_attributes_for` calls; a match is breaking ONLY when (a) the association is inherited from a gem-provided base class AND (b) that gem is being version-bumped in Gemfile.next. A same-file declared association is safe"
+      fix: "Restore the lost reflection on the next side; leave the current side untouched. Two ways. (1) ROOT-CAUSE, preferred when a gem namespace / inheritance move is the cause: re-point the inherited base class in ONE place under the gate, leaving every subclass and reference unchanged. For the paper_trail example: `if NextRails.next?\\n  Version = PaperTrail::Version\\nend` in config/initializers/paper_trail.rb. (2) PER-MODEL, when the loss is per-model rather than a shared base class: re-declare the association on each affected model under the gate — `belongs_to :foo, polymorphic: true if NextRails.next?` (or the matching has_one / has_many). Why gate it: declaring unconditionally adds a duplicate auto-generated reader+writer on the current side, where the reflection still arrives via inheritance. A hand-rolled `def foo` override is preserved either way — Ruby resolves the explicit method before the generated reader. After cutover, drop the `NextRails.next?` gate"
+      variable_name: "ACCEPTS_NESTED_NO_REFLECTION"
+
     - name: "Duplicate root route declarations across constraints"
       kind: "breaking"
       pattern: "^\\s*root\\s+(to:|=>|['\"])"
