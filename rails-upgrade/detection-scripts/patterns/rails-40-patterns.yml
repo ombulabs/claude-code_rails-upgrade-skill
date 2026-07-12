@@ -193,6 +193,16 @@ upgrade_findings:
       fix: "Delete the config.whiny_nils = true line entirely. No replacement — Ruby's own nil-method errors are sufficient. False-positive watch: matches in comments documenting the removal; verify the hit is an actual assignment, not a comment"
       variable_name: "WHINY_NILS"
 
+    - name: "Modern JS-compressor gem requires newer Sprockets than Rails 4 ships"
+      kind: "breaking"
+      pattern: "gem\\s+['\"](terser|closure-compiler)['\"]"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+      explanation: "Only fires when terser or closure-compiler is in the Gemfile — apps on plain uglifier never see this entry. Modern JS-compressor gems (terser, closure-compiler) declare a runtime dependency on `sprockets/digest_utils`, which exists only in Sprockets >= 3. Rails 4.0 locks Sprockets to the 2.x line via sprockets-rails. On Rails 4.0's next side the bundle resolves cleanly (gemspec passes railsbump's check) but the gem's railtie loads at boot and raises `LoadError: cannot load such file -- sprockets/digest_utils`. Invisible to railsbump because the failure is at require-time, after the bundle is locked. Apps reach for terser deliberately (modern JS the abandoned uglifier 4.2.0 cannot compile: ES2020 optional chaining `?.`, UTF-8 source), so you cannot simply swap it for uglifier on the next side without losing those assets. For uglifier itself the breaking versions are 4.x+, so a hit on a bare `gem \"uglifier\"` needs a version-pin check"
+      fix: "Keep terser on the next side but stop its railtie from auto-loading on Sprockets 2.x: `gem \"terser\", require: false` (require: false is mandatory or boot dies with the LoadError). Add `gem \"uglifier\", \">= 1.3.0\"` on the next side too, only so the `:uglifier` symbol resolves in environment configs, then register Terser as the real compressor at compile time via a rake task hooked on assets:environment. The current (Rails 3.2) side keeps plain `gem \"terser\"` (its railtie is harmless there). Full recipe with Gemfile, env-config, and rake-task examples: rails-upgrade/references/js-compressor-sprockets-mismatch.md"
+      variable_name: "JS_COMPRESSOR_GEM_MISMATCH"
+
     - name: "validates_format_of with multiline anchors (^...$)"
       kind: "breaking"
       pattern: "validates_format_of.*\\bwith(?::|\\s*=>)\\s*/[^/]*[\\^$]"
