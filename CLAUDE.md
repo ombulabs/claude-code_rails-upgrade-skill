@@ -110,7 +110,7 @@ The top-level `dependencies:` block in each `rails-*-patterns.yml` file is not b
 The `check: true` / `check: false` flag on each `dependencies:` entry is **editorial advice about whether the gem applies broadly**, not a per-app determination. The actual applicability depends on whether the user's app triggers the `breaking` pattern the bridge rescues:
 
 - `check: true` — the gem rescues a `breaking` that most apps will trigger (e.g., `responders` rescues `respond_with`, which most controller-heavy apps use). Default to recommending it.
-- `check: false` — either a bridge for a `breaking` that not all apps will trigger (e.g., `actionpack-action_caching` only matters if the app uses `caches_page` / `caches_action`), or a new-default gem the user can adopt at their own pace (e.g., `bootsnap`, `propshaft`). The user's actual code drives whether they need it.
+- `check: false` — either a bridge for a `breaking` that not all apps will trigger (e.g., `actionpack-action_caching` only matters if the app uses `caches_page` / `caches_action`), or a new-default gem the user can adopt at their own pace (e.g., `bootsnap`, `solid_cache`). The user's actual code drives whether they need it.
 
 A `check: false` bridge gem still becomes effectively required for any specific app that triggers its rescued `breaking` pattern. Treat the flag as a starting recommendation; the per-app `fix:` field on each pattern entry is what tells the user whether they actually hit it.
 
