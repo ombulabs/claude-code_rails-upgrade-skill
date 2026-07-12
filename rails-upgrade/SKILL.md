@@ -191,6 +191,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `references/multi-hop-strategy.md` - Multi-version planning
 - `references/testing-checklist.md` - Comprehensive testing
 - `references/gem-compatibility.md` - Gem update order and the "no compatible version" playbook (fork / vendor / replace). Load only when Step 4.5's compatibility check produced blockers.
+- `references/js-compressor-sprockets-mismatch.md` - Keeping terser / closure-compiler working when the target Rails pins Sprockets to the 2.x line. Load only when JS_COMPRESSOR_GEM_MISMATCH fires.
 
 ### Detection Pattern Resources
 - `detection-scripts/patterns/rails-*.yml` - Version-specific patterns for direct detection
