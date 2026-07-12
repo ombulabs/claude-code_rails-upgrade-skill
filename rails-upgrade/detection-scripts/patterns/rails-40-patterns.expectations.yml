@@ -35,3 +35,27 @@ SCOPE_WITHOUT_LAMBDA:
     - "  scope :active, -> { where(active: true) }"
     # wrapped in an explicit lambda — also correct, must not flag
     - "  scope :active, lambda { where(active: true) }"
+
+CLASS_SCOPED:
+  # Pattern: "\\bscoped\\b"
+  # Model.scoped and bare `scoped` (implicit self) were deprecated in 4.0,
+  # removed in 4.1. Word boundaries catch both receiver and bare forms while
+  # rejecting look-alikes, so no exclude regex is needed.
+  match:
+    # explicit receiver, no args
+    - "  items = Model.scoped"
+    # bare implicit-self form inside a scope lambda (the previously-missed case)
+    - "  scope :foo, -> { scoped.joins(:bar) }"
+    # with-args ad-hoc scope constructor
+    - "  Model.scoped(conditions: { active: true })"
+    # a real .scoped call sharing a line with reorder must still flag
+    - "  Model.scoped.reorder(:id)"
+  no_match:
+    # unscoped is a different, non-deprecated API
+    - "  Model.unscoped.where(active: true)"
+    # default_scoped is a real Rails method, not the deprecated `scoped`
+    - "  Model.default_scoped"
+    # scoped_ids is an unrelated identifier
+    - "  user.scoped_ids"
+    # a method name ending in _scoped is not the AR method
+    - "  def user_scoped"
