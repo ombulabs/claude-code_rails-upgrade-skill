@@ -130,6 +130,27 @@ upgrade_findings:
       fix: "Use the schema_cache_path / cache_dump_filename API directly, or rely on the new ActiveRecord::Base.schema_cache_ignored_tables / connection_pool.schema_reflection knobs depending on the use case"
       variable_name: "ENV_SCHEMA_CACHE"
 
+    - name: "read_encrypted_secrets config"
+      kind: "deprecation"
+      pattern: "read_encrypted_secrets"
+      exclude: ""
+      search_paths:
+        - "config/environments/"
+        - "config/application.rb"
+      explanation: "config.read_encrypted_secrets drives the legacy encrypted-secrets feature (config/secrets.yml.enc), which was superseded by credentials and removed alongside config/secrets.yml in Rails 7.2. On 7.1/7.2 the setter emits `DEPRECATION WARNING: 'config.read_encrypted_secrets=' is deprecated and will be removed in Rails 8.0` at boot. On 8.0 the setter still exists as a silent no-op (no warning, no error), so the line is dead config either way — most visibly it noisily pollutes the 7.2 boot/precompile logs during the 7.2 → 8.0 hop"
+      fix: "Delete the `config.read_encrypted_secrets = true` line (and its comment block) from config/environments/production.rb. Safe to remove on both 7.2 and 8.0; no dual-boot branch needed. If the app genuinely stored secrets in config/secrets.yml.enc, migrate them to credentials (`rails credentials:edit`) first"
+      variable_name: "READ_ENCRYPTED_SECRETS"
+
+    - name: "to_time_preserves_timezone default (load_defaults below 8.1)"
+      kind: "deprecation"
+      pattern: "load_defaults\\s+(?:[4-7]\\.\\d+|8\\.0)\\b"
+      exclude: ""
+      search_paths:
+        - "config/application.rb"
+      explanation: "Under `config.load_defaults` below 8.1, ActiveSupport's `to_time_preserves_timezone` is not yet set to `:zone`, so Rails 8.0 emits `DEPRECATION WARNING: to_time will always preserve the full timezone rather than offset of the receiver in Rails 8.1` at boot (activesupport/CHANGELOG.md 8.1: to_time preserves the full timezone). The warning fires by default on every app that hasn't opted in — an explicit `to_time_preserves_timezone = :zone` is absent, so it can't be grepped for directly; the load_defaults value below 8.1 is the proxy signal"
+      fix: "Add `config.active_support.to_time_preserves_timezone = :zone` in config/application.rb (after `load_defaults`). Valid on both 7.2 and 8.0, so set it unconditionally during the dual boot — no NextRails.next? branch needed. This is the 8.1 default; setting it early makes `to_time` keep the full zone instead of a bare UTC offset and silences the warning"
+      variable_name: "TO_TIME_PRESERVES_TIMEZONE"
+
     - name: "Routes drawn with multiple paths"
       kind: "deprecation"
       pattern: "^\\s*(get|post|put|patch|delete|match)\\s+\\["
