@@ -14,6 +14,16 @@ upgrade_findings:
       fix: "Upgrade Ruby to 2.7.0+ (3.0+ recommended)"
       variable_name: "RUBY_VERSION"
 
+    - name: "Explicit format/handler extension in template: or layout:"
+      kind: "breaking"
+      pattern: "(template|layout):\\s*[\"'][^\"']*\\.(html|erb)\\b"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+      explanation: "Found via a real 6.1 -> 7.0 upgrade (fastruby/audit). ActionView's template resolver became stricter about parsing an explicit :template or :layout string in Rails 7.0. A call like `render template: \"posts/show.html.erb\"` or `layout: \"pdf.html\"` worked on 6.1 (the resolver tolerated the redundant format/handler suffix) but raises ActionView::MissingTemplate on 7.0, because the resolver now treats the full string literally instead of stripping the trailing format/handler. Most commonly hit via wicked_pdf's `render pdf:` helper, which forwards :template/:layout straight through. A related, non-regex-detectable failure mode: if the render call runs inside a non-html respond_to format block (e.g. `format.pdf do render pdf: ... end`) and does not pass an explicit `formats:` option, Rails resolves the template using the block's format (:pdf) instead of :html, and raises MissingTemplate even with a bare template name -- 6.1 fell back to :html here, 7.0 does not. See workflows/boot-smoke-test-workflow.md notes: neither this pattern nor the boot smoke test catches the formats: variant because it only manifests when the specific action+format combination is actually invoked, not at boot."
+      fix: "Drop the format/handler extension from the string: template: \"posts/show.html.erb\" -> template: \"posts/show\"; layout: \"pdf.html\" -> layout: \"pdf\". If the render happens inside a non-html format.<x> block, also add formats: [:html] explicitly so template resolution doesn't use the block's format."
+      variable_name: "EXPLICIT_TEMPLATE_EXTENSION"
+
     - name: "Webpacker usage"
       kind: "migration"
       pattern: "webpacker|javascript_pack_tag"

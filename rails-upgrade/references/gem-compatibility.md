@@ -43,3 +43,40 @@ A common false-blocker pattern: gems that became unnecessary in a specific Rails
 - **Extracted as a back-compat shim**: `protected_attributes` is the *opposite* shape — it was extracted from Rails 4.0 specifically as a transitional shim for the old mass-assignment API and was never re-merged. It still exists as a separate gem, but if your code is moving to `strong_parameters` you can remove it once the controllers are converted.
 
 If `bundle_report` flags one of these, check the target version guide before assuming you need a fork.
+
+---
+
+## Known Gotchas
+
+Real issues hit during actual upgrades, not generic advice. Add to this list as new ones surface.
+
+### `concurrent-ruby` >= 1.3.5 breaks Rails' logger require order on Ruby < 3.5
+
+**Symptom:** `NameError: uninitialized constant ActiveSupport::LoggerThreadSafeLevel::Logger`, raised from `active_support/logger_thread_safe_level.rb` on boot. `bundle install` / `bundle_report` show nothing wrong — this is a pure require-order bug, not a version constraint conflict.
+
+**Cause:** `activesupport/lib/active_support/logger.rb` requires `active_support/logger_thread_safe_level` *before* it requires the stdlib `logger` gem. Versions of `logger_thread_safe_level.rb` prior to the fix reference the bare `Logger` constant without requiring it themselves, relying on something else in the load path having already pulled in `logger` — which `concurrent-ruby` < 1.3.5 happened to do as a side effect, and 1.3.5+ no longer does.
+
+**Confirmed via source diff:** `activesupport/lib/active_support/logger_thread_safe_level.rb` at tag `v7.0.10` has no `require "logger"` at the top (only `require "concurrent"` and `require "fiber"`) — vulnerable. The same file at `v7.1.6` (in practice, the fix landed by Rails' 7.0.x branch reaching this patch level) adds an explicit `require "logger"`. **The fix is per-Rails-patch-release, not per-Rails-minor** — check the specific patch you're on, not just the major.minor. Rails 6.1.7.10 was confirmed vulnerable; Rails 7.0.10 was confirmed fixed, both checked directly against GitHub source for that tag.
+
+**Fix:** Pin `gem "concurrent-ruby", "< 1.3.5"` in the Gemfile. Safe to apply unconditionally across a dual-boot Gemfile (both sides) even if only the older side actually needs it — confirmed empirically that Rails 7.0.10 boots fine with either the pin or `concurrent-ruby` 1.3.7.
+
+**How to verify whether your target Rails patch needs the pin:** `curl -s https://raw.githubusercontent.com/rails/rails/v<VERSION>/activesupport/lib/active_support/logger_thread_safe_level.rb | head -10` and check for `require "logger"` near the top.
+
+### Accidentally narrow legacy Gemfile pins
+
+Distinct from "gem has no compatible version" above: these are gems where a *compatible* version genuinely exists, but the app's own Gemfile pins below it — usually a leftover constraint from years earlier that nobody has revisited. `bundle_report` may not flag these clearly since the gem itself isn't the blocker; the app's own version constraint is. Bundler's resolver error will look like a normal dependency conflict, e.g.:
+
+```
+font-awesome-rails was resolved to 4.7.0.7, which depends on
+  railties (>= 3.2, < 7)
+```
+
+Check the Gemfile for pins that predate the target Rails version's release by years — `~> 1.8.2` on a gem now at `1.15.x`, an unpinned gem still resolving to a several-years-old version because nothing forced a re-resolve. Bump the floor (`bundle lock --update <gem>`) rather than assuming it's a real blocker requiring a fork/replace.
+
+Real example (fastruby/audit, 6.1 -> 7.0): `nokogiri "~> 1.8.2"` (pinned circa 2018) blocked resolution once `loofah`/`rails-html-sanitizer` needed a newer `nokogiri` for Rails 7.0. `font-awesome-rails` (unpinned, but locked at `4.7.0.7` since nothing had bumped it) capped `railties < 7`; `4.7.0.9` relaxed that to `< 9.0`. Neither gem was actually incompatible with Rails 7.0 — the lockfile just hadn't moved in years.
+
+### Dev-only gems with an independent Ruby floor
+
+When a gem's Rails-N-compatible release also raises its own Ruby floor higher than the Ruby version this specific hop targets, and the gem is dev/test-only (doesn't affect production boot or the test suite itself), the pragmatic move is usually to drop it for this hop rather than force an unplanned Ruby bump — Ruby upgrades are their own separate, independently-sequenced piece of work.
+
+Real example (fastruby/audit, 6.1 -> 7.0, staying on Ruby 2.7.2): `spring` 2.x (Rails-6-era) works fine on Ruby 2.7, but `spring-watcher-listen` 2.1.0 requires `spring >= 4`, and `spring` 4.x requires Ruby >= 3.1. Since `spring` is dev-only tooling (faster local boot times, not loaded in CI or by the deployed app), the resolution was to drop `spring` / `spring-watcher-listen` from the Gemfile's `next?` (target-Rails) branch entirely, with a comment noting they come back once Ruby is separately upgraded past 3.1. Confirm a gem is safe to drop this way by checking it's declared only inside `group :development` (or `:development, :test`) and isn't required by any file the test suite or production boot path loads.
