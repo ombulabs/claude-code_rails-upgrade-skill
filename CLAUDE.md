@@ -81,7 +81,11 @@ Priority is about **urgency during an upgrade**, not editorial weight.
 
 **Judge `kind` at the target hop, not the API's historical timeline.** Each `rails-XY-patterns.yml` file is a statement *about that hop* — what changes when the user upgrades INTO that version. A removal that was first deprecated in an earlier Rails minor is `breaking` in the file for the version where it actually raises, not `deprecation` because of its history. The same API can legitimately be `deprecation` in `rails-31-patterns.yml` and `breaking` in `rails-40-patterns.yml`. Apply the rule to all four kinds: `kind` reflects what the change *is at this hop*, not what it *was* earlier or *will become* later.
 
-Concrete example: `SCOPE_WITHOUT_LAMBDA` was deprecated in Rails 3.1 and raises in 4.0 — it is `breaking` in `rails-40-patterns.yml`.
+Concrete example: `SCOPE_WITHOUT_LAMBDA`. Rails 3.2 accepts a non-callable scope body and merges it into the current scope; 4.0 warns and hands the stored relation back verbatim, silently dropping the association or chained scope; 4.1 raises `NoMethodError` at call time; 4.2 raises `ArgumentError` at class load. It is `breaking` in `rails-40-patterns.yml`, `rails-41-patterns.yml`, and `rails-42-patterns.yml` — see the next rule for why the 4.0 entry is not a `deprecation`.
+
+**A deprecation that changes query results is `breaking`.** Rule 2 below ("does Rails emit a deprecation warning?") assumes the deprecated code still *behaves correctly* at this hop — the usual case, where the warning is the only symptom and the real break is one version away. When the deprecated form instead changes what the database returns — dropped conditions, wrong rows, wrong SQL — classify it `breaking` at the hop where the behavior changes, whatever Rails prints. The deciding question is "can a green test suite and a clean boot hide this?", not "does Rails warn?". Deprecations whose only symptom is the warning stay `deprecation`, even at HIGH priority.
+
+`SCOPE_WITHOUT_LAMBDA` at 4.0 is the canonical case. Rails only warns, but `owner.things.active` silently queries the entire table instead of the owner's rows. That shipped to production in a real 3.2 → 4.0 upgrade and took a page down with an unbounded read; dev and CI held too little data for the query to be slow, so nothing failed before production. Do not reclassify it to `deprecation` on the strength of the warning — the pattern entries carry inline comments saying so.
 
 The four values:
 

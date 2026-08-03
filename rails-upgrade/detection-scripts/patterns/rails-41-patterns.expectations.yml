@@ -1,0 +1,104 @@
+# Fixture expectations for rails-41-patterns.yml.
+#
+# Coverage is partial: only the patterns listed here are asserted. Patterns
+# without an entry are not tested (bin/test-patterns only checks the keys it
+# finds), so add entries as patterns are touched. See
+# rails-40-patterns.expectations.yml for the fully-documented worked example.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-41-patterns.yml
+
+SCOPE_WITHOUT_LAMBDA:
+  # Pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*\\S"
+  # Exclude:  "scope\\s+:\\w+\\s*,\\s*\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new)"
+  #
+  # Same regex as the 4.0 file — the difference is the consequence, not the
+  # shape: 4.0 warns and silently drops the surrounding scope, 4.1 raises
+  # NoMethodError when the scope is called.
+  match:
+    - "  scope :active, where(active: true)"
+    - "  scope :ordered, order(:position)"
+    - "  scope :published, Post.where(published: true)"
+    - "  scope :legacy, conditions: { active: true }, order: 'id'"
+  no_match:
+    - "  scope :active, -> { where(active: true) }"
+    - "  scope :by_state, ->(state) { where(state: state) }"
+    - "  scope :active, lambda { where(active: true) }"
+    - "  scope :active, proc { where(active: true) }"
+    - "  scope :active, Proc.new { where(active: true) }"
+    - "  def self.active"
+    # a callable wrapped in parens is still callable
+    - "  scope :lookup, (proc { |s| where(name: s) })"
+    - "  scope :ordered, (-> { order(:position) })"
+
+DEFAULT_SCOPE_WITHOUT_BLOCK:
+  # Pattern: "^\\s*default_scope\\b\\s*\\S"
+  # Exclude:  "default_scope\\b\\s*(do\\b|\\{|\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new))"
+  #
+  # Any non-block body is wrong, not just where() / order(): the argument has to
+  # respond to #call. The exclusion covers every callable form — a { } or do
+  # block, a stabby or explicit lambda, a proc, and any of those wrapped in
+  # parens.
+  # The non-block form raises ArgumentError at class-definition time on 4.1.
+  match:
+    - "  default_scope where(deleted_at: nil)"
+    - "  default_scope order('created_at ASC')"
+    - "  default_scope :order => 'created_at ASC'"
+    # any other bare relation is equally non-callable
+    - "  default_scope joins(:account)"
+    - "  default_scope select(:id, :name)"
+    - "  default_scope Post.where(published: true)"
+    # a hash of finder options does not respond to #call either
+    - "  default_scope conditions: { active: true }"
+    # method-call form, no space before the paren
+    - "  default_scope(where(deleted_at: nil))"
+  no_match:
+    # block form — correct on 3.2 through current
+    - "  default_scope { where(deleted_at: nil) }"
+    # do/end block is equally callable
+    - "  default_scope do"
+    # explicit callables, bare and parenthesised
+    - "  default_scope -> { where(deleted_at: nil) }"
+    - "  default_scope lambda { where(deleted_at: nil) }"
+    - "  default_scope (proc { where(deleted_at: nil) })"
+    # overriding the method itself, not calling it
+    - "  def self.default_scope"
+    # commented out
+    - "  # default_scope where(deleted_at: nil)"
+    # an identifier that merely starts with "default_scope" — the \b guard.
+    # Found in the wild: a `default_scoper` helper call in a controller concern
+    - "          default_scoper"
+    - "  default_scoper.where(active: true)"
+
+SCOPE_BODY_CONTINUATION:
+  # Pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*$"
+  # See the same block in rails-40-patterns.expectations.yml.
+  match:
+    - "  scope :with_likes_without_select,"
+    - "    scope :has_public_experience,"
+  no_match:
+    - "  scope :active, where(active: true)"
+    - "  scope :active, -> { where(active: true) }"
+    - "  scope :legacy, conditions: { active: true },"
+    - "  def self.active"
+    - "  # scope :active,"
+
+SCOPE_NAME_COLLISION:
+  # Pattern: "^\\s*scope\\s+:(none|all|first|last|take|find|count|sum|average|minimum|maximum|select|update|delete|destroy|create|new|group|order|limit|offset|distinct|ids|pluck)\\b"
+  #
+  # 4.1 raises at class-definition time when a scope name shadows a class
+  # method Active Record already defines. The \b matters: a name that merely
+  # starts with a reserved word (:ordered, :newest, :selected, :first_active)
+  # is not a collision and must not be flagged.
+  match:
+    - "  scope :none, -> { where('1=0') }"
+    - "  scope :all, -> { where(nil) }"
+    - "    scope :count, -> { group(:id) }"
+    - "  scope :select, -> { where(chosen: true) }"
+  no_match:
+    - "  scope :ordered, -> { order(:position) }"
+    - "  scope :newest, -> { order(created_at: :desc) }"
+    - "  scope :selected, -> { where(chosen: true) }"
+    - "  scope :first_active, -> { where(active: true) }"
+    - "  scope :nonexistent, -> { where(missing: true) }"
+    - "  def self.none"

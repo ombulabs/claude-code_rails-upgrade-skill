@@ -41,18 +41,54 @@ REQUIRE_STRONG_PARAMS:
     - "require 'strong_password'"
 
 SCOPE_WITHOUT_LAMBDA:
-  # Pattern: "scope\\s+:\\w+\\s*,\\s*where"
-  # Rails 4.0 requires every scope to wrap its query in a callable (lambda).
+  # Pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*\\S"
+  # Exclude:  "scope\\s+:\\w+\\s*,\\s*\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new)"
+  #
+  # Any non-callable body is wrong on 4.0, not just where(): the body is stored
+  # at class-definition time and handed back verbatim, discarding the
+  # association or scope it was chained onto. So the match list covers every
+  # bare-relation shape, and the exclusion is anchored to the body position
+  # (immediately after the scope name and comma) so a `proc` / `lambda`
+  # substring elsewhere on the line cannot suppress a real finding.
   match:
-    # bare where() right after the scope name — the breaking form
+    # bare where() right after the scope name — the classic form
     - "  scope :active, where(active: true)"
     # extra whitespace around the name and comma must still flag
     - "  scope :recent , where('created_at > ?', 1.week.ago)"
+    # order / joins / includes / select / limit / group bodies are equally non-callable
+    - "  scope :ordered, order(:position)"
+    - "  scope :with_author, joins(:author)"
+    - "  scope :eager, includes(:comments)"
+    - "  scope :ids_only, select(:id)"
+    - "  scope :top, limit(10)"
+    - "  scope :per_author, group(:author_id)"
+    # a relation built off another class is still a stored relation
+    - "  scope :published, Post.where(published: true)"
+    # a hash of finder options does not respond to #call either
+    - "  scope :legacy, conditions: { active: true }, order: 'id'"
+    # an argument named proc_* / lambda_* must not satisfy the anchored
+    # exclusion — this is a real finding
+    - "  scope :queued, where(proc_id: 3)"
   no_match:
     # already wrapped in a stabby lambda — the correct Rails 4 form
     - "  scope :active, -> { where(active: true) }"
     # wrapped in an explicit lambda — also correct, must not flag
     - "  scope :active, lambda { where(active: true) }"
+    # parameterized lambda
+    - "  scope :by_state, ->(state) { where(state: state) }"
+    # proc / Proc.new bodies respond to #call, so 4.0 handles them correctly
+    - "  scope :active, proc { where(active: true) }"
+    - "  scope :active, Proc.new { where(active: true) }"
+    # body on a continuation line: nothing follows the comma, so this line is
+    # not evidence either way and must not be flagged
+    - "  scope :active,"
+    # class method definition, not a scope declaration
+    - "  def self.active"
+    # a callable wrapped in parens is still callable — real shape found in the
+    # wild: scope :lookup, (proc { |s| where(...) })
+    - "  scope :lookup, (proc { |s| where(name: s) })"
+    - "  scope :recent, ( lambda { where('id > 0') } )"
+    - "  scope :ordered, (-> { order(:position) })"
 
 CLASS_SCOPED:
   # Pattern: "\\bscoped\\b"
@@ -79,11 +115,42 @@ CLASS_SCOPED:
     - "  def user_scoped"
 
 DEFAULT_SCOPE_WITHOUT_BLOCK:
+  # Pattern: "^\\s*default_scope\\b\\s*\\S"
+  # Exclude:  "default_scope\\b\\s*(do\\b|\\{|\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new))"
+  #
+  # Any non-block body is wrong, not just where() / order(): the argument has to
+  # respond to #call. The exclusion covers every callable form — a { } or do
+  # block, a stabby or explicit lambda, a proc, and any of those wrapped in
+  # parens.
   match:
-    - "  default_scope where(active: true)"
-    - "  default_scope :order => 'created_at'"
+    - "  default_scope where(deleted_at: nil)"
+    - "  default_scope order('created_at ASC')"
+    - "  default_scope :order => 'created_at ASC'"
+    # any other bare relation is equally non-callable
+    - "  default_scope joins(:account)"
+    - "  default_scope select(:id, :name)"
+    - "  default_scope Post.where(published: true)"
+    # a hash of finder options does not respond to #call either
+    - "  default_scope conditions: { active: true }"
+    # method-call form, no space before the paren
+    - "  default_scope(where(deleted_at: nil))"
   no_match:
-    - "  default_scope { where(active: true) }"
+    # block form — correct on 3.2 through current
+    - "  default_scope { where(deleted_at: nil) }"
+    # do/end block is equally callable
+    - "  default_scope do"
+    # explicit callables, bare and parenthesised
+    - "  default_scope -> { where(deleted_at: nil) }"
+    - "  default_scope lambda { where(deleted_at: nil) }"
+    - "  default_scope (proc { where(deleted_at: nil) })"
+    # overriding the method itself, not calling it
+    - "  def self.default_scope"
+    # commented out
+    - "  # default_scope where(deleted_at: nil)"
+    # an identifier that merely starts with "default_scope" — the \b guard.
+    # Found in the wild: a `default_scoper` helper call in a controller concern
+    - "          default_scoper"
+    - "  default_scoper.where(active: true)"
 
 ASSOCIATION_CONDITIONS:
   match:
@@ -458,3 +525,25 @@ RACK_LOCK_MIDDLEWARE:
     - '    config.middleware.use Rack::Lock'
     # commented-out line is inert
     - '    # config.middleware.insert_before Rack::Lock'
+
+SCOPE_BODY_CONTINUATION:
+  # Pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*$"
+  #
+  # Deliberately matches the declaration line alone, with nothing after the
+  # comma. SCOPE_WITHOUT_LAMBDA is line-oriented and cannot see a body that
+  # starts on the next line, so this flags the declaration for a human to read
+  # the continuation rather than dropping it. Both callable and non-callable
+  # continuations match — that is the point; the reviewer resolves which.
+  match:
+    - "  scope :with_likes_without_select,"
+    - "    scope :has_public_experience,"
+    - "  scope :for_acknowledgement,   "
+  no_match:
+    # body present on the same line — SCOPE_WITHOUT_LAMBDA owns these
+    - "  scope :active, where(active: true)"
+    - "  scope :active, -> { where(active: true) }"
+    # a trailing comma inside a body, not a bare declaration
+    - "  scope :legacy, conditions: { active: true },"
+    # not a scope declaration at all
+    - "  def self.active"
+    - "  # scope :active,"

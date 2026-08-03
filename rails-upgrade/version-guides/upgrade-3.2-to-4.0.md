@@ -116,9 +116,13 @@ ActiveRecord scopes must use a lambda. Additionally, association options like `:
 
 ##### 3a. Scopes
 
+Wrapping a scope body in a lambda is **mandatory at this hop, not stylistic**. Rails 4.0 does not raise on the old form — it prints a deprecation warning and then **silently returns wrong rows**. Skipping this fix is the single most dangerous choice in a 3.2 → 4.0 upgrade, because nothing fails loudly: no exception, no warning at query time, just different SQL than the code asks for. Treat it as a hard break even though Rails only warns.
+
 **Detection Pattern:**
 ```ruby
 scope :active, where(active: true)
+scope :ordered, order(:position)          # any bare relation, not just where()
+scope :with_author, joins(:author)
 default_scope where(deleted_at: nil)
 default_scope :order => 'created_at ASC'
 ```
@@ -135,6 +139,98 @@ scope :active, -> { where(active: true) }
 default_scope { where(deleted_at: nil) }
 default_scope { order('created_at ASC') }
 ```
+
+Both `AFTER` forms are valid on Rails 3.2, so apply them before the bump and under dual boot.
+
+###### Why the old form breaks silently (Rails source)
+
+The eagerly-built relation is created once, at class-definition time, against the model class. What changed between versions is what `Model.scope_name` does with it.
+
+**Rails 3.2** — `activerecord-3.2.22/lib/active_record/scoping/named.rb`:
+
+```ruby
+scope_proc = lambda do |*args|
+  options = scope_options.respond_to?(:call) ? unscoped { scope_options.call(*args) } : scope_options
+  options = scoped.apply_finder_options(options) if options.is_a?(Hash)
+
+  relation = scoped.merge(options)   # <-- merged INTO the current scope
+  ...
+end
+```
+
+3.2 wraps even a non-callable body in a lambda and **merges it into `scoped`** at call time. Inside an association proxy, `scoped` is the association's relation, so the owner's condition survives. The stored relation is only ever a bag of conditions to merge.
+
+**Rails 4.0** — `activerecord-4.0.13/lib/active_record/scoping/named.rb:161-170`:
+
+```ruby
+singleton_class.send(:define_method, name) do |*args|
+  if body.respond_to?(:call)
+    scope = all.scoping { body.call(*args) }   # current scope preserved
+    scope = scope.extending(extension) if extension
+  else
+    scope = body                              # <-- returned verbatim
+  end
+
+  scope || all
+end
+```
+
+There is no `merge` and no `scoping` on the non-callable branch. Rails hands back the relation object built at class-definition time, which knows nothing about the receiver — so **everything to the left of the scope is discarded**. The lambda branch works because `all.scoping { }` installs the current scope before the body runs.
+
+Rails 4.0 flags this itself at `named.rb:150-159`:
+
+> Using #scope without passing a callable object is deprecated. [...] There are numerous gotchas in the former usage and it makes the implementation more complicated and buggy.
+
+This is one of those gotchas.
+
+###### The SQL, measured
+
+Given `has_many :issues` on `Incident` and `scope :active` on `Issue`, `incident.issues.active.to_sql` for `incident.id = 123`:
+
+```sql
+-- Rails 3.2, and Rails 4.0 with `scope :active, -> { where(deleted: nil) }`
+SELECT `issues`.* FROM `issues`
+WHERE `issues`.`incident_id` = 123 AND `issues`.`deleted` IS NULL
+
+-- Rails 4.0 with `scope :active, where(deleted: nil)`
+SELECT `issues`.* FROM `issues`
+WHERE `issues`.`deleted` IS NULL
+```
+
+The `incident_id` predicate is gone. Chaining class-level scopes loses the left-hand side the same way — `Issue.where(id: 5).active` drops `id = 5` and selects the whole table.
+
+Field report: this exact shape shipped to production in a 3.2 → 4.0 dual-boot upgrade. A page called `incident.issues.active` to decide whether a record was editable; on 4.0 that became an unbounded read of a multi-million-row table, the request never returned, and the failure surfaced as a 503 from the proxy after the worker died. Development and CI had too little data for the query to hurt, so it passed every pre-production gate. Wrong-but-survivable on a small database, fatal on a large one — which is why this cannot be deferred to a later hop.
+
+###### What each version does
+
+| Version | Non-callable `scope` body | Non-block `default_scope` | Scope name shadowing an AR class method |
+|---------|---------------------------|---------------------------|------------------------------------------|
+| 3.2 | Works. Merged into the current scope | Works | Allowed. Logs `Creating scope :x. Overwriting existing method` |
+| 4.0 | **Deprecation warning, silently wrong results.** Discards the association / chained scope | Deprecation warning, still applied correctly (`build_default_scope` merges it) | Allowed silently — `#scope` has no name check at all |
+| 4.1 | `NoMethodError: undefined method 'call'` — raised lazily on first call, not at boot | `ArgumentError: Support for calling #default_scope without a block is removed` at class load | `ArgumentError: You tried to define a scope named "x" on the model "Y", but Active Record already defined a class method with the same name.` at class load |
+| 4.2 | `ArgumentError: The scope body needs to be callable.` at class load (guard clause added to `#scope`) | Same as 4.1 | Same as 4.1 |
+
+Note the asymmetry: `default_scope` degrades honestly (deprecated but correct, then raises), while `scope` has a one-version window where it is quietly wrong. If you only have time for part of this section, do the `scope` half.
+
+The third column is a separate trap with a longer fuse, and `none` is the one that springs it. Active Record gained `Model.none` in 4.0, so a `scope :none` an app hand-rolled on 3.2 — where no such method existed — keeps working on 3.2 and 4.0, then refuses to load the class on 4.1. Delete those rather than renaming: the built-in returns a `NullRelation` without touching the database, which is what the hand-rolled `where('1=0')` was approximating.
+
+###### Auditing
+
+- Grep for **any** non-callable body, not just `where(...)`: `order`, `joins`, `includes`, `select`, `limit`, `group`, `uniq`, a relation built off another class (`Post.where(...)`), and a bare hash of finder options are all affected.
+- Fix them all, but triage by call site first: scopes reached **through an association** (`owner.things.scope_name`) or **chained onto another scope** are the ones already returning wrong data. A scope only ever called as `Model.scope_name` on its own produces the same SQL either way, which is why these survive so long unnoticed.
+- **Find the real model roots before grepping.** `app/models/` is an assumption, not a fact. Packwerk apps keep models in `packs/*/app/models/`, engine hosts in `engines/*/app/models/`, and some apps have no top-level `app/` at all — where a sweep of `app/models/` returns zero findings and reads as a clean bill of health. `Glob: "**/app/models/*.rb"` first, and say in the report which roots you searched.
+- **Catch the multi-line form.** A line-oriented grep for `scope :name, <body>` misses a body that wraps onto the next line:
+
+  ```ruby
+  scope :with_likes_without_select,
+    joins("LEFT OUTER JOIN likes ON ...")
+    .group("posts.id")
+  ```
+
+  Grep separately for a declaration with nothing after the comma (`^\s*scope\s+:\w+\s*,\s*$`) and read the following line. On one audited codebase 22 of 25 non-callable scopes were single-line and caught by the obvious grep; all 3 misses were this shape, and two of them were live bugs.
+- **Gems declare scopes on your models too.** `acts_as_commentable`, `acts_as_list`, `friendly_id` and friends inject scopes that carry the same defect and appear nowhere in your repo. Grep cannot see them; booting the app can — the deprecation warning names the `include` line in your model. Check whether a newer release of the gem already fixed it before patching around it.
+- Verify a fix with `to_sql` through the association, not in isolation: `owner.things.scope_name.to_sql` must still contain the foreign-key predicate.
+- To prove a whole codebase is clean rather than spot-checking, walk every `has_many` whose target class declares one of these scopes, generate `owner.assoc.scope_name.to_sql` under both the old and new boot, and diff. Any pair whose SQL differs is a regression; under dual boot this runs in one session against the same data.
 
 ##### 3b. Association `:conditions` hash → lambda with `where()`
 
@@ -833,7 +929,7 @@ bundle update rails
 ```
 
 ### Phase 3: Fix Breaking Changes
-1. Add lambda to all scopes
+1. Add lambda to **every** scope (mandatory — 4.0 only warns, then returns silently wrong rows; see Section 3a)
 2. **Migrate all association `:conditions`, `:order`, `:extend`, `:uniq` options to lambda syntax** (this is typically the highest-volume change)
 3. Rewrite `:finder_sql` associations as scopes or methods; remove `:readonly` options
 4. Update dynamic finders to where/find_by
@@ -890,6 +986,8 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `ActiveModel::ForbiddenAttributesError` | Section 2 (Strong Parameters) — use `user_params` not `params[:user]` |
 | Scope returns wrong results or errors | Section 3a (Scopes) — add lambda |
+| Query through an association returns rows from the whole table | Section 3a (Scopes) — a non-callable scope body dropped the owner condition |
+| Unexplained slow query / timeout / 503 on a page that scopes an association | Section 3a (Scopes) — check for a full-table read from a non-lambda scope |
 | `Unknown key: :conditions` | Section 3b (Association conditions) — move to lambda |
 | `No route matches` | Section 5 (Routes) — add HTTP method |
 | `NoMethodError: undefined method 'rescue_action'` | Section 6 (rescue_action) — use `rescue_from` |

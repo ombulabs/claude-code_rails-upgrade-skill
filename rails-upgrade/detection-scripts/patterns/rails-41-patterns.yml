@@ -68,6 +68,57 @@ upgrade_findings:
       fix: "Audit each scope on models with default_scope. Use unscope(where: :col) or rewhere(col: value) where a scope is supposed to override the default"
       variable_name: "DEFAULT_SCOPE"
 
+    # The 4.0 hop only warned about these two (see rails-40-patterns.yml). If
+    # they survived that hop they stop working here, so re-check them even when
+    # the 4.0 report was cleared.
+    - name: "Scope without lambda"
+      kind: breaking
+      pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*\\S"
+      exclude: "scope\\s+:\\w+\\s*,\\s*\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new)"
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 dropped the 4.0 deprecation path for non-callable scope bodies and calls body.call unconditionally (activerecord-4.1 lib/active_record/scoping/named.rb). A stored Relation does not respond to #call, so the scope raises NoMethodError the first time it is called — lazily, at call time, not at boot, so a green boot proves nothing. On 4.0 the same code silently returned wrong rows instead of raising"
+      fix: "Wrap the body in a lambda: scope :name, -> { where(...) }. Valid on 3.2 and every later version, so it can be applied before the bump"
+      variable_name: "SCOPE_WITHOUT_LAMBDA"
+
+    - name: "default_scope without block"
+      kind: breaking
+      pattern: "^\\s*default_scope\\b\\s*\\S"
+      exclude: "default_scope\\b\\s*(do\\b|\\{|\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new))"
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 raises ArgumentError, 'Support for calling #default_scope without a block is removed', at class-definition time. Unlike the scope case this fails while the class loads, so it surfaces as a boot / eager-load failure rather than a runtime error"
+      fix: "Change default_scope where(...) to default_scope { where(...) }, or redefine self.default_scope"
+      variable_name: "DEFAULT_SCOPE_WITHOUT_BLOCK"
+
+    # See the same entry in rails-40-patterns.yml for why this exists: the
+    # single-line pattern above cannot see a body that starts on the next line.
+    - name: "Scope body on a continuation line (manual review)"
+      kind: breaking
+      pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*$"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "The scope's body starts on the following line, so a single-line pattern cannot tell whether it is callable. Read the next non-blank line: anything that does not open with ->, lambda, proc or Proc.new is a non-callable body, which raises NoMethodError the first time the scope is called on 4.1"
+      fix: "Inspect the continuation line and wrap the body in a lambda if it is not already callable. Report each occurrence as reviewed, not as fixed-by-pattern"
+      variable_name: "SCOPE_BODY_CONTINUATION"
+
+    # New in 4.1 and independent of whether the body is callable: `scope` now
+    # refuses a name that Active Record already defines as a class method.
+    # Verified against rails/rails 4-1-stable and 4-2-stable
+    # activerecord/lib/active_record/scoping/named.rb. 4.0's `scope` has no name
+    # check at all, and 3.2 only logged "Overwriting existing method", so a
+    # colliding scope can sit in a codebase for years before this hop.
+    - name: "Scope name collides with an Active Record class method"
+      kind: breaking
+      pattern: "^\\s*scope\\s+:(none|all|first|last|take|find|count|sum|average|minimum|maximum|select|update|delete|destroy|create|new|group|order|limit|offset|distinct|ids|pluck)\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 added a guard to ActiveRecord::Scoping::Named#scope: `if dangerous_class_method?(name) ... raise ArgumentError, 'You tried to define a scope named \"x\" on the model \"Y\", but Active Record already defined a class method with the same name.'` This fires at class-definition time, so one colliding scope anywhere breaks boot or eager load. `scope :none` is the common one — Active Record defines `none` itself from 4.0 onward, and apps that hand-rolled a `none` scope on 3.2 (where it did not exist) are carrying a name that now collides"
+      fix: "Rename the scope, or delete it when Active Record's own method already does the job — a hand-rolled `scope :none, -> { where('1=0') }` is redundant from 4.0, since Model.none returns a NullRelation without touching the database. Rails' own check is authoritative; this pattern lists the common collisions and cannot know about class methods your own model defines"
+      variable_name: "SCOPE_NAME_COLLISION"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking

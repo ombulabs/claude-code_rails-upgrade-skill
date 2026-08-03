@@ -159,6 +159,59 @@ assert_select "a[href='/foo']"
 
 ---
 
+#### 5b. Non-Callable `scope` Body Now Fails at Class Load
+
+**What Changed:**
+Rails 4.2 adds a guard clause to `ActiveRecord::Scoping::Named#scope`:
+
+```ruby
+unless body.respond_to?(:call)
+  raise ArgumentError, 'The scope body needs to be callable.'
+end
+```
+
+This fires while the model class is being defined, so **one non-callable scope anywhere in the app breaks boot or eager load** — a louder failure than 4.1, where the same code raised `NoMethodError` lazily on first call. Non-block `default_scope` already raised at class load in 4.1 and continues to.
+
+**Detection Pattern:**
+```ruby
+scope :active, where(active: true)        # any non-callable body, not just where()
+scope :ordered, order(:position)
+default_scope where(deleted_at: nil)
+```
+
+**Fix:**
+```ruby
+scope :active, -> { where(active: true) }
+scope :ordered, -> { order(:position) }
+default_scope { where(deleted_at: nil) }
+```
+
+Coming from 4.1 this should already be done — the app could not have run otherwise. Re-check anyway if the upgrade skipped a hop (4.0 straight to 4.2), because on 4.0 this form only *warned* while silently returning wrong rows. See section 3a of the 3.2 → 4.0 guide for the Rails-source explanation and the SQL evidence.
+
+A line-oriented grep for `scope :name, <body>` misses a body that wraps onto the next line. Search `^\s*scope\s+:\w+\s*,\s*$` as well and read the continuation line.
+
+---
+
+#### 5c. `scope` Still Rejects a Name Active Record Already Defines
+
+**What Changed:**
+Nothing new in 4.2 — the name check `#scope` gained in 4.1 is still there:
+
+```ruby
+if dangerous_class_method?(name)
+  raise ArgumentError, "You tried to define a scope named \"#{name}\" " \
+    "on the model \"#{self.name}\", but Active Record already defined " \
+    "a class method with the same name."
+end
+```
+
+It matters here only for an app that skipped 4.1 and went 4.0 → 4.2 directly: 4.0's `scope` has no name check at all, so the collision surfaces at this hop instead. It fires at class-definition time and stops boot or eager load. `scope :none` is the usual casualty — Active Record gained `Model.none` in 4.0, so a hand-rolled 3.2-era version is carrying a name that is now taken. This is orthogonal to 5b: a colliding scope can be perfectly callable and still refuse to load.
+
+**Fix:**
+Delete the scope where the built-in already does the job (`Model.none` returns a `NullRelation` without querying), rename it otherwise. See section 7c of the 4.0 → 4.1 guide for the full treatment.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### 6. HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -489,6 +542,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 1. Replace `.deliver` / `.deliver!` with `.deliver_now` / `.deliver_now!` (or `.deliver_later` for async)
 2. Replace `.find(obj)` / `.exists?(obj)` with `.find(obj.id)` / `.exists?(obj.id)`
 3. Replace `assert_tag` with `assert_select`
+3b. Wrap any remaining non-callable `scope` / `default_scope` body in a lambda or block — these now raise at class load (section 5b)
 4. Update `Procfile` with `-b 0.0.0.0` if external access needed
 5. Review HTML sanitizer output in tests
 6. Add `config.active_record.raise_in_transactional_callbacks = true`
@@ -524,6 +578,14 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 **Cause:** Extracted to the `responders` gem
 
 **Fix:** `gem 'responders', '~> 2.0'`
+
+### Issue: Boot fails with "The scope body needs to be callable."
+
+**Error:** `ArgumentError: The scope body needs to be callable.`
+
+**Cause:** A model declares `scope :name, where(...)` without wrapping the body in a lambda. Rails 4.2 raises while the class loads. The backtrace names the model, not the scope, so grep the file for `scope :` declarations whose body is a bare relation.
+
+**Fix:** `scope :name, -> { where(...) }` — see section 5b
 
 ### Issue: Transactional callback bugs became silent
 

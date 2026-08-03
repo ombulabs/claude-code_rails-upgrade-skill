@@ -77,6 +77,57 @@ upgrade_findings:
       fix: "Set config.active_job.queue_adapter = :sidekiq (or :resque, :delayed_job, :que, etc.) in config/application.rb or per-environment, and ensure the adapter gem is in the Gemfile. For dev/test without a backend, :inline or :async is acceptable"
       variable_name: "ACTIVE_JOB_ADAPTER"
 
+    # Third and final stop for the non-callable scope body: warned in 4.0,
+    # NoMethodError at call time in 4.1, and from 4.2 the class will not even
+    # load. See version-guides/upgrade-3.2-to-4.0.md section 3a for the
+    # per-version source evidence.
+    - name: "Scope without lambda"
+      kind: "breaking"
+      pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*\\S"
+      exclude: "scope\\s+:\\w+\\s*,\\s*\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new)"
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.2 added a guard clause to ActiveRecord::Scoping::Named#scope: `unless body.respond_to?(:call) ... raise ArgumentError, 'The scope body needs to be callable.'`. This fires at class-definition time, so a single non-callable scope anywhere in the app breaks boot / eager load"
+      fix: "Wrap the body in a lambda: scope :name, -> { where(...) }"
+      variable_name: "SCOPE_WITHOUT_LAMBDA"
+
+    # Removed in 4.1 and still removed in 4.2. Repeated here for the app that
+    # hops 4.0 -> 4.2 directly and never reads the 4.1 guide.
+    - name: "default_scope without block"
+      kind: "breaking"
+      pattern: "^\\s*default_scope\\b\\s*\\S"
+      exclude: "default_scope\\b\\s*(do\\b|\\{|\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new))"
+      search_paths:
+        - "app/models/"
+      explanation: "Support for calling #default_scope without a block was removed in Rails 4.1 and is still absent in 4.2: it raises ArgumentError at class-definition time, so it fails boot / eager load rather than at query time"
+      fix: "Change default_scope where(...) to default_scope { where(...) }, or redefine self.default_scope"
+      variable_name: "DEFAULT_SCOPE_WITHOUT_BLOCK"
+
+    # See rails-40-patterns.yml for why this exists: the single-line pattern
+    # above cannot see a body that starts on the next line.
+    - name: "Scope body on a continuation line (manual review)"
+      kind: "breaking"
+      pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*$"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "The scope's body starts on the following line, so a single-line pattern cannot tell whether it is callable. Read the next non-blank line: anything that does not open with ->, lambda, proc or Proc.new is a non-callable body, and from 4.2 that stops the class from loading at all"
+      fix: "Inspect the continuation line and wrap the body in a lambda if it is not already callable. Report each occurrence as reviewed, not as fixed-by-pattern"
+      variable_name: "SCOPE_BODY_CONTINUATION"
+
+    # The collision guard added in 4.1 is still present in 4.2, so an app
+    # hopping 4.0 -> 4.2 directly needs the same check. Verified against
+    # rails/rails 4-2-stable activerecord/lib/active_record/scoping/named.rb.
+    - name: "Scope name collides with an Active Record class method"
+      kind: "breaking"
+      pattern: "^\\s*scope\\s+:(none|all|first|last|take|find|count|sum|average|minimum|maximum|select|update|delete|destroy|create|new|group|order|limit|offset|distinct|ids|pluck)\\b"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "ActiveRecord::Scoping::Named#scope raises ArgumentError, 'You tried to define a scope named \"x\" on the model \"Y\", but Active Record already defined a class method with the same name.', at class-definition time. Introduced in 4.1 and still present in 4.2, so an app skipping straight from 4.0 hits it here"
+      fix: "Rename the scope, or delete it when Active Record's own method already covers it. Rails' own check is authoritative; this pattern lists the common collisions and cannot know about class methods your own model defines"
+      variable_name: "SCOPE_NAME_COLLISION"
+
   medium_priority:
     - name: "find/exists? with possible AR object argument"
       kind: "deprecation"

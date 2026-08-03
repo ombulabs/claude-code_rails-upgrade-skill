@@ -37,24 +37,54 @@ upgrade_findings:
       fix: "Remove require 'strong_parameters' calls entirely"
       variable_name: "REQUIRE_STRONG_PARAMS"
 
+    # kind: breaking is deliberate. Rails 4.0 emits a deprecation warning rather
+    # than raising, but the runtime behaviour is silently wrong results (see the
+    # explanation below), which is a data-level failure at THIS hop, not a
+    # warning to schedule later. Verified against activerecord-4.0.13
+    # lib/active_record/scoping/named.rb:161-170 — see version-guides/upgrade-3.2-to-4.0.md
+    # section 3a for the source diff and the SQL evidence. Do not reclassify to
+    # deprecation on the strength of the warning alone.
     - name: "Scope without lambda"
       kind: "breaking"
-      pattern: "scope\\s+:\\w+\\s*,\\s*where"
-      exclude: ""
+      pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*\\S"
+      exclude: "scope\\s+:\\w+\\s*,\\s*\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new)"
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 requires all scopes to use a lambda"
-      fix: "Change scope :name, where(...) to scope :name, -> { where(...) }"
+      explanation: "Rails 4.0 only warns on a non-callable scope body, but it SILENTLY RETURNS WRONG RESULTS. 3.2 merged the stored relation into the current scope (scoped.merge(options)); 4.0 returns the stored relation verbatim, discarding whatever it was chained onto. incident.issues.active drops the incident_id condition and queries the whole table; Model.where(x).active drops where(x). No error, no warning at call time — just a full-table read and wrong rows. It raises NoMethodError in 4.1 and ArgumentError at class load in 4.2, so the fix is not deferrable. Any body counts, not just where(): order, joins, includes, select, limit, group, and a hash of finder options are all non-callable"
+      fix: "Wrap every scope body in a lambda: scope :name, where(...) becomes scope :name, -> { where(...) }. Treat this as mandatory, not stylistic. The lambda form is valid on Rails 3.2 as well, so it is safe to apply before the bump and under dual boot. Grep for every scope with a non-callable body (any bare method call, not only where), and check any that are called through an association or chained onto another scope first — those are the ones already returning wrong data"
       variable_name: "SCOPE_WITHOUT_LAMBDA"
 
-    - name: "default_scope without block"
+    # SCOPE_WITHOUT_LAMBDA is line-oriented and needs the body on the same line
+    # as the declaration, so it cannot see `scope :name,` followed by the body
+    # on the next line. That form is common in real code once the body is long
+    # enough to wrap. Measured on one Packwerk app: 22 of its 25 non-callable
+    # scopes were single-line and flagged, and the 3 it missed were all this
+    # shape — two of which were live bugs. This pattern flags the declaration so
+    # a human reads the next line, rather than dropping it silently.
+    - name: "Scope body on a continuation line (manual review)"
       kind: "breaking"
-      pattern: "default_scope\\s+(where|order|:order)"
+      pattern: "^\\s*scope\\s+:\\w+\\s*,\\s*$"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 requires default_scope to use a block"
-      fix: "Change default_scope where(...) to default_scope { where(...) }"
+      explanation: "The scope's body starts on the following line, so a single-line pattern cannot tell whether it is callable. Read the next non-blank line: if it opens with ->, lambda, proc or Proc.new the scope is fine; anything else (joins, where, order, includes, a relation on another class) is a non-callable body and carries the full SCOPE_WITHOUT_LAMBDA problem — silently wrong rows on 4.0, NoMethodError on 4.1, a class-load ArgumentError on 4.2"
+      fix: "Inspect the continuation line and wrap the body in a lambda if it is not already callable: scope :with_author,\\n  joins(:author) becomes scope :with_author, -> { joins(:author) }. Report each occurrence as reviewed, not as fixed-by-pattern"
+      variable_name: "SCOPE_BODY_CONTINUATION"
+
+    # Unlike `scope`, a non-block default_scope still behaves CORRECTLY on 4.0:
+    # build_default_scope merges it (activerecord-4.0.13
+    # lib/active_record/scoping/default.rb). It raises at class load in 4.1.
+    # Kept as breaking so it is fixed in the same pass as the scope bodies —
+    # the two live on the same lines of the same models, and splitting them
+    # across hops means touching every model twice.
+    - name: "default_scope without block"
+      kind: "breaking"
+      pattern: "^\\s*default_scope\\b\\s*\\S"
+      exclude: "default_scope\\b\\s*(do\\b|\\{|\\(?\\s*(->|lambda\\b|proc\\b|Proc\\.new))"
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.0 warns on default_scope without a block but still applies it correctly (build_default_scope merges a Relation argument). Rails 4.1 raises ArgumentError, 'Support for calling #default_scope without a block is removed', at class-definition time — a boot failure at the next hop"
+      fix: "Change default_scope where(...) to default_scope { where(...) }. The block form works on Rails 3.2 as well"
       variable_name: "DEFAULT_SCOPE_WITHOUT_BLOCK"
 
     - name: "Association :conditions option"

@@ -244,6 +244,77 @@ See [this commit](https://github.com/rails/rails/commit/f950b2699f97749ef706c693
 
 ---
 
+#### 7b. Non-Callable `scope` / `default_scope` Bodies Stop Working
+
+**What Changed:**
+Rails 4.0 deprecated a scope body that is not callable but kept accepting it. Rails 4.1 removes both deprecation paths:
+
+- `scope :active, where(active: true)` — 4.1 calls `body.call` unconditionally, so a stored `Relation` raises `NoMethodError: undefined method 'call'`. It raises **lazily, the first time the scope is called**, not at boot, so a clean boot proves nothing. (Rails 4.2 adds a class-load guard that raises `ArgumentError, 'The scope body needs to be callable.'` instead.)
+- `default_scope where(deleted_at: nil)` — 4.1 raises `ArgumentError: Support for calling #default_scope without a block is removed` at class-definition time, which fails boot or eager load.
+
+**Detection Pattern:**
+```ruby
+scope :active, where(active: true)        # any non-callable body, not just where()
+scope :ordered, order(:position)
+default_scope where(deleted_at: nil)
+```
+
+**Fix:**
+```ruby
+scope :active, -> { where(active: true) }
+scope :ordered, -> { order(:position) }
+default_scope { where(deleted_at: nil) }
+```
+
+If you are coming from 4.0 this should already be done — but re-run the check, because on 4.0 the old form only *warned* while silently returning wrong rows, so a codebase that "worked fine" on 4.0 can still be carrying these. See section 3a of the 3.2 → 4.0 guide for the Rails-source explanation and the SQL evidence.
+
+Grep for the wrapped form too. A body that starts on the line *after* the declaration is invisible to a line-oriented search for `scope :name, <body>`:
+
+```ruby
+scope :with_author,
+  joins(:author)      # still non-callable, still raises on 4.1
+```
+
+Search `^\s*scope\s+:\w+\s*,\s*$` as well, and read the continuation line.
+
+---
+
+#### 7c. `scope` Rejects a Name Active Record Already Defines
+
+**What Changed:**
+Rails 4.1 added a name check to `ActiveRecord::Scoping::Named#scope`:
+
+```ruby
+if dangerous_class_method?(name)
+  raise ArgumentError, "You tried to define a scope named \"#{name}\" " \
+    "on the model \"#{self.name}\", but Active Record already defined " \
+    "a class method with the same name."
+end
+```
+
+It fires at **class-definition time**, so one colliding scope anywhere stops boot or eager load. Rails 4.0's `scope` has no name check at all, and 3.2 only logged `Creating scope :x. Overwriting existing method`, so a collision can sit in a codebase for years and surface for the first time here.
+
+`none` is the usual casualty. Active Record only gained `Model.none` in 4.0, so an app that hand-rolled one on 3.2 is carrying a name that is now taken:
+
+```ruby
+# common 3.2-era workaround, often tucked inside a concern
+scope :none, -> { where("1=0") }
+```
+
+Note this is orthogonal to section 7b: the scope above *is* callable and still refuses to load.
+
+**Detection Pattern:**
+```ruby
+scope :none, ...
+scope :all, ...
+scope :count, ...     # any name Active Record defines as a class method
+```
+
+**Fix:**
+Delete the scope where the built-in already does the job — `Model.none` returns a `NullRelation` and never queries the database, which is strictly better than `where("1=0")`. Rename it otherwise. Rails' error message is authoritative; a grep list is only a pre-flight, since the check covers every class method Active Record defines.
+
+---
+
 #### 8. `ActiveRecord::Relation` Mutator Methods Removed
 
 **What Changed:**
@@ -619,6 +690,8 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 7. Swap `post :x, format: :js` for `xhr :post, :x, format: :js` in controller tests.
 8. Update `flash.to_hash` callers to use string keys.
 9. Review `default_scope`-bearing models; apply `unscope`/`rewhere`.
+9b. Wrap every remaining non-callable `scope` / `default_scope` body in a lambda or block — these raise on 4.1 (section 7b), and on 4.0 they only warned. Include bodies that wrap onto a continuation line.
+9c. Rename or delete any scope whose name Active Record already defines as a class method — `scope :none` above all (section 7c). These fail at class load even when the body is callable.
 10. Convert `Relation.compact!` / `Relation.map!` etc. to `to_a` then mutate.
 11. Replace `render :text` with `:plain` / `:html` / `:body`.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
