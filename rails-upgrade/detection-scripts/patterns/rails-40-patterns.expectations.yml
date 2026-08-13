@@ -458,3 +458,17 @@ RACK_LOCK_MIDDLEWARE:
     - '    config.middleware.use Rack::Lock'
     # commented-out line is inert
     - '    # config.middleware.insert_before Rack::Lock'
+
+BELONGS_TO_DEPENDENT:
+  match:
+    - "  belongs_to :document, dependent: :destroy"
+    - "  belongs_to :content, polymorphic: true, dependent: :destroy"
+    - "  belongs_to :document, foreign_key: :resource_id, dependent: :destroy"
+    - "  belongs_to :brand, dependent: :delete"
+  no_match:
+    # Only belongs_to moved phase in 4.0; has_one/has_many were already before_destroy.
+    - "  has_one :attachment, dependent: :destroy"
+    - "  has_many :comments, dependent: :destroy"
+    # A belongs_to without a cascade is unaffected.
+    - "  belongs_to :creator, class_name: \"Person\""
+    - "  belongs_to :organization"
