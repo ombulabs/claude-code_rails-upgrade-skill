@@ -559,9 +559,99 @@ Rails 4.0 dropped support for `vendor/plugins`.
 
 ---
 
+#### 14. Bidirectional `dependent: :destroy` Now Recurses Forever
+
+**What Changed:**
+Rails 3.2 registered `belongs_to ..., dependent: :destroy` as an **after_destroy**, in a `belongs_to`-specific `configure_dependency` (`activerecord-3.2.x/lib/active_record/associations/builder/belongs_to.rb`):
+
+```ruby
+model.after_destroy method_name
+```
+
+Rails 4.0 dropped that special case and registers all three macros from the shared association builder, as a **before_destroy** (`activerecord-4.0.x/lib/active_record/associations/builder/association.rb`):
+
+```ruby
+model.before_destroy "#{macro}_dependent_for_#{name}"
+```
+
+`has_many` and `has_one` were `before_destroy` on both versions; only `belongs_to` moved.
+
+The consequence is that any **two models that each declare `dependent: :destroy` pointing at the other** terminate on 3.2 and recurse forever on 4.0. On 3.2 the `belongs_to` side fired after its own row was deleted, so the reciprocal cascade looked for a row that was already gone and stopped after one bounce. On 4.0 both fire while both rows still exist, so `a.destroy → b.destroy → a.destroy → ...` never ends. Each lap reloads from the database, so nothing detects the repetition: a `SystemStackError` in tests, and in a request a hang that times out into a 5xx.
+
+This is silent on upgrade. There is no deprecation warning, the app boots normally, and it only fires on the delete path — which is exactly the path a lot of suites cover thinly, so it tends to survive to production.
+
+Fixed in Rails 5.0 by [rails/rails#18548](https://github.com/rails/rails/pull/18548), which guards `ActiveRecord::Callbacks#destroy` against re-entrant callbacks. Not backported to 4.x.
+
+**Detection Pattern:**
+```ruby
+# Flag every belongs_to carrying dependent: :destroy, then check the target
+# model for a has_one/has_many pointing back with dependent: :destroy.
+# belongs_to accepts only :destroy and :delete, and :delete skips callbacks,
+# so it cannot close a cycle — :destroy is the whole search.
+belongs_to :document, dependent: :destroy      # and Document has_one :link, dependent: :destroy
+belongs_to :content, polymorphic: true, dependent: :destroy
+belongs_to :document, :dependent => :destroy   # 3.2-era hash-rocket form, same bug
+```
+
+**A single hit is not a bug.** The cycle needs both edges cascading into each other: the `belongs_to` side destroying its parent *and* that parent destroying this record back. A lone `belongs_to ..., dependent: :destroy` whose target does not point back, or a pair where the return edge is `dependent: :delete` / `:nullify` (neither runs callbacks on the way back), terminates fine on 4.0. Every hit is a "go read the other model", not a fix.
+
+A regex cannot see the pair, only one side, and a line-based match also misses a declaration wrapped across lines. To enumerate cycles across a whole app, walk the reflections instead — for each model, each association carrying a cascading `dependent:`, resolve the target (for a polymorphic `belongs_to`, through the models declaring the matching `as:`), then look for an edge pointing back:
+
+```ruby
+model.reflect_on_all_associations.select { |r| r.options[:dependent] == :destroy }
+```
+
+**Fix:**
+Move the cascade the application does *not* drive to an explicit `after_destroy`, which restores the 3.2 ordering. Cut the edge only if nothing relies on that direction — dropping `dependent:` outright stops the loop but silently orphans rows.
+
+```ruby
+# BEFORE — both sides cascade, recurses on 4.0
+class Attachment < ActiveRecord::Base
+  belongs_to :document, dependent: :destroy   # the direction the app drives
+end
+
+class Document < ActiveRecord::Base
+  has_one :attachment, dependent: :destroy    # the reciprocal that closes the cycle
+end
+
+# AFTER — same two deletions, one of them reordered
+class Attachment < ActiveRecord::Base
+  belongs_to :document, dependent: :destroy
+end
+
+class Document < ActiveRecord::Base
+  has_one :attachment
+
+  after_destroy :destroy_attachment
+
+  private
+
+  def destroy_attachment
+    attachment.destroy if attachment
+  end
+end
+```
+
+By the time `after_destroy` runs, this row is gone, so the reciprocal cascade re-reads and resolves to `nil`, stopping after one bounce. Three caveats worth knowing:
+
+- That termination depends on the reciprocal association being re-read from the database. If the pair declares `inverse_of:` (available in 4.0; only the automatic detection arrived in 4.1), or the target is already loaded in memory, `attachment.document` returns the in-memory destroyed `Document` instead of `nil`, its `before_destroy` fires again, and the loop survives the fix — 4.0 has no re-entrancy guard (Rails 5.0 added `@_destroy_callback_already_called`). Verify the pair does not declare `inverse_of:` on the reciprocal edge, or make the callback itself re-entrant:
+  ```ruby
+  def destroy_attachment
+    return if @_destroying_attachment
+    @_destroying_attachment = true
+    attachment.destroy if attachment
+  end
+  ```
+  A `destroyed?` / `frozen?` check is not enough here: neither flag is set until the destroy completes, so the second pass through the callback still sees a live-looking record.
+
+- If the model soft-deletes, "gone" means excluded by the default scope rather than deleted. That still terminates, but confirm it for your soft-delete implementation rather than assuming.
+- The cleanup can no longer veto the destroy. As a `before_destroy` a failed cascade halted the whole operation and `destroy` returned `false`; from `after_destroy` the row is already deleted, so a failure leaves an orphan and `destroy` still reports success. Raise from the callback if you need the old all-or-nothing behavior.
+
+---
+
 ### 🟢 LOW PRIORITY (but commonly encountered)
 
-#### 14. Fixture Dates Must Be Cast to Strings
+#### 15. Fixture Dates Must Be Cast to Strings
 
 **What Changed:**
 Rails 4 is stricter about date parsing in YAML fixtures. Dynamic date expressions like `<%= 3.days.ago %>` can produce `invalid date` errors in tests.
@@ -584,7 +674,7 @@ accepted_at: "<%= 3.days.ago.to_s(:db) %>"
 
 ---
 
-#### 15. `config.eager_load` Required in All Environments
+#### 16. `config.eager_load` Required in All Environments
 
 **What Changed:**
 Rails 4.0 requires `config.eager_load` to be set in every environment file. Without it, Rails raises an error on boot.
@@ -600,7 +690,7 @@ config.eager_load = false
 
 ---
 
-#### 16. `config.assets.compress` Removed
+#### 17. `config.assets.compress` Removed
 
 **What Changed:**
 The `config.assets.compress` directive no longer works in Rails 4. It has been replaced by specific compressor settings.
@@ -622,7 +712,7 @@ config.assets.css_compressor = :sass
 
 ---
 
-#### 17. `ActiveSupport::BufferedLogger` Renamed
+#### 18. `ActiveSupport::BufferedLogger` Renamed
 
 **What Changed:**
 `ActiveSupport::BufferedLogger` was renamed to `ActiveSupport::Logger`.
@@ -646,7 +736,7 @@ Logger.const_get(Rails.configuration.log_level.to_s.upcase)
 
 ---
 
-#### 18. `config.paths["config/routes"]` Key Changed
+#### 19. `config.paths["config/routes"]` Key Changed
 
 **What Changed:**
 The config path key for routes changed from `"config/routes"` to `"config/routes.rb"`.
@@ -667,7 +757,7 @@ config.paths["config/routes.rb"].concat(...)
 
 ---
 
-#### 19. `select('distinct ...').pluck` → `.distinct.pluck`
+#### 20. `select('distinct ...').pluck` → `.distinct.pluck`
 
 **What Changed:**
 Rails 4 introduced the `.distinct` query method as the preferred way to get distinct results.
@@ -688,7 +778,7 @@ relation.distinct.pluck(:assigned_to_id)
 
 ---
 
-#### 20. `assign_attributes` Method Signature Changed
+#### 21. `assign_attributes` Method Signature Changed
 
 **What Changed:**
 In Rails 3.2, `assign_attributes` accepted an options hash as a second argument. In Rails 4.0, the options argument was removed and the method was aliased to `attributes=`.
@@ -711,7 +801,7 @@ assign_attributes(new_attributes)
 
 ---
 
-#### 21. Validation Callback API Changed
+#### 22. Validation Callback API Changed
 
 **What Changed:**
 The internal method `_run_validation_callbacks` was replaced with `run_callbacks(:validation)`.
@@ -732,7 +822,7 @@ run_callbacks(:validation)
 
 ---
 
-#### 22. Test Request Headers API Changed
+#### 23. Test Request Headers API Changed
 
 **What Changed:**
 In controller specs, setting request headers changed from `request.env` to `request.headers`.
@@ -753,7 +843,7 @@ request.headers.merge!(headers)
 
 ---
 
-#### 23. `ActiveRecord::ImmutableRelation` Error
+#### 24. `ActiveRecord::ImmutableRelation` Error
 
 **What Changed:**
 In Rails 4, calling methods like `count` on a relation that has already been loaded or modified can raise `ActiveRecord::ImmutableRelation`.
@@ -768,7 +858,7 @@ Rewrite the query to avoid modifying a frozen relation, e.g., use `.distinct.cou
 
 ---
 
-#### 24. PaperTrail Version Models Require `VersionConcern`
+#### 25. PaperTrail Version Models Require `VersionConcern`
 
 **What Changed:**
 If using PaperTrail with custom version models (subclassing `Version`), Rails 4 requires explicitly including `PaperTrail::VersionConcern`.
@@ -895,11 +985,11 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'rescue_action'` | Section 6 (rescue_action) — use `rescue_from` |
 | `undefined local variable or method` in partial | Section 7 (Partial magic variables) — pass `locals:` |
 | Cache misses after upgrade | Section 8 (cache_key format) — changed to `:nsec` |
-| `invalid date` in fixtures | Section 14 (Fixture dates) — cast with `.to_s(:db)` |
-| `eager_load is set to nil` | Section 15 (config.eager_load) — set in all environments |
-| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 17 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
-| `ActiveRecord::ImmutableRelation` | Section 23 (ImmutableRelation) — use `.distinct.count` |
-| Controller specs don't see custom headers | Section 22 (Test headers) — use `request.headers.merge!` |
+| `invalid date` in fixtures | Section 15 (Fixture dates) — cast with `.to_s(:db)` |
+| `eager_load is set to nil` | Section 16 (config.eager_load) — set in all environments |
+| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 18 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
+| `ActiveRecord::ImmutableRelation` | Section 24 (ImmutableRelation) — use `.distinct.count` |
+| Controller specs don't see custom headers | Section 23 (Test headers) — use `request.headers.merge!` |
 
 ---
 
