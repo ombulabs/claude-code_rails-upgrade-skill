@@ -464,8 +464,16 @@ BELONGS_TO_DEPENDENT:
     - "  belongs_to :document, dependent: :destroy"
     - "  belongs_to :content, polymorphic: true, dependent: :destroy"
     - "  belongs_to :document, foreign_key: :resource_id, dependent: :destroy"
-    - "  belongs_to :brand, dependent: :delete"
+    # 3.2-era hash-rocket syntax is common in the code being upgraded.
+    - "  belongs_to :document, :dependent => :destroy"
+    # Commented-out declarations are flagged on purpose: a commented cascade is
+    # still worth a look when tracing a cycle, and dropping it is a one-line dismissal.
+    - "  # belongs_to :document, dependent: :destroy"
   no_match:
+    # dependent: :delete deletes without running callbacks, so it cannot close a
+    # cycle. :destroy and :delete are the only options belongs_to accepts (4.0
+    # builder/belongs_to.rb valid_dependent_options), so :destroy is the full set.
+    - "  belongs_to :brand, dependent: :delete"
     # Only belongs_to moved phase in 4.0; has_one/has_many were already before_destroy.
     - "  has_one :attachment, dependent: :destroy"
     - "  has_many :comments, dependent: :destroy"

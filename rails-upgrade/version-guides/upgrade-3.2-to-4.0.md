@@ -584,13 +584,18 @@ Fixed in Rails 5.0 by [rails/rails#18548](https://github.com/rails/rails/pull/18
 
 **Detection Pattern:**
 ```ruby
-# Flag every belongs_to carrying dependent:, then check the target model
-# for a has_one/has_many pointing back with dependent: :destroy.
+# Flag every belongs_to carrying dependent: :destroy, then check the target
+# model for a has_one/has_many pointing back with dependent: :destroy.
+# belongs_to accepts only :destroy and :delete, and :delete skips callbacks,
+# so it cannot close a cycle — :destroy is the whole search.
 belongs_to :document, dependent: :destroy      # and Document has_one :link, dependent: :destroy
 belongs_to :content, polymorphic: true, dependent: :destroy
+belongs_to :document, :dependent => :destroy   # 3.2-era hash-rocket form, same bug
 ```
 
-A regex cannot see the pair, only one side. To enumerate cycles across a whole app, walk the reflections instead — for each model, each association carrying a cascading `dependent:`, resolve the target (for a polymorphic `belongs_to`, through the models declaring the matching `as:`), then look for an edge pointing back:
+**A single hit is not a bug.** The cycle needs both edges cascading into each other: the `belongs_to` side destroying its parent *and* that parent destroying this record back. A lone `belongs_to ..., dependent: :destroy` whose target does not point back, or a pair where the return edge is `dependent: :delete` / `:nullify` (neither runs callbacks on the way back), terminates fine on 4.0. Every hit is a "go read the other model", not a fix.
+
+A regex cannot see the pair, only one side, and a line-based match also misses a declaration wrapped across lines. To enumerate cycles across a whole app, walk the reflections instead — for each model, each association carrying a cascading `dependent:`, resolve the target (for a polymorphic `belongs_to`, through the models declaring the matching `as:`), then look for an edge pointing back:
 
 ```ruby
 model.reflect_on_all_associations.select { |r| r.options[:dependent] == :destroy }
@@ -627,7 +632,17 @@ class Document < ActiveRecord::Base
 end
 ```
 
-By the time `after_destroy` runs, this row is gone, so the reciprocal cascade resolves to `nil` and stops after one bounce. Two caveats worth knowing:
+By the time `after_destroy` runs, this row is gone, so the reciprocal cascade re-reads and resolves to `nil`, stopping after one bounce. Three caveats worth knowing:
+
+- That termination depends on the reciprocal association being re-read from the database. If the pair declares `inverse_of:` (available in 4.0; only the automatic detection arrived in 4.1), or the target is already loaded in memory, `attachment.document` returns the in-memory destroyed `Document` instead of `nil`, its `before_destroy` fires again, and the loop survives the fix — 4.0 has no re-entrancy guard (Rails 5.0 added `@_destroy_callback_already_called`). Verify the pair does not declare `inverse_of:` on the reciprocal edge, or make the callback itself re-entrant:
+  ```ruby
+  def destroy_attachment
+    return if @_destroying_attachment
+    @_destroying_attachment = true
+    attachment.destroy if attachment
+  end
+  ```
+  A `destroyed?` / `frozen?` check is not enough here: neither flag is set until the destroy completes, so the second pass through the callback still sees a live-looking record.
 
 - If the model soft-deletes, "gone" means excluded by the default scope rather than deleted. That still terminates, but confirm it for your soft-delete implementation rather than assuming.
 - The cleanup can no longer veto the destroy. As a `before_destroy` a failed cascade halted the whole operation and `destroy` returned `false`; from `after_destroy` the row is already deleted, so a failure leaves an orphan and `destroy` still reports success. Raise from the callback if you need the old all-or-nothing behavior.
@@ -970,11 +985,11 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'rescue_action'` | Section 6 (rescue_action) — use `rescue_from` |
 | `undefined local variable or method` in partial | Section 7 (Partial magic variables) — pass `locals:` |
 | Cache misses after upgrade | Section 8 (cache_key format) — changed to `:nsec` |
-| `invalid date` in fixtures | Section 14 (Fixture dates) — cast with `.to_s(:db)` |
-| `eager_load is set to nil` | Section 15 (config.eager_load) — set in all environments |
-| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 17 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
-| `ActiveRecord::ImmutableRelation` | Section 23 (ImmutableRelation) — use `.distinct.count` |
-| Controller specs don't see custom headers | Section 22 (Test headers) — use `request.headers.merge!` |
+| `invalid date` in fixtures | Section 15 (Fixture dates) — cast with `.to_s(:db)` |
+| `eager_load is set to nil` | Section 16 (config.eager_load) — set in all environments |
+| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 18 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
+| `ActiveRecord::ImmutableRelation` | Section 24 (ImmutableRelation) — use `.distinct.count` |
+| Controller specs don't see custom headers | Section 23 (Test headers) — use `request.headers.merge!` |
 
 ---
 
