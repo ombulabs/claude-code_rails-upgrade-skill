@@ -458,3 +458,55 @@ RACK_LOCK_MIDDLEWARE:
     - '    config.middleware.use Rack::Lock'
     # commented-out line is inert
     - '    # config.middleware.insert_before Rack::Lock'
+
+ORDER_WITHOUT_ARGUMENTS:
+  # Pattern: a bare order/reorder with nothing to sort by. Requires either a
+  # relation method right after the call, or empty / nil / [] arguments, so
+  # that reading an `order` association or column does not get flagged.
+  match:
+    - '        link = PersonConsentLink.where(person_id: person_id).order.last'
+    - '    scope.reorder.to_a'
+    - '    Widget.where(active: true).order.first'
+    - '    Widget.order().each { |w| puts w }'
+  no_match:
+    # reading an order association or column, by far the common case
+    - '    total = line_item.order.total'
+    - '    payment.order'
+    # already naming a column
+    - '    Widget.order(:id).last'
+    - '    Widget.order("id ASC").first'
+    - '    Widget.reorder(:created_at).to_a'
+    # method names that merely start with a relation method
+    - '    total = line_item.order.summary'
+    - '    items = invoice.order.selected_items'
+    - '    n = line_item.order.counts'
+    # nil / [] are not blank? once splatted, so these never raise on 4.0.
+    # reorder(nil) is the documented way to clear a default order.
+    - '    Widget.order(nil).count'
+    - '    Widget.reorder([]).pluck(:id)'
+    - '    Widget.reorder(nil).to_a'
+    # different method entirely
+    - '    Widget.order_by(:id).last'
+
+SQUEEL_ORDER_JOINED_TABLE:
+  # Pattern: a single-line order hash whose value is not :asc / :desc, with or
+  # without braces. A hash spread over several lines cannot be matched, since
+  # detection reads one line at a time.
+  match:
+    - '          .order(patient_groups: :id)'
+    - '          .order({ checklist_task_items: :month })'
+    - '    relation.order(:event => :start)'
+    - '    relation.order({:event => :start})'
+    # a :description column must not suppress a real finding on the same line
+    - '    relation.order(event: :start).where(:description => x)'
+  no_match:
+    # legitimate direction hashes
+    - '    Widget.order(name: :asc)'
+    - '    Widget.order(id: :desc)'
+    - '    Widget.order({ id: :desc })'
+    # method names merely ending in "order"
+    - '    work_order(status: :open)'
+    - '    set_sort_order(field: :name)'
+    # string and symbol forms are unaffected
+    - '    Widget.order("events.start ASC")'
+    - '    Widget.order(:start)'
