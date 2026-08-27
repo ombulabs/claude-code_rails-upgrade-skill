@@ -367,9 +367,105 @@ get '/home' => 'home#index'
 
 ---
 
+#### 6. `order` and `reorder` Require Arguments
+
+**What Changed:**
+Rails 3.2 defined `order` as:
+
+```ruby
+def order(*args)
+  return self if args.blank?
+  # ...
+end
+```
+
+so a bare `order` or `order()` silently returned the relation unchanged. Rails 4.0 calls
+`check_if_method_has_arguments!("order", args)` at the top of both `order` and `reorder`,
+so both forms now raise:
+
+```
+ArgumentError: The method .order() must contain arguments.
+```
+
+This raises at runtime on the call site, not at boot. A report, a background worker or an
+admin screen that no spec exercises will pass CI and raise in production.
+
+Only those two forms raise. The guard tests the splat array, so `order(nil)` passes
+`[nil]` and `order([])` passes `[[]]`, and neither is `blank?`. Both keep working on 4.0,
+and `reorder(nil)` is the documented way to clear a default order, so leave them alone.
+
+The hash form has the same shape of problem. Rails 3.2 had no hash support in `order` at
+all: the hash was serialized into the `ORDER BY` string, the database sorted by nothing
+usable, and rows came back in whatever order it chose. Rails 4.0 reads a hash strictly as
+`{column => direction}` and validates the value against `:asc` / `:desc`, so
+`order(events: :start)` raises. It also only accepts columns on the model's own table, so
+a sort spanning joined tables cannot be written as a hash on 4.0 at all.
+
+**Detection Pattern:**
+```bash
+# bare calls: empty parens, or a relation method right after
+grep -rnE "\.(order|reorder)(\(\s*\)|\.(first|last|all|to_a|each|find_each|find_in_batches|count|size|length|pluck|ids|limit|offset|where|includes|joins|select|distinct|exists\?|any\?|none\?|empty\?|sum|maximum|minimum|average|take)([^A-Za-z0-9_]|$))" app/ lib/
+
+# hash forms, minus the legitimate direction hashes
+grep -rnE "(^|[^A-Za-z0-9_])(re)?order\(\s*\{?\s*:?\w+\s*(:|=>)\s*:\w+" app/ lib/ | grep -vE ":asc|:desc"
+```
+
+Reading an `order` association or column (`line_item.order`, `payment.order.total`) is far
+more common than the bug, which is why the bare-call grep requires a relation method after
+it, and why that method name must end there: without the trailing boundary,
+`line_item.order.summary` matches on `sum`. The `:asc` / `:desc` filter is applied to the
+whole line, so a line chaining a bad hash and a good one is filtered out with it; split
+such chains before trusting a clean run. Multi-line hashes cannot be grepped at all, so
+also scan `order(` by hand in query objects and reports. Two shapes stay invisible to both
+the grep and the skill's own pattern: a receiverless `order` inside a scope
+(`scope :recent, -> { order }`), and a bare call followed by an enumerable method rather
+than a relation method (`.order.map { ... }`, `.order.sort_by { ... }`).
+
+**Fix:**
+```ruby
+# BEFORE
+PersonConsentLink.where(person_id: person_id).order.last
+
+# AFTER
+PersonConsentLink.where(person_id: person_id).order(:id).last
+```
+
+`:id` is not an arbitrary choice for the `.order.last` shape. On 3.2, `last` with no order
+calls `reverse_order`, which falls back to `ORDER BY <table>.<primary_key> DESC LIMIT 1`,
+so `order(:id).last` reproduces the old result exactly.
+
+```ruby
+# BEFORE: raises on 4.0, sorted by nothing on 3.2
+.order(
+  { patient_groups: :id },
+  { checklist_task_items: :month }
+)
+
+# AFTER: strings are the only form that can express a sort across joined tables
+.order(
+  "patient_groups.id",
+  "checklist_task_items.month"
+)
+```
+
+Both fixes are version-agnostic and behave identically on 3.2 and 4.0, so no
+`NextRails.next?` branch is needed.
+
+**Expect output to change.** Every one of these call sites except `.order.last` was
+sorting by nothing before, so the query has never returned rows in the order the code
+claims. Fixing it sorts the result for the first time, which is a behavior change to
+review, not just a syntax fix. Check whether any test asserts on the old row order, and
+whether downstream code (a CSV export, a paginated screen) depends on it.
+
+For Rails 5.2 and later, a bare string passed to `order` triggers a `Dangerous query
+method` warning; wrap it as `Arel.sql("patient_groups.id")`. `Arel.sql` exists since Rails
+3.0, so the wrap is safe to add now.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. `rescue_action` Removed — Use `rescue_from`
+#### 7. `rescue_action` Removed — Use `rescue_from`
 
 **What Changed:**
 The `rescue_action` method was removed in Rails 4.0 with no deprecation warning. Use `rescue_from` instead.
@@ -401,7 +497,7 @@ Note: `rescue_from` does not support `super`, so re-raise the exception if neede
 
 ---
 
-#### 7. Partial Magic Variables Removed
+#### 8. Partial Magic Variables Removed
 
 **What Changed:**
 In Rails 3.2, rendering a partial automatically defined a local variable named after the partial (set to `nil` if no object/collection was passed). Rails 4.0 only defines this variable when rendering with `collection:` or `object:` options. Partials that rely on the implicit variable will raise `undefined local variable or method` errors.
@@ -458,7 +554,7 @@ Results need manual review — only partials rendered without `collection:`, `ob
 
 ---
 
-#### 8. `cache_key` Timestamp Format Changed
+#### 9. `cache_key` Timestamp Format Changed
 
 **What Changed:**
 The `cache_timestamp_format` changed from `:number` to `:nsec`, producing longer, more precise cache keys. This can break code that compares or stores cache keys as strings.
@@ -487,7 +583,7 @@ If your code stores cache keys externally (e.g., in Redis, a database, or a back
 
 ---
 
-#### 9. Observers Extracted
+#### 10. Observers Extracted
 
 **What Changed:**
 ActiveRecord Observers are no longer included by default.
@@ -500,7 +596,7 @@ gem 'rails-observers'
 
 ---
 
-#### 10. ActionController Sweeper Extracted
+#### 11. ActionController Sweeper Extracted
 
 **What Changed:**
 Sweepers are no longer included.
@@ -511,11 +607,11 @@ Sweepers are no longer included.
 gem 'rails-observers'
 ```
 
-Note: This is the same gem as #9 (Observers) — `rails-observers` bundles both Observers and Sweepers.
+Note: This is the same gem as #10 (Observers) — `rails-observers` bundles both Observers and Sweepers.
 
 ---
 
-#### 11. Action Caching Extracted
+#### 12. Action Caching Extracted
 
 **What Changed:**
 `caches_page` and `caches_action` are no longer included.
@@ -534,7 +630,7 @@ gem 'actionpack-action_caching'
 
 ---
 
-#### 12. ActiveResource Extracted
+#### 13. ActiveResource Extracted
 
 **What Changed:**
 ActiveResource is no longer included.
@@ -547,7 +643,7 @@ gem 'activeresource'
 
 ---
 
-#### 13. Plugins No Longer Supported
+#### 14. Plugins No Longer Supported
 
 **What Changed:**
 Rails 4.0 dropped support for `vendor/plugins`.
@@ -561,7 +657,7 @@ Rails 4.0 dropped support for `vendor/plugins`.
 
 ### 🟢 LOW PRIORITY (but commonly encountered)
 
-#### 14. Fixture Dates Must Be Cast to Strings
+#### 15. Fixture Dates Must Be Cast to Strings
 
 **What Changed:**
 Rails 4 is stricter about date parsing in YAML fixtures. Dynamic date expressions like `<%= 3.days.ago %>` can produce `invalid date` errors in tests.
@@ -584,7 +680,7 @@ accepted_at: "<%= 3.days.ago.to_s(:db) %>"
 
 ---
 
-#### 15. `config.eager_load` Required in All Environments
+#### 16. `config.eager_load` Required in All Environments
 
 **What Changed:**
 Rails 4.0 requires `config.eager_load` to be set in every environment file. Without it, Rails raises an error on boot.
@@ -600,7 +696,7 @@ config.eager_load = false
 
 ---
 
-#### 16. `config.assets.compress` Removed
+#### 17. `config.assets.compress` Removed
 
 **What Changed:**
 The `config.assets.compress` directive no longer works in Rails 4. It has been replaced by specific compressor settings.
@@ -622,7 +718,7 @@ config.assets.css_compressor = :sass
 
 ---
 
-#### 17. `ActiveSupport::BufferedLogger` Renamed
+#### 18. `ActiveSupport::BufferedLogger` Renamed
 
 **What Changed:**
 `ActiveSupport::BufferedLogger` was renamed to `ActiveSupport::Logger`.
@@ -646,7 +742,7 @@ Logger.const_get(Rails.configuration.log_level.to_s.upcase)
 
 ---
 
-#### 18. `config.paths["config/routes"]` Key Changed
+#### 19. `config.paths["config/routes"]` Key Changed
 
 **What Changed:**
 The config path key for routes changed from `"config/routes"` to `"config/routes.rb"`.
@@ -667,7 +763,7 @@ config.paths["config/routes.rb"].concat(...)
 
 ---
 
-#### 19. `select('distinct ...').pluck` → `.distinct.pluck`
+#### 20. `select('distinct ...').pluck` → `.distinct.pluck`
 
 **What Changed:**
 Rails 4 introduced the `.distinct` query method as the preferred way to get distinct results.
@@ -688,7 +784,7 @@ relation.distinct.pluck(:assigned_to_id)
 
 ---
 
-#### 20. `assign_attributes` Method Signature Changed
+#### 21. `assign_attributes` Method Signature Changed
 
 **What Changed:**
 In Rails 3.2, `assign_attributes` accepted an options hash as a second argument. In Rails 4.0, the options argument was removed and the method was aliased to `attributes=`.
@@ -711,7 +807,7 @@ assign_attributes(new_attributes)
 
 ---
 
-#### 21. Validation Callback API Changed
+#### 22. Validation Callback API Changed
 
 **What Changed:**
 The internal method `_run_validation_callbacks` was replaced with `run_callbacks(:validation)`.
@@ -732,7 +828,7 @@ run_callbacks(:validation)
 
 ---
 
-#### 22. Test Request Headers API Changed
+#### 23. Test Request Headers API Changed
 
 **What Changed:**
 In controller specs, setting request headers changed from `request.env` to `request.headers`.
@@ -753,7 +849,7 @@ request.headers.merge!(headers)
 
 ---
 
-#### 23. `ActiveRecord::ImmutableRelation` Error
+#### 24. `ActiveRecord::ImmutableRelation` Error
 
 **What Changed:**
 In Rails 4, calling methods like `count` on a relation that has already been loaded or modified can raise `ActiveRecord::ImmutableRelation`.
@@ -768,7 +864,7 @@ Rewrite the query to avoid modifying a frozen relation, e.g., use `.distinct.cou
 
 ---
 
-#### 24. PaperTrail Version Models Require `VersionConcern`
+#### 25. PaperTrail Version Models Require `VersionConcern`
 
 **What Changed:**
 If using PaperTrail with custom version models (subclassing `Version`), Rails 4 requires explicitly including `PaperTrail::VersionConcern`.
@@ -892,14 +988,16 @@ Error → section lookup for the most common errors encountered during this upgr
 | Scope returns wrong results or errors | Section 3a (Scopes) — add lambda |
 | `Unknown key: :conditions` | Section 3b (Association conditions) — move to lambda |
 | `No route matches` | Section 5 (Routes) — add HTTP method |
-| `NoMethodError: undefined method 'rescue_action'` | Section 6 (rescue_action) — use `rescue_from` |
-| `undefined local variable or method` in partial | Section 7 (Partial magic variables) — pass `locals:` |
-| Cache misses after upgrade | Section 8 (cache_key format) — changed to `:nsec` |
-| `invalid date` in fixtures | Section 14 (Fixture dates) — cast with `.to_s(:db)` |
-| `eager_load is set to nil` | Section 15 (config.eager_load) — set in all environments |
-| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 17 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
-| `ActiveRecord::ImmutableRelation` | Section 23 (ImmutableRelation) — use `.distinct.count` |
-| Controller specs don't see custom headers | Section 22 (Test headers) — use `request.headers.merge!` |
+| `ArgumentError: The method .order() must contain arguments.` | Section 6 (order/reorder) — name the column, `order(:id)` for `.order.last` |
+| `ArgumentError: Direction should be :asc or :desc` | Section 6 (order/reorder) — hash values must be `:asc` / `:desc`; use strings across joins |
+| `NoMethodError: undefined method 'rescue_action'` | Section 7 (rescue_action) — use `rescue_from` |
+| `undefined local variable or method` in partial | Section 8 (Partial magic variables) — pass `locals:` |
+| Cache misses after upgrade | Section 9 (cache_key format) — changed to `:nsec` |
+| `invalid date` in fixtures | Section 15 (Fixture dates) — cast with `.to_s(:db)` |
+| `eager_load is set to nil` | Section 16 (config.eager_load) — set in all environments |
+| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 18 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
+| `ActiveRecord::ImmutableRelation` | Section 24 (ImmutableRelation) — use `.distinct.count` |
+| Controller specs don't see custom headers | Section 23 (Test headers) — use `request.headers.merge!` |
 
 ---
 
