@@ -458,3 +458,22 @@ RACK_LOCK_MIDDLEWARE:
     - '    config.middleware.use Rack::Lock'
     # commented-out line is inert
     - '    # config.middleware.insert_before Rack::Lock'
+
+REMOTE_FORM_CSRF_TOKEN:
+  # Pattern: form helpers carrying remote: true (either hash syntax).
+  # Remote links and plain forms are not affected.
+  match:
+    - '= form_for @user, remote: true do |f|'
+    - '  <%= form_tag(search_path, remote: true) do %>'
+    - '= form_for @person, :remote => true, html: { class: "opt-in-form" } do |f|'
+    - '= simple_form_for @user, remote: true do |f|'
+    - '= form_for [clinic, patient], url: settings_path, remote: true do |f|'
+  no_match:
+    # remote link_to: UJS builds the form and its token itself
+    - '= link_to "Delete", user_path(user), remote: true, method: :delete'
+    # button_to renders its own token_tag on POST, regardless of this config
+    - '= button_to "Save", settings_path, remote: true'
+    # not a remote form
+    - '= form_for @user do |f|'
+    # the config pin itself, not a form
+    - '    config.action_view.embed_authenticity_token_in_remote_forms = true'
