@@ -367,7 +367,101 @@ get '/home' => 'home#index'
 
 ---
 
-#### 6. `order` and `reorder` Require Arguments
+#### 6. Remote Forms Stop Embedding the CSRF Token
+
+**What Changed:**
+`config.action_view.embed_authenticity_token_in_remote_forms` defaults to `false` in
+Rails 4.0 (it was `true` in 3.2), so `remote: true` forms no longer render the hidden
+`authenticity_token` field. From then on the token reaches the server only as the
+`X-CSRF-Token` header that rails-ujs sets from the `csrf-token` meta tag, which means
+the form is protected only while UJS is the thing submitting it. Any other submit path
+(a hand-rolled `fetch` posting a `FormData` built from the form, an iframe upload, a
+form serialized by a plugin) posts with no CSRF token at all. With a bare
+`protect_from_forgery`, Rails 4.0 does not raise: the `:null_session` strategy empties
+the session, so the request arrives without its user and fails somewhere further in, or
+silently does nothing.
+
+Rails made the change for fragment caching. The token is per-session, so the hidden
+field makes the form's HTML unique per user: cache that fragment and you either serve
+one user's token to everybody or you cannot cache it at all. Remote forms were assumed
+to always be submitted by UJS as an XHR, which in a real application they are not. The
+[Rails CHANGELOG entry for the flip](https://github.com/rails/rails/commit/128cfbdf4d316a544a76e5c58dbeac153f3d4e36)
+names the escape hatch: set the config to `true`, or pass `:authenticity_token => true`
+per form. Later Rails
+[softened the default to `nil`](https://github.com/rails/rails/commit/6309b85100dd2b55c716ee4a4e9cbd3da2dc0617),
+meaning "let the form helper decide", so pinning it back is not fighting the
+framework's direction.
+
+Nothing warns, and no test catches it. The Rails-side change is the *absence* of a
+config line, so no grep can see it; the failure is browser-only, so `rack_test` never
+runs the JavaScript that does the submitting; and `allow_forgery_protection` is off in
+the test environment, so no token is rendered in tests either way.
+
+**Detection Pattern:**
+```bash
+# remote forms whose submit path needs auditing, both hash syntaxes
+grep -rnE "remote:\s*true|:remote\s*=>\s*true" app/views/ app/helpers/
+
+# confirm the app never pinned the config
+grep -rn "embed_authenticity_token_in_remote_forms" config/
+
+# true on the current boot and false on the next confirms it relies on the default
+bundle exec rails runner 'puts ActionView::Helpers::FormTagHelper.embed_authenticity_token_in_remote_forms.inspect'
+BUNDLE_GEMFILE=Gemfile.next bundle exec rails runner 'puts ActionView::Helpers::FormTagHelper.embed_authenticity_token_in_remote_forms.inspect'
+```
+
+Remote `link_to` / `button_to` links are safe: UJS builds their form and token itself.
+The grep is a list of forms to audit, not a list of forms to change.
+
+**Fix:**
+```ruby
+# config/application.rb
+# Pinned to the Rails 3.2 default: Rails 4.0 stops embedding the token in
+# remote forms, leaving custom JS submit paths with no CSRF token at all.
+config.action_view.embed_authenticity_token_in_remote_forms = true
+```
+
+Valid on both 3.2 and 4.x, so no `NextRails.next?` branch. The pin is a backstop, not
+the whole fix. Any `fetch` / `XMLHttpRequest` that posts form data itself still needs
+the token set explicitly:
+
+```javascript
+fetch(url, {
+  method: "POST",
+  body: new FormData(form),
+  headers: { "X-CSRF-Token": document.querySelector("meta[name=csrf-token]").content }
+})
+```
+
+Check that the layout renders `csrf_meta_tags`. Without it there is no token to read,
+and UJS has nothing to send either.
+
+**Catch it in the suite:** one example with forgery protection switched on. It goes red
+on the next boot and green after the pin, and flipping the flag is the whole trick,
+since the test environment disables it:
+
+```ruby
+around do |example|
+  was_protecting = ActionController::Base.allow_forgery_protection
+  ActionController::Base.allow_forgery_protection = true
+  example.run
+  ActionController::Base.allow_forgery_protection = was_protecting
+end
+
+it "embeds an authenticity token in the remote form" do
+  visit edit_settings_path
+
+  expect(page).to have_css("form.opt-in-form input[name='authenticity_token']", visible: :all)
+end
+```
+
+Related: **4.2** masks the token per request (`CSRF_TOKEN_MASKING`), so any client that
+caches a token across requests breaks there. **7.0** replaces UJS with Turbo and the
+submit path changes again.
+
+---
+
+#### 7. `order` and `reorder` Require Arguments
 
 **What Changed:**
 Rails 3.2 defined `order` as:
@@ -465,7 +559,7 @@ method` warning; wrap it as `Arel.sql("patient_groups.id")`. `Arel.sql` exists s
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 7. `rescue_action` Removed — Use `rescue_from`
+#### 8. `rescue_action` Removed — Use `rescue_from`
 
 **What Changed:**
 The `rescue_action` method was removed in Rails 4.0 with no deprecation warning. Use `rescue_from` instead.
@@ -497,7 +591,7 @@ Note: `rescue_from` does not support `super`, so re-raise the exception if neede
 
 ---
 
-#### 8. Partial Magic Variables Removed
+#### 9. Partial Magic Variables Removed
 
 **What Changed:**
 In Rails 3.2, rendering a partial automatically defined a local variable named after the partial (set to `nil` if no object/collection was passed). Rails 4.0 only defines this variable when rendering with `collection:` or `object:` options. Partials that rely on the implicit variable will raise `undefined local variable or method` errors.
@@ -554,7 +648,7 @@ Results need manual review — only partials rendered without `collection:`, `ob
 
 ---
 
-#### 9. `cache_key` Timestamp Format Changed
+#### 10. `cache_key` Timestamp Format Changed
 
 **What Changed:**
 The `cache_timestamp_format` changed from `:number` to `:nsec`, producing longer, more precise cache keys. This can break code that compares or stores cache keys as strings.
@@ -583,7 +677,7 @@ If your code stores cache keys externally (e.g., in Redis, a database, or a back
 
 ---
 
-#### 10. Observers Extracted
+#### 11. Observers Extracted
 
 **What Changed:**
 ActiveRecord Observers are no longer included by default.
@@ -596,7 +690,7 @@ gem 'rails-observers'
 
 ---
 
-#### 11. ActionController Sweeper Extracted
+#### 12. ActionController Sweeper Extracted
 
 **What Changed:**
 Sweepers are no longer included.
@@ -611,7 +705,7 @@ Note: This is the same gem as #10 (Observers) — `rails-observers` bundles both
 
 ---
 
-#### 12. Action Caching Extracted
+#### 13. Action Caching Extracted
 
 **What Changed:**
 `caches_page` and `caches_action` are no longer included.
@@ -630,7 +724,7 @@ gem 'actionpack-action_caching'
 
 ---
 
-#### 13. ActiveResource Extracted
+#### 14. ActiveResource Extracted
 
 **What Changed:**
 ActiveResource is no longer included.
@@ -643,7 +737,7 @@ gem 'activeresource'
 
 ---
 
-#### 14. Plugins No Longer Supported
+#### 15. Plugins No Longer Supported
 
 **What Changed:**
 Rails 4.0 dropped support for `vendor/plugins`.
@@ -657,7 +751,7 @@ Rails 4.0 dropped support for `vendor/plugins`.
 
 ### 🟢 LOW PRIORITY (but commonly encountered)
 
-#### 15. Fixture Dates Must Be Cast to Strings
+#### 16. Fixture Dates Must Be Cast to Strings
 
 **What Changed:**
 Rails 4 is stricter about date parsing in YAML fixtures. Dynamic date expressions like `<%= 3.days.ago %>` can produce `invalid date` errors in tests.
@@ -680,7 +774,7 @@ accepted_at: "<%= 3.days.ago.to_s(:db) %>"
 
 ---
 
-#### 16. `config.eager_load` Required in All Environments
+#### 17. `config.eager_load` Required in All Environments
 
 **What Changed:**
 Rails 4.0 requires `config.eager_load` to be set in every environment file. Without it, Rails raises an error on boot.
@@ -696,7 +790,7 @@ config.eager_load = false
 
 ---
 
-#### 17. `config.assets.compress` Removed
+#### 18. `config.assets.compress` Removed
 
 **What Changed:**
 The `config.assets.compress` directive no longer works in Rails 4. It has been replaced by specific compressor settings.
@@ -718,7 +812,7 @@ config.assets.css_compressor = :sass
 
 ---
 
-#### 18. `ActiveSupport::BufferedLogger` Renamed
+#### 19. `ActiveSupport::BufferedLogger` Renamed
 
 **What Changed:**
 `ActiveSupport::BufferedLogger` was renamed to `ActiveSupport::Logger`.
@@ -742,7 +836,7 @@ Logger.const_get(Rails.configuration.log_level.to_s.upcase)
 
 ---
 
-#### 19. `config.paths["config/routes"]` Key Changed
+#### 20. `config.paths["config/routes"]` Key Changed
 
 **What Changed:**
 The config path key for routes changed from `"config/routes"` to `"config/routes.rb"`.
@@ -763,7 +857,7 @@ config.paths["config/routes.rb"].concat(...)
 
 ---
 
-#### 20. `select('distinct ...').pluck` → `.distinct.pluck`
+#### 21. `select('distinct ...').pluck` → `.distinct.pluck`
 
 **What Changed:**
 Rails 4 introduced the `.distinct` query method as the preferred way to get distinct results.
@@ -784,7 +878,7 @@ relation.distinct.pluck(:assigned_to_id)
 
 ---
 
-#### 21. `assign_attributes` Method Signature Changed
+#### 22. `assign_attributes` Method Signature Changed
 
 **What Changed:**
 In Rails 3.2, `assign_attributes` accepted an options hash as a second argument. In Rails 4.0, the options argument was removed and the method was aliased to `attributes=`.
@@ -807,7 +901,7 @@ assign_attributes(new_attributes)
 
 ---
 
-#### 22. Validation Callback API Changed
+#### 23. Validation Callback API Changed
 
 **What Changed:**
 The internal method `_run_validation_callbacks` was replaced with `run_callbacks(:validation)`.
@@ -828,7 +922,7 @@ run_callbacks(:validation)
 
 ---
 
-#### 23. Test Request Headers API Changed
+#### 24. Test Request Headers API Changed
 
 **What Changed:**
 In controller specs, setting request headers changed from `request.env` to `request.headers`.
@@ -849,7 +943,7 @@ request.headers.merge!(headers)
 
 ---
 
-#### 24. `ActiveRecord::ImmutableRelation` Error
+#### 25. `ActiveRecord::ImmutableRelation` Error
 
 **What Changed:**
 In Rails 4, calling methods like `count` on a relation that has already been loaded or modified can raise `ActiveRecord::ImmutableRelation`.
@@ -864,7 +958,7 @@ Rewrite the query to avoid modifying a frozen relation, e.g., use `.distinct.cou
 
 ---
 
-#### 25. PaperTrail Version Models Require `VersionConcern`
+#### 26. PaperTrail Version Models Require `VersionConcern`
 
 **What Changed:**
 If using PaperTrail with custom version models (subclassing `Version`), Rails 4 requires explicitly including `PaperTrail::VersionConcern`.
@@ -988,16 +1082,17 @@ Error → section lookup for the most common errors encountered during this upgr
 | Scope returns wrong results or errors | Section 3a (Scopes) — add lambda |
 | `Unknown key: :conditions` | Section 3b (Association conditions) — move to lambda |
 | `No route matches` | Section 5 (Routes) — add HTTP method |
-| `ArgumentError: The method .order() must contain arguments.` | Section 6 (order/reorder) — name the column, `order(:id)` for `.order.last` |
-| `ArgumentError: Direction should be :asc or :desc` | Section 6 (order/reorder) — hash values must be `:asc` / `:desc`; use strings across joins |
-| `NoMethodError: undefined method 'rescue_action'` | Section 7 (rescue_action) — use `rescue_from` |
-| `undefined local variable or method` in partial | Section 8 (Partial magic variables) — pass `locals:` |
-| Cache misses after upgrade | Section 9 (cache_key format) — changed to `:nsec` |
-| `invalid date` in fixtures | Section 15 (Fixture dates) — cast with `.to_s(:db)` |
-| `eager_load is set to nil` | Section 16 (config.eager_load) — set in all environments |
-| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 18 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
-| `ActiveRecord::ImmutableRelation` | Section 24 (ImmutableRelation) — use `.distinct.count` |
-| Controller specs don't see custom headers | Section 23 (Test headers) — use `request.headers.merge!` |
+| Remote form POST arrives with no session or current user | Section 6 (Remote form CSRF) — pin `embed_authenticity_token_in_remote_forms` |
+| `ArgumentError: The method .order() must contain arguments.` | Section 7 (order/reorder) — name the column, `order(:id)` for `.order.last` |
+| `ArgumentError: Direction should be :asc or :desc` | Section 7 (order/reorder) — hash values must be `:asc` / `:desc`; use strings across joins |
+| `NoMethodError: undefined method 'rescue_action'` | Section 8 (rescue_action) — use `rescue_from` |
+| `undefined local variable or method` in partial | Section 9 (Partial magic variables) — pass `locals:` |
+| Cache misses after upgrade | Section 10 (cache_key format) — changed to `:nsec` |
+| `invalid date` in fixtures | Section 16 (Fixture dates) — cast with `.to_s(:db)` |
+| `eager_load is set to nil` | Section 17 (config.eager_load) — set in all environments |
+| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 19 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
+| `ActiveRecord::ImmutableRelation` | Section 25 (ImmutableRelation) — use `.distinct.count` |
+| Controller specs don't see custom headers | Section 24 (Test headers) — use `request.headers.merge!` |
 
 ---
 
