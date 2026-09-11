@@ -317,6 +317,18 @@ upgrade_findings:
       fix: "Extract the inline module out of the route file into a conventional autoload path so the constant is loaded the same way on both Rails versions. This fix is version-agnostic — no `NextRails.next?` branch is needed, because an autoloaded constant survives the routes-reload boundary on 4.0 and loads identically on 3.2. Steps: (1) Move the definition into an autoload location that mirrors the constant name, e.g. `Constraints::Admin` → `app/constraints/constraints/admin.rb`. Every directory under `app/` is on the autoload path by default on both 3.2 and 4.0, so no config change is needed; only if you place the file under `lib/` do you add `config.autoload_paths += [Rails.root.join(\"lib\")]` in `config/application.rb`. (2) Delete the `module ... end` wrapper from the route file, leaving only the usage. BEFORE (config/routes/admin.rb): `module Constraints; class Admin; def matches?(req); ...; end; end; end` followed by the `Rails.application.routes.draw` block that calls `constraints Constraints::Admin.new do ... end`. AFTER: the `module`/`class` block lives in `app/constraints/constraints/admin.rb`; the route file keeps only the `constraints Constraints::Admin.new do ... end` usage and no longer defines the constant"
       variable_name: "ROUTES_TOP_LEVEL_MODULE_AUTOLOAD"
 
+    - name: "Remote form that relies on an embedded CSRF token"
+      kind: "breaking"
+      pattern: "(form_for|form_tag|form_with|simple_form_for)[^\\n]*(remote:\\s*true|:remote\\s*=>\\s*true)"
+      exclude: ""
+      search_paths:
+        - "app/views/"
+        - "app/helpers/"
+        - "app/cells/"
+      explanation: "Rails 4.0 flips the default of config.action_view.embed_authenticity_token_in_remote_forms from true to false, so remote forms stop rendering the hidden authenticity_token field. From then on the token reaches the server only as the X-CSRF-Token header that rails-ujs sets from the csrf-token meta tag. Any submit path that does not go through rails-ujs (custom fetch / XHR that posts a FormData built from the form, a jQuery-triggered submit, an iframe upload, a form serialized by a plugin) posts with no CSRF token at all, and bare protect_from_forgery nulls the session instead of raising, so the request silently loses its user rather than erroring. Nothing in the test suite catches it: allow_forgery_protection is false in the test environment, and rack_test drivers never run the JavaScript that does the submitting. The regex flags remote form helpers; remote link_to links are safe (rails-ujs builds their form and token itself), and so is button_to, which renders its own token_tag on POST and never consults this config, so neither is in the regex. The regex also matches one line at a time, so a form helper split across lines with remote: true on a continuation line is missed, so this is a list of forms to audit, not a list of forms to change"
+      fix: "Set config.action_view.embed_authenticity_token_in_remote_forms = true in config/application.rb to keep the Rails 3.2 behavior on both sides of a dual boot, then audit the JavaScript that submits each flagged form: anything not driven by rails-ujs needs the X-CSRF-Token header set explicitly. See section 6 of version-guides/upgrade-3.2-to-4.0.md"
+      variable_name: "REMOTE_FORM_CSRF_TOKEN"
+
   medium_priority:
     - name: "rescue_action method"
       kind: "breaking"
