@@ -53,17 +53,17 @@ upgrade_findings:
       fix: "Replace manual autoload_paths/eager_load_paths with config.autoload_lib(ignore: %w[assets tasks])"
       variable_name: "LIB_AUTOLOAD"
 
+  medium_priority:
     - name: "cache_format_version 6.1 deprecated"
       kind: "deprecation"
       pattern: "cache_format_version\\s*=\\s*6\\.1"
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "config.active_support.cache_format_version = 6.1 is implied by config.load_defaults 5.1/6.0/6.1 and is not usually set explicitly. Rails 7.1 deprecates support for the 6.1 cache format and removes it in 7.2, so apps that have not yet aligned load_defaults past 6.1 will see this warning on every boot once on Rails 7.1, even with no explicit cache_format_version line in the codebase."
-      fix: "Add config.active_support.cache_format_version = 7.0 to config/application.rb (after load_defaults) ahead of the full load_defaults alignment, or complete the load_defaults bump to 7.0+ during Step 7"
+      explanation: "Rails 7.1 deprecates the 6.1 cache format and removes it in 7.2. DETECTION LIMIT: this pattern only finds an explicit cache_format_version = 6.1 line. The far more common case is implicit — config.load_defaults 5.1/6.0/6.1 sets the 6.1 format with no line anywhere to grep for, so the app warns on every boot under 7.1 and this pattern reports clean. Treat a clean run as inconclusive: check the app's load_defaults value, and let Step 7 (rails-load-defaults) resolve the implicit case"
+      fix: "Set config.active_support.cache_format_version = 7.1 in config/application.rb (after load_defaults), or complete the load_defaults bump to 7.1 during Step 7. WARNING: do not enable until every server is running Rails 7.1 — during a rolling deploy, servers still on the old format read new-format entries as misses and vice versa, which can stampede the cache. Deploy the version bump first, then flip the format"
       variable_name: "CACHE_FORMAT_VERSION"
 
-  medium_priority:
     - name: "ActiveRecord::Migration.check_pending! deprecated"
       kind: "deprecation"
       pattern: "Migration\\.check_pending!"
