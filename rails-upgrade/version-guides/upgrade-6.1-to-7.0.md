@@ -288,6 +288,44 @@ Date.today.to_fs(:short)
 
 ---
 
+#### 10. Explicit Format/Handler Extension in `template:` / `layout:`
+
+**What Changed:**
+Passing a template name containing a `.` — `render template: "posts/show.html.erb"`, `layout: "pdf.html"` — worked on 6.1 and raises `ActionView::MissingTemplate` on 7.0.
+
+6.1 tolerated it and said so: `actionview/lib/action_view/template/resolver.rb` warned `"Rendering actions with '.' in the name is deprecated"` from `find_template_paths_from_details`. That code path is gone in 7.0, so the dotted name is now taken literally and matches no template.
+
+Most commonly hit through `wicked_pdf`'s `render pdf:` helper, which forwards `:template` / `:layout` straight through.
+
+**Detection Pattern:**
+```ruby
+render template: "posts/show.html.erb"
+render pdf: "report", template: "reports/show.html.erb", layout: "pdf.html"
+```
+
+**Fix:**
+```ruby
+# BEFORE
+render template: "posts/show.html.erb"
+render pdf: "report", layout: "pdf.html"
+
+# AFTER
+render template: "posts/show"
+render pdf: "report", layout: "pdf"
+```
+
+**A sibling bug the regex cannot find.** If the render runs inside a non-html `respond_to` block and passes no explicit `formats:`, 7.0 resolves the template using the *block's* format instead of `:html` and raises `MissingTemplate` even with a bare template name. 6.1 fell back to `:html` here; 7.0 does not.
+
+```ruby
+respond_to do |format|
+  format.pdf { render pdf: "report", template: "reports/show", formats: [:html] }
+end
+```
+
+Neither a boot smoke test nor a green suite catches this one: it only manifests when that specific action + format combination is actually invoked. Exercise every non-`format.html` branch by hand or add a spec for it.
+
+---
+
 ## Migration Steps
 
 ### Phase 1: Preparation
@@ -359,6 +397,12 @@ config.load_defaults 7.0
 ---
 
 ## Common Issues
+
+### Issue: `ActionView::MissingTemplate` on an action that worked on 6.1
+
+**Cause:** A `template:` / `layout:` string carrying an explicit `.html.erb` extension. 6.1 warned and tolerated it; 7.0 takes the name literally.
+
+**Fix:** Drop the extension. If the render sits in a non-html `respond_to` branch, also pass `formats: [:html]`.
 
 ### Issue: Links with method: :delete Don't Work
 
