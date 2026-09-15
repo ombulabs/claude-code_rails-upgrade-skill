@@ -68,6 +68,20 @@ upgrade_findings:
       fix: "Audit each scope on models with default_scope. Use unscope(where: :col) or rewhere(col: value) where a scope is supposed to override the default"
       variable_name: "DEFAULT_SCOPE"
 
+    - name: "cache_digests gem (backport now in core)"
+      kind: breaking
+      pattern: "\\bcache_digests\\b|\\bCacheDigests\\b"
+      exclude: "^\\s*#|unless\\s+NextRails\\.next\\?"
+      search_paths:
+        - "Gemfile"
+        - "Gemfile.lock"
+        - "app/"
+        - "lib/"
+        - "config/"
+      explanation: "The cache_digests gem backported cache digests to Rails 4.0; Rails 4.1 ships them in core as ActionView::Digestor. The gem does not just go unused, it collides: actionview's action_view/tasks/dependencies.rake declares `class CacheDigests` inside a `namespace :cache_digests do` block, and a Rake namespace does not scope Ruby constants, so that defines top-level ::CacheDigests while the gem defines `module CacheDigests`. Class vs module on one constant raises `TypeError: CacheDigests is not a class` while Rails loads its rake tasks. The blast radius is every rake invocation, not one task — asset precompile, db tasks, and any CI step shelling out to rake all fail before running. It does not reproduce under `rails runner` or the test suite, because neither loads rake tasks, so a boot smoke test and a green suite can both pass while CI is entirely red"
+      fix: "Gate the gem out of the 4.1 bundle rather than delete it while the current bundle is still 4.0 and depends on it: `gem 'cache_digests' unless NextRails.next?`. Then confirm no first-party code calls the gem API, because core's is not call-compatible: CacheDigests::TemplateDigestor.digest(name, format, finder, options) (positional) became ActionView::Digestor.digest(name:, finder:, dependencies:, partial:) (single options hash); cache_prefix and the swappable cache accessor are gone; the ['v3', 'key'] explicitly-versioned cache-key form is gone, leaving only skip_digest: true; view_cache_dependency survives unchanged in ActionView::Helpers::CacheHelper. Core's ERB dependency tracker also detects more dependencies than the gem's (it parses layout: keys and method chains), so fragment digests can shift — that is a cold fragment cache on first deploy, not an error. A hit in Gemfile.lock with nothing in the Gemfile means another gem pulls cache_digests in transitively — run `bundle why cache_digests` and gate or upgrade that parent gem instead. Delete cache_digests outright once the current Rails is 4.1"
+      variable_name: "CACHE_DIGESTS_BACKPORT"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking
