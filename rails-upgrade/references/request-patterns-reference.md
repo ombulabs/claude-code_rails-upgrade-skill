@@ -13,7 +13,7 @@
 |----------|--------------|-----------|---------------|--------------|
 | 00 Verify latest patch | run, MANDATORY | run, MANDATORY. This check applies at the START and again after each hop | run. Check if on latest patch — warn if not, recommend patching first | run, MANDATORY |
 | 01 Run test suite | run, MANDATORY. If tests FAIL → STOP and help fix tests first | run, MANDATORY. Run test suite BEFORE planning any upgrade work | run, MANDATORY. If tests fail → Warn user and recommend fixing first. If tests pass → Proceed with analysis | run, MANDATORY |
-| 02 Set up next_rails | run | run (if not already set up). Dual-boot stays active throughout the multi-hop process | skip | run. Adding `next_rails` and the `if next?` branch is not the bump the user declined; if they also forbid Gemfile edits, record it and run 05 and 06 from a scratch Gemfile outside the repo |
+| 02 Set up next_rails | run | run (if not already set up). Dual-boot stays active throughout the multi-hop process | skip | run. Adding `next_rails` and the `if next?` branch is not the bump the user declined |
 | 03 Validate upgrade path | run | run. Explain sequential requirement, calculate hops (e.g. 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1), see `references/multi-hop-strategy-reference.md` | skip | run |
 | 04 Detect breaking changes | run | run, per hop | run. Present findings summary, offer to generate full upgrade report | run |
 | 05 Check gem compatibility | run | run, per hop | skip | run |

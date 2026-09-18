@@ -102,7 +102,7 @@ When proposing code fixes that must work with both the current and target Rails 
 
 ### Reference Materials
 - `references/sequential-strategy-reference.md` - Sequential upgrade rule (no version skipping) and the supported upgrade paths tables. Load in Workflow 03.
-- `references/request-patterns-reference.md` - Which workflows run for each request shape (full upgrade, multi-hop, analysis only). Read at the start of a session.
+- `references/request-patterns-reference.md` - Which workflows run for each request shape (full upgrade, multi-hop, analysis only, reports only). Read at the start of a session.
 - `references/no-test-suite-smoke-reference.md` - **Load from Workflow 01 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
 - `references/deprecation-warnings-reference.md` - Finding and fixing deprecations
 - `references/staying-current-reference.md` - Keeping up with Rails releases
@@ -141,7 +141,7 @@ When user requests an upgrade, follow this workflow. Sequential Process is Criti
 | 11 | Align load_defaults | AFTER THE UPGRADE IS COMPLETE. Delegates to the rails-load-defaults skill | `workflows/11-align-load-defaults-workflow.md` |
 | 12 | Mention cleanup | USER-TRIGGERED. Delegates to the `upgrade-cleanup` plugin only when the user explicitly asks | `workflows/12-mention-cleanup-workflow.md` |
 
-The Purpose column is a summary. Gates live only in each workflow's `## Gates` section. Which workflows run depends on the request shape (full upgrade, multi-hop, analysis only): `references/request-patterns-reference.md`.
+The Purpose column is a summary. Gates live only in each workflow's `## Gates` section. Which workflows run depends on the request shape (full upgrade, multi-hop, analysis only, reports only): `references/request-patterns-reference.md`.
 
 ---
 
