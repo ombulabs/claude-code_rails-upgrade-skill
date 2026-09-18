@@ -63,7 +63,7 @@ curl -s https://rubygems.org/api/v1/versions/rails.json | \
       .select { |v| v.start_with?(series) }
       .sort_by { |v| Gem::Version.new(v) }
     puts versions.last
-  ' "7.1."
+  ' "7.2."
 ```
 Replace `"7.2."` with the target series prefix (e.g., `"8.0."`, `"8.1."`).
 
