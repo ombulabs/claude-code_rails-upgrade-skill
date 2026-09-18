@@ -36,8 +36,8 @@ This skill follows the proven FastRuby.io upgrade methodology:
 
 **Key Resources:**
 - **DELEGATE** to the `dual-boot` skill for dual-boot setup with `next_rails` (see Dependencies)
-- See `references/deprecation-warnings.md` for managing deprecations
-- See `references/staying-current.md` for maintaining upgrades over time
+- See `references/deprecation-warnings-reference.md` for managing deprecations
+- See `references/staying-current-reference.md` for maintaining upgrades over time
 
 ---
 
@@ -185,13 +185,13 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - **rails-load-defaults skill** - Incremental load_defaults alignment (Step 7, final step) (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
 
 ### Reference Materials
-- `references/deprecation-warnings.md` - Finding and fixing deprecations
-- `references/staying-current.md` - Keeping up with Rails releases
-- `references/breaking-changes-by-version.md` - Quick lookup
-- `references/multi-hop-strategy.md` - Multi-version planning
-- `references/testing-checklist.md` - Comprehensive testing
-- `references/gem-compatibility.md` - Gem update order and the "no compatible version" playbook (fork / vendor / replace). Load only when Step 4.5's compatibility check produced blockers.
-- `references/js-compressor-sprockets-mismatch.md` - Keeping terser / closure-compiler working when the target Rails pins Sprockets to the 2.x line. Load only when JS_COMPRESSOR_GEM_MISMATCH fires.
+- `references/deprecation-warnings-reference.md` - Finding and fixing deprecations
+- `references/staying-current-reference.md` - Keeping up with Rails releases
+- `references/breaking-changes-by-version-reference.md` - Quick lookup
+- `references/multi-hop-strategy-reference.md` - Multi-version planning
+- `references/testing-checklist-reference.md` - Comprehensive testing
+- `references/gem-compatibility-reference.md` - Gem update order and the "no compatible version" playbook (fork / vendor / replace). Load only when Step 4.5's compatibility check produced blockers.
+- `references/js-compressor-sprockets-mismatch-reference.md` - Keeping terser / closure-compiler working when the target Rails pins Sprockets to the 2.x line. Load only when JS_COMPRESSOR_GEM_MISMATCH fires.
 
 ### Detection Pattern Resources
 - `detection-scripts/patterns/rails-*.yml` - Version-specific patterns for direct detection
@@ -212,8 +212,8 @@ When user requests an upgrade, follow this workflow:
 
 1. Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
 2. Compare against latest patch for that series:
-   - EOL series (≤ 7.1): use static table in references/multi-hop-strategy.md
-   - Active series (≥ 7.2): query RubyGems API (see references/multi-hop-strategy.md for commands)
+   - EOL series (≤ 7.1): use static table in references/multi-hop-strategy-reference.md
+   - Active series (≥ 7.2): query RubyGems API (see references/multi-hop-strategy-reference.md for commands)
 3. If current version < latest patch:
    - INFORM user: "Your app is on Rails X.Y.Z but the latest patch is X.Y.W"
    - Guide through Gemfile update and bundle update rails
@@ -291,7 +291,7 @@ Determines which gems must be bumped before the Rails version change can resolve
 2. Pass the resulting three buckets — required bumps, blockers,
    already compatible — into Step 5's report so the gem-update
    section reflects real per-lockfile data.
-3. If any blockers exist, load references/gem-compatibility.md for
+3. If any blockers exist, load references/gem-compatibility-reference.md for
    the fork/replace/vendor playbook and the gem update order. Skip
    otherwise.
 ```
@@ -430,7 +430,7 @@ Before starting ANY upgrade:
 
 **Action - Step 0 (MANDATORY: Verify Latest Patch):**
 1. Read `Gemfile.lock` for exact Rails version
-2. Compare against latest patch for that series (see `references/multi-hop-strategy.md`)
+2. Compare against latest patch for that series (see `references/multi-hop-strategy-reference.md`)
 3. If not on latest patch → Guide user through patch upgrade first
 4. If on latest patch → Proceed to Step 1
 
@@ -458,7 +458,7 @@ Before starting ANY upgrade:
 1. Load: `workflows/05-check-gem-compatibility-workflow.md` and follow it
 2. Run primary check (`bundle_report compatibility`); escalate to railsbump only when the workflow's conditions trigger
 3. Pass the resulting buckets (required bumps, blockers, already compatible) into Step 5's report
-4. If blockers exist, load `references/gem-compatibility.md` for the fork/replace/vendor playbook
+4. If blockers exist, load `references/gem-compatibility-reference.md` for the fork/replace/vendor playbook
 
 **Action - Step 5 (Generate Reports):**
 1. Load: `workflows/07-generate-upgrade-report-workflow.md`
@@ -498,7 +498,7 @@ Before starting ANY upgrade:
 **Action - Step 3 (Plan & Execute):**
 1. Explain sequential requirement
 2. Calculate hops: 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1
-3. Reference: `references/multi-hop-strategy.md`
+3. Reference: `references/multi-hop-strategy-reference.md`
 4. Follow Pattern 1 Steps 4-6 for FIRST hop (5.2 → 6.0)
 5. After first hop complete, repeat for next hops
 6. **IMPORTANT:** After each hop, align load_defaults to the new version before starting the next hop
