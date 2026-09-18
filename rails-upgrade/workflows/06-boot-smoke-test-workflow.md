@@ -1,6 +1,6 @@
 # Workflow 06: Boot Smoke Test
 
-**Purpose:** Workflow 04 (codebase grep) only sees the user's own code. Workflow 05 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file. These surface only when something boots Rails. Catching them here, before the report is written, lets them land in fix-before-bump where they belong instead of mid-implementation.
+**Purpose:** Workflow 04 (codebase grep) only sees the user's own code. Workflow 05 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file. These surface only when something boots Rails. Catching them here, before the report is written, lets them land in fix-before-bump where they belong instead of mid-implementation. A booted Rails process is the only signal that catches that class of failure.
 
 **When to use:** Workflow 06 of the upgrade workflow, after gem-compat (Workflow 05) and before report generation (Workflow 07).
 
@@ -16,8 +16,6 @@
 ## Gates (must be true before the next workflow that runs)
 
 - Boot succeeds under `Gemfile.next`. Re-run the boot smoke test until it succeeds.
-
-A booted Rails process is the only signal that catches that class of failure.
 
 ## Real examples this catches
 

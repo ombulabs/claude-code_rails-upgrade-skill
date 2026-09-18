@@ -2,7 +2,7 @@
 
 **Purpose:** Verify every CI configuration file in the repo matches the versions declared in the upgraded `Gemfile` / `Gemfile.lock`. CI drift (old Ruby version, old Rails matrix, stale service versions) is a frequent cause of red builds on the upgrade PR and is easy to miss because the local test suite passes. Check CI Config Before Opening the PR (stale CI is the most common cause of red builds on upgrade PRs).
 
-**When to use:** Workflow 09 Step 6 (`workflows/09-implement-and-upgrade-workflow.md`), immediately before declaring the upgrade complete or opening a PR. Also any time the user reports a red CI build after an upgrade PR is opened.
+**When to use:** Workflow 09 Step 6 (`workflows/09-implement-and-upgrade-workflow.md`), immediately before declaring the upgrade complete or opening a PR. Also any time the user reports a red CI build after an upgrade PR is opened. This workflow is **mandatory**, not a reminder — produce a written CI sync report and do not open the PR until every CI file matches the Gemfile.
 
 ## Inputs
 
@@ -16,8 +16,6 @@
 ## Gates (must be true before the next workflow that runs)
 
 - Overall verdict is `OK`. Do not open the PR until every CI file matches the Gemfile.
-
-This workflow is **mandatory**, not a reminder — produce a written CI sync report and do not open the PR until every CI file matches the Gemfile.
 
 ---
 
