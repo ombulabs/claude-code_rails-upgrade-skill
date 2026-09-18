@@ -20,8 +20,12 @@
 
 ## Step 1: Check if upgrade is single-hop or multi-hop
 
+Compare the exact current version (Workflow 00) with the target the user named. One adjacent minor or major step (7.0 to 7.1, 7.2 to 8.0) is a single hop. Anything further (5.2 to 8.1) is multi-hop. Read `references/sequential-strategy-reference.md` for the supported paths table and the Ruby requirement of each hop.
+
 ## Step 2: If multi-hop, explain sequential requirement
+
+Tell the user that Rails upgrades MUST follow a sequential path and that version skipping is not allowed, with the examples from `references/sequential-strategy-reference.md` (5.2 to 6.1 skips 6.0; 7.0 to 8.0 skips 7.1 and 7.2). Then: break it into individual hops, generate separate reports for each hop, and recommend completing each hop fully before moving to the next.
 
 ## Step 3: Plan individual hops
 
-Reference: `references/sequential-strategy-reference.md` and `references/multi-hop-strategy-reference.md`
+List the hops in order (e.g. 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1). For each hop note the Ruby requirement from the supported paths table. For the hop-by-hop plan, milestones and time budget, read `references/multi-hop-strategy-reference.md`, section "Planning a Multi-Hop Upgrade". Workflows 04 to 11 then run once per hop; Workflow 00 runs again at the start of every hop.
