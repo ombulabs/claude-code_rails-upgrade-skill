@@ -11,7 +11,7 @@
 
 ## Outputs
 
-- `Gemfile.next` configured with `if next?` conditionals
+- `Gemfile` carrying the `if next?` conditionals (`Gemfile.next` is the symlink `next_rails --init` creates; the branch lives in `Gemfile`)
 - Dependencies installed for both Rails versions
 
 ## Gates (must be true before the next workflow that runs)
