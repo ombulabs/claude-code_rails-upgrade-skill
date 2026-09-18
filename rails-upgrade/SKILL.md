@@ -152,32 +152,3 @@ The Purpose column is a summary. Gates live only in each workflow's `## Gates` s
 3. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
 
 Everything else that used to be listed here lives in the workflow it governs: see each workflow's Purpose and Gates.
-
----
-
-## Success Criteria
-
-A successful upgrade assistance session:
-
-✅ **Verified latest patch version** (Step 0 - MANDATORY)
-✅ **Upgraded to latest patch if needed** (before any minor/major hop)
-✅ **Ran test suite** (Step 1 - MANDATORY)
-✅ **Verified all tests pass** (blocked if tests failed)
-✅ **Recorded baseline metrics** (test count, coverage)
-✅ **Set up dual-boot** (Step 2 - early, before upgrading)
-✅ **Validated upgrade path** (Step 3 - single-hop vs multi-hop, hops planned)
-✅ **Ran detection directly** (using Grep/Glob/Read tools - no script)
-✅ **Generated Comprehensive Upgrade Report** using actual findings
-✅ **Generated app:update Preview** using actual config files
-✅ Used user's actual code from findings (not generic examples)
-✅ Flagged all custom code with ⚠️ warnings based on detected issues
-✅ **Implemented changes and upgraded Rails version**
-✅ **Verified CI config matches the upgraded Gemfile** (Ruby, Rails matrix, services — all mismatches fixed before opening the PR)
-✅ **Aligned load_defaults** (after upgrade is complete)
-✅ **Mentioned cleanup after the upgrade shipped** (pointed to the `upgrade-cleanup` plugin without auto-running it; delegated only when the user explicitly asked)
-✅ Provided clear next steps
-✅ Offered to help implement changes
-
----
-
-See [CHANGELOG.md](../CHANGELOG.md) for version history and current version.

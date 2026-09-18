@@ -347,3 +347,4 @@ Before delivering, verify:
 - [ ] Custom code warnings based on actual detected issues
 - [ ] Code examples use user's actual code from affected files
 - [ ] Next steps clearly outlined
+- [ ] Offered to help implement changes
