@@ -18,6 +18,24 @@ This file captures project-specific conventions Claude should follow when workin
   - Expectations are keyed by `variable_name` and list `match` (lines the pattern MUST flag) and `no_match` (lines it MUST NOT flag) — see the worked example in `rails-40-patterns.expectations.yml`
   - Exits 0 on success, 1 on any failure with a per-pattern error report
 
+## Workflows and references (`rails-upgrade/workflows/`, `rails-upgrade/references/`)
+
+The skill body follows the progressive-disclosure practice from the skill-creator skill and the [Agent Skills specification](https://agentskills.io/specification): `SKILL.md` is the short entry point, procedures live in `workflows/`, on-demand material lives in `references/`. Two kinds of file, named so a search hit shows which kind it is:
+
+- **Workflow**: one numbered unit of the upgrade flow, one file, `workflows/NN-name-workflow.md`. The number is the position in the flow, zero-padded so the directory listing sorts. `SKILL.md`'s workflow index lists every one in order.
+- **Step**: a `Step N` header inside a workflow file. Flat integers only, no `4.5`, no `2a`: nested numbering was hard to track and to reference. A sub-step is either two sequential steps or a conditional branch (`### A.` / `### B.`).
+- **Reference**: anything loaded on demand (lookup tables, playbooks, conditional branches), `references/name-reference.md`. Every reference is listed in `SKILL.md` under Reference Materials with a "load when" hint.
+
+Every workflow file opens with the same header, in this order: numbered title, `**Purpose:**`, `**When to use:**`, `## Inputs` (artifacts handed forward by earlier workflows, nouns), `## Outputs` (artifacts this workflow hands forward, nouns), `## Gates` (boolean stop conditions before the next workflow that runs, predicates), then an optional `## Pre-upgrade checklist` (unchecked FastRuby.io recommendations, not gates), then its Steps, then `## Self-review checklist` where one exists. Inputs and Gates never repeat the same fact. Provenance of a rule belongs in `CHANGELOG.md`, not in the workflow file.
+
+Refer to a whole workflow as "Workflow NN". Refer to a step as the file path plus the step (`workflows/01-run-test-suite-workflow.md` Step 4), never as a bare "Step N of the upgrade workflow". `bin/lint-skill` check 1 validates paths, so a renumber breaks the old path and lint goes red. Bare numbers are invisible to it.
+
+Inserting a workflow mid-flow renumbers every later file and its inbound links. That is accepted churn; the path check catches every stale link in markdown. Paths inside pattern YAML `explanation:` / `fix:` strings are not scanned by lint, so grep for them by hand after a rename.
+
+`bin/lint-skill` skips any line containing the word `dual-boot` (a cross-plugin exception): in every markdown file for the path check, and in SKILL.md for the index check. A stale path on such a line is invisible to lint. Keep that word out of workflow file names and index rows, and do not put a file path on a line that also mentions `dual-boot`.
+
+Files that carry a type suffix: `-workflow.md`, `-reference.md`, `-template.md`, `-patterns.yml`. `examples/` and `version-guides/` do not (yet).
+
 ## Version guides (`rails-upgrade/version-guides/*.md`)
 
 - **Do NOT include "Difficulty" or "Estimated Time" in the header.** These are subjective, application-dependent, and drift out of date. Keep the header minimal: title, Ruby requirement, and the attribution line.
