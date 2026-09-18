@@ -364,8 +364,8 @@ These are `kind: migration` and `kind: optional` — silent and fully working at
 
 After detection completes:
 
-1. Pass findings to `workflows/upgrade-report-workflow.md`
-2. Pass config file contents to `workflows/app-update-preview-workflow.md`
+1. Pass findings to `workflows/07-generate-upgrade-report-workflow.md`
+2. Pass config file contents to `workflows/08-generate-app-update-preview-workflow.md`
 3. Generate both reports using actual findings
 4. Present to user
 

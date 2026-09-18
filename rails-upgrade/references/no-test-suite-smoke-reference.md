@@ -10,7 +10,7 @@ This workflow is not a replacement for adding tests. It is a minimum boot and ro
 
 ## Step 1: Confirm There Is No Runnable Suite
 
-Check for actual test **files**, not just gem presence. `minitest` ships with every Rails app (it is a transitive dependency of `activesupport` in virtually every `Gemfile.lock`), so a gem match alone does not mean a runnable suite exists. Relying on it sends abandoned-test-setup apps back to `test-suite-verification-workflow.md`, which finds nothing to run and bounces them right back here, an infinite loop.
+Check for actual test **files**, not just gem presence. `minitest` ships with every Rails app (it is a transitive dependency of `activesupport` in virtually every `Gemfile.lock`), so a gem match alone does not mean a runnable suite exists. Relying on it sends abandoned-test-setup apps back to `workflows/01-run-test-suite-workflow.md`, which finds nothing to run and bounces them right back here, an infinite loop.
 
 ```bash
 # Test file presence (the deciding signal)
@@ -21,7 +21,7 @@ test -d test && find test -name "*_test.rb" | grep -q .
 grep -E "rspec-rails|minitest-rails" Gemfile
 ```
 
-Treat the app as having **no runnable suite** unless at least one test file is found. If test files do exist, return to `test-suite-verification-workflow.md` and run the real suite. Use this fallback only when no runnable suite exists.
+Treat the app as having **no runnable suite** unless at least one test file is found. If test files do exist, return to `workflows/01-run-test-suite-workflow.md` and run the real suite. Use this fallback only when no runnable suite exists.
 
 ---
 

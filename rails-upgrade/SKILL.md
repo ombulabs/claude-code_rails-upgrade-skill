@@ -166,14 +166,14 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `version-guides/upgrade-8.0-to-8.1.md` - Rails 8.0 → 8.1 (bundler-audit)
 
 ### Workflow Guides (Load when generating deliverables)
-- `workflows/test-suite-verification-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
-- `workflows/no-test-suite-smoke-workflow.md` - **Load from Step 1 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
-- `workflows/direct-detection-workflow.md` - How to run breaking change detection directly
-- `workflows/upgrade-report-workflow.md` - How to generate upgrade reports
-- `workflows/gem-compatibility-workflow.md` - **Load in Step 4.5** - Per-lockfile gem compatibility check against the target Rails version. Documents both the primary (`next_rails` `bundle_report compatibility`) and the secondary (railsbump.org API) and the rules for when to escalate.
-- `workflows/boot-smoke-test-workflow.md` - **Load in Step 4.6** - Run a Rails-loading command against `Gemfile.next` to catch gem-level runtime incompat that the resolver can't see (gems calling removed Rails internals or `require`-ing removed files).
-- `workflows/ci-sync-workflow.md` - **MANDATORY before opening the upgrade PR** - How to verify CI config matches the upgraded Gemfile
-- `workflows/app-update-preview-workflow.md` - How to generate app:update previews
+- `workflows/01-run-test-suite-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
+- `references/no-test-suite-smoke-reference.md` - **Load from Step 1 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
+- `workflows/04-detect-breaking-changes-workflow.md` - How to run breaking change detection directly
+- `workflows/07-generate-upgrade-report-workflow.md` - How to generate upgrade reports
+- `workflows/05-check-gem-compatibility-workflow.md` - **Load in Step 4.5** - Per-lockfile gem compatibility check against the target Rails version. Documents both the primary (`next_rails` `bundle_report compatibility`) and the secondary (railsbump.org API) and the rules for when to escalate.
+- `workflows/06-boot-smoke-test-workflow.md` - **Load in Step 4.6** - Run a Rails-loading command against `Gemfile.next` to catch gem-level runtime incompat that the resolver can't see (gems calling removed Rails internals or `require`-ing removed files).
+- `workflows/10-sync-ci-workflow.md` - **MANDATORY before opening the upgrade PR** - How to verify CI config matches the upgraded Gemfile
+- `workflows/08-generate-app-update-preview-workflow.md` - How to generate app:update previews
 - **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding and drops `NextRails.next?` / `NextRails.current?` branches. Deprecation triage stays with this skill for the next hop.
 
 ### Examples (Load when user needs clarification)
@@ -230,12 +230,12 @@ When user requests an upgrade, follow this workflow:
 ```
 ⚠️  THIS STEP IS REQUIRED BEFORE ANY OTHER WORK
 
-1. Read: workflows/test-suite-verification-workflow.md
+1. Read: workflows/01-run-test-suite-workflow.md
 2. Detect test framework (RSpec, Minitest, or both)
 3. Run test suite with: bundle exec rspec OR bundle exec rails test
 4. Capture results: total tests, passing, failing, pending
 5. If no runnable test suite exists:
-   - Load: workflows/no-test-suite-smoke-workflow.md
+   - Load: references/no-test-suite-smoke-reference.md
    - Run the safe read-only smoke baseline: Rails boot, test-env boot when possible, routes load, migration status, and asset/build command if present
    - Record baseline confidence as partial
    - Continue only if boot/routes checks pass and the user accepts the risk of proceeding without real tests
@@ -270,7 +270,7 @@ That skill handles:
 ```
 Claude runs detection directly using tools - NO script generation needed
 
-1. Read: workflows/direct-detection-workflow.md
+1. Read: workflows/04-detect-breaking-changes-workflow.md
 2. Read: detection-scripts/patterns/rails-{VERSION}-patterns.yml
 3. For each pattern in the patterns file:
    - Use Grep tool to search for the pattern
@@ -284,7 +284,7 @@ Claude runs detection directly using tools - NO script generation needed
 ```
 Determines which gems must be bumped before the Rails version change can resolve.
 
-1. Read: workflows/gem-compatibility-workflow.md and follow it. The
+1. Read: workflows/05-check-gem-compatibility-workflow.md and follow it. The
    workflow documents the primary check (next_rails bundle_report),
    the conditions for escalating to the secondary (railsbump API),
    and the bucket mapping for both.
@@ -316,7 +316,7 @@ These surface only when something boots Rails. Catching them here, before
 the report is written, lets them land in fix-before-bump where they belong
 instead of mid-implementation.
 
-1. Read: workflows/boot-smoke-test-workflow.md
+1. Read: workflows/06-boot-smoke-test-workflow.md
 2. Run a Rails-loading command against Gemfile.next:
      BUNDLE_GEMFILE=Gemfile.next bundle exec rspec --dry-run
    (or `bin/rails runner "puts Rails.version"`, or `bundle exec rspec` if
@@ -333,13 +333,13 @@ instead of mid-implementation.
 ```
 1. Read: templates/upgrade-report-template.md
 2. Read: templates/app-update-preview-template.md
-3. Read: workflows/upgrade-report-workflow.md
-4. Read: workflows/app-update-preview-workflow.md
+3. Read: workflows/07-generate-upgrade-report-workflow.md
+4. Read: workflows/08-generate-app-update-preview-workflow.md
 ```
 
 **Deliverable #1: Comprehensive Upgrade Report**
 - **Input:** Direct detection findings + version guide data
-- **Output:** A report covering findings grouped into the two buckets defined in `workflows/direct-detection-workflow.md` — **fix-before-bump** (`kind: breaking` and `kind: deprecation`) and **fix-when-ready** (`kind: migration` and `kind: optional`) — with OLD vs NEW code examples taken from the user's actual files, custom-code warnings flagged with ⚠️, a step-by-step migration plan, a testing checklist, and a rollback plan.
+- **Output:** A report covering findings grouped into the two buckets defined in `workflows/04-detect-breaking-changes-workflow.md` — **fix-before-bump** (`kind: breaking` and `kind: deprecation`) and **fix-when-ready** (`kind: migration` and `kind: optional`) — with OLD vs NEW code examples taken from the user's actual files, custom-code warnings flagged with ⚠️, a step-by-step migration plan, a testing checklist, and a rollback plan.
 
 **Deliverable #2: app:update Preview**
 - **Input:** Actual config files + findings
@@ -352,7 +352,7 @@ instead of mid-implementation.
 3. Apply fix-before-bump changes (`kind: breaking` and `kind: deprecation`). Most fixes are direct rewrites — the new API typically works on both sides of the dual-boot pair (e.g., `update_attributes` → `update`). Use `NextRails.next?` only when the fix requires target-version-only APIs that don't exist in the current Rails
 4. Update Gemfile to target Rails version
 5. Run test suite against both versions
-6. **Check CI config matches the upgraded Gemfile** — load `workflows/ci-sync-workflow.md`, fix any mismatches before proceeding
+6. **Check CI config matches the upgraded Gemfile** — load `workflows/10-sync-ci-workflow.md`, fix any mismatches before proceeding
 7. Deploy and verify
 ```
 
@@ -435,7 +435,7 @@ Before starting ANY upgrade:
 4. If on latest patch → Proceed to Step 1
 
 **Action - Step 1 (MANDATORY: Verify Tests Pass):**
-1. Load: `workflows/test-suite-verification-workflow.md`
+1. Load: `workflows/01-run-test-suite-workflow.md`
 2. Detect test framework (RSpec or Minitest)
 3. Run test suite: `bundle exec rspec` or `bundle exec rails test`
 4. If tests FAIL → STOP and help fix tests first
@@ -449,20 +449,20 @@ Before starting ANY upgrade:
 1. Validate upgrade path (single-hop vs multi-hop)
 
 **Action - Step 4 (Run Detection Directly):**
-1. Load: `workflows/direct-detection-workflow.md`
+1. Load: `workflows/04-detect-breaking-changes-workflow.md`
 2. Load: `detection-scripts/patterns/rails-{VERSION}-patterns.yml`
 3. Use Grep/Glob/Read tools to search for each pattern
 4. Collect findings with file:line references
 
 **Action - Step 4.5 (Check Gem Compatibility):**
-1. Load: `workflows/gem-compatibility-workflow.md` and follow it
+1. Load: `workflows/05-check-gem-compatibility-workflow.md` and follow it
 2. Run primary check (`bundle_report compatibility`); escalate to railsbump only when the workflow's conditions trigger
 3. Pass the resulting buckets (required bumps, blockers, already compatible) into Step 5's report
 4. If blockers exist, load `references/gem-compatibility.md` for the fork/replace/vendor playbook
 
 **Action - Step 5 (Generate Reports):**
-1. Load: `workflows/upgrade-report-workflow.md`
-2. Load: `workflows/app-update-preview-workflow.md`
+1. Load: `workflows/07-generate-upgrade-report-workflow.md`
+2. Load: `workflows/08-generate-app-update-preview-workflow.md`
 3. Generate Comprehensive Upgrade Report (using direct findings)
 4. Generate app:update Preview (using actual config files)
 5. Present both reports to user
@@ -471,7 +471,7 @@ Before starting ANY upgrade:
 1. Apply fix-before-bump changes (`kind: breaking` and `kind: deprecation`). Most fixes are direct rewrites — the new API typically works on both sides of the dual-boot pair (e.g., `update_attributes` → `update`). Use `NextRails.next?` only when the fix requires target-version-only APIs that don't exist in the current Rails
 2. Update Gemfile to target Rails version
 3. Run tests against both versions
-4. **Check CI config matches the upgraded Gemfile** (`workflows/ci-sync-workflow.md`) — fix any mismatches before declaring Step 6 complete
+4. **Check CI config matches the upgraded Gemfile** (`workflows/10-sync-ci-workflow.md`) — fix any mismatches before declaring Step 6 complete
 5. Deploy and verify
 
 **Action - Step 7 (Align load_defaults - FINAL):**
@@ -517,7 +517,7 @@ This pattern is analysis-only — it intentionally skips Step 2 (Dual-Boot setup
 3. If tests pass → Proceed with analysis
 
 **Action - Step 4 (Run Detection):**
-1. Load: `workflows/direct-detection-workflow.md`
+1. Load: `workflows/04-detect-breaking-changes-workflow.md`
 2. Run detection directly using tools
 3. Present findings summary
 4. Offer to generate full upgrade report
@@ -571,7 +571,7 @@ Before delivering, verify:
 11. **Sequential Process is Critical** (patch check → tests → dual-boot → validate path → detection → reports → implement → load_defaults)
 12. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
 13. **Always Use `NextRails.next?` for Dual-Boot Code** (NEVER use `respond_to?` for version branching. DELEGATE to the `dual-boot` skill for patterns and setup.)
-14. **Check CI Config Before Opening the PR** (run `workflows/ci-sync-workflow.md` to make sure every CI file matches the upgraded Gemfile — stale CI is the most common cause of red builds on upgrade PRs)
+14. **Check CI Config Before Opening the PR** (run `workflows/10-sync-ci-workflow.md` to make sure every CI file matches the upgraded Gemfile — stale CI is the most common cause of red builds on upgrade PRs)
 15. **Align load_defaults After the Version Bump** (load_defaults update happens AFTER the Rails version upgrade is complete)
 16. **Mention, Don't Auto-Run, Cleanup** (after the upgrade ships, mention the `upgrade-cleanup` plugin. Delegate to it only when the user explicitly asks: "finish the upgrade", "clean up dual-boot", "drop the NextRails branches". Cleanup removes `NextRails.next?` / `NextRails.current?` branches and retires dual-boot scaffolding. Deprecation triage stays with this skill for the next hop.)
 

@@ -190,14 +190,14 @@ Could not find:
 - test/ directory (Minitest)
 
 This is a significant risk for upgrading. Before proceeding:
-1. Run the no-test-suite smoke baseline in `workflows/no-test-suite-smoke-workflow.md`
+1. Run the no-test-suite smoke baseline in `references/no-test-suite-smoke-reference.md`
 2. Record boot, routes, migration-status, and asset/build results
 3. Recommend adding focused test coverage before or during the first upgrade hop
 
 Do you want to proceed with only a smoke baseline? (This is risky)
 ```
 
-**Action:** Load `workflows/no-test-suite-smoke-workflow.md`, run the safe read-only baseline checks, and mark baseline confidence as `partial` if they pass. If any boot/routes check fails, stop the upgrade until the baseline is fixed or the user explicitly accepts the blocker.
+**Action:** Load `references/no-test-suite-smoke-reference.md`, run the safe read-only baseline checks, and mark baseline confidence as `partial` if they pass. If any boot/routes check fails, stop the upgrade until the baseline is fixed or the user explicitly accepts the blocker.
 
 #### Tests Take Too Long (> 10 minutes)
 
