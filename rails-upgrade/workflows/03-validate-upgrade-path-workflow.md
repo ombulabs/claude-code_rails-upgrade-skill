@@ -24,4 +24,4 @@
 
 ## Step 3: Plan individual hops
 
-Reference: `references/multi-hop-strategy-reference.md`
+Reference: `references/sequential-strategy-reference.md` and `references/multi-hop-strategy-reference.md`
