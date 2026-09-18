@@ -169,7 +169,7 @@ Baseline Metrics:
 Proceeding with upgrade assessment...
 ```
 
-**Action:** Continue to Step 2 of the main workflow (Detect Current Version)
+**Action:** Continue to Workflow 02 (`workflows/02-setup-next-rails-workflow.md`)
 
 #### If ANY Tests Fail:
 
@@ -370,7 +370,7 @@ This workflow integrates with the main upgrade process:
 
 ```
 ┌─────────────────────────────────────────┐
-│  Step 1: Test Suite Verification        │
+│  Workflow 01: Run Test Suite            │
 │  (THIS WORKFLOW)                        │
 │                                         │
 │  ┌─────────────┐    ┌─────────────────┐ │
@@ -393,7 +393,7 @@ This workflow integrates with the main upgrade process:
               │
               ▼
 ┌─────────────────────────────────────────┐
-│  Step 2: Detect Current Version         │
+│  Workflow 02: Set Up next_rails         │
 │  (Continue main workflow)               │
 └─────────────────────────────────────────┘
 ```

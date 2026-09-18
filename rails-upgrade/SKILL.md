@@ -23,13 +23,13 @@ description: Analyzes Rails applications and generates comprehensive upgrade rep
 | **Step** | A `Step N` header inside a workflow file | inside the workflow |
 | **Reference** | Material loaded on demand: lookup tables, playbooks, conditional branches | `references/<name>-reference.md` |
 
-No sub-steps: a "Step 4.1" is either two sequential steps or a conditional branch inside one step (`### A.` / `### B.` headers). Cross-reference a step as file path plus step, e.g. `workflows/01-run-test-suite-workflow.md` Step 4. Not used in headings: Stage, Phase, Sub-step, dotted step numbers.
+No sub-steps: a "Step 4.1" is either two sequential steps or a conditional branch inside one step (`### A.` / `### B.` headers). Refer to a whole workflow as Workflow NN; refer to a step as file path plus step, e.g. `workflows/01-run-test-suite-workflow.md` Step 4. Not used in headings: Stage, Phase, Sub-step, dotted step numbers.
 
 ---
 
 ## Dependencies
 
-- **dual-boot skill** ([github.com/ombulabs/claude-code_dual-boot-skill](https://github.com/ombulabs/claude-code_dual-boot-skill)) — Sets up and manages dual-boot environments using the `next_rails` gem. Covers setup, `NextRails.next?` code patterns, CI configuration, and post-upgrade cleanup. Must be installed for Step 2 of the upgrade workflow.
+- **dual-boot skill** ([github.com/ombulabs/claude-code_dual-boot-skill](https://github.com/ombulabs/claude-code_dual-boot-skill)) — Sets up and manages dual-boot environments using the `next_rails` gem. Covers setup, `NextRails.next?` code patterns, CI configuration, and post-upgrade cleanup. Must be installed for Workflow 02 (`workflows/02-setup-next-rails-workflow.md`).
 - **rails-load-defaults skill** ([github.com/ombulabs/claude-code_rails-load-defaults-skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)) — Handles incremental `load_defaults` updates with tiered risk assessment (Tier 1: low-risk, Tier 2: needs codebase grep, Tier 3: requires human review). Used as the final step after the Rails version upgrade is complete.
 
 ---
@@ -96,20 +96,20 @@ When proposing code fixes that must work with both the current and target Rails 
 - `examples/multi-hop-upgrade.md` - Multi-hop upgrade example
 
 ### External Dependencies
-- **dual-boot skill** - Dual-boot setup and management with next_rails (Step 2) (https://github.com/ombulabs/claude-code_dual-boot-skill)
-- **rails-load-defaults skill** - Incremental load_defaults alignment (Step 7, final step) (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
+- **dual-boot skill** - Dual-boot setup and management with next_rails (Workflow 02) (https://github.com/ombulabs/claude-code_dual-boot-skill)
+- **rails-load-defaults skill** - Incremental load_defaults alignment (Workflow 11) (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
 - **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding and drops `NextRails.next?` / `NextRails.current?` branches. Deprecation triage stays with this skill for the next hop.
 
 ### Reference Materials
 - `references/sequential-strategy-reference.md` - Sequential upgrade rule (no version skipping) and the supported upgrade paths tables. Load in Workflow 03.
 - `references/request-patterns-reference.md` - Which workflows run for each request shape (full upgrade, multi-hop, analysis only). Read at the start of a session.
-- `references/no-test-suite-smoke-reference.md` - **Load from Step 1 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
+- `references/no-test-suite-smoke-reference.md` - **Load from Workflow 01 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
 - `references/deprecation-warnings-reference.md` - Finding and fixing deprecations
 - `references/staying-current-reference.md` - Keeping up with Rails releases
 - `references/breaking-changes-by-version-reference.md` - Quick lookup
 - `references/multi-hop-strategy-reference.md` - Multi-version planning
 - `references/testing-checklist-reference.md` - Comprehensive testing
-- `references/gem-compatibility-reference.md` - Gem update order and the "no compatible version" playbook (fork / vendor / replace). Load only when Step 4.5's compatibility check produced blockers.
+- `references/gem-compatibility-reference.md` - Gem update order and the "no compatible version" playbook (fork / vendor / replace). Load only when Workflow 05's compatibility check produced blockers.
 - `references/js-compressor-sprockets-mismatch-reference.md` - Keeping terser / closure-compiler working when the target Rails pins Sprockets to the 2.x line. Load only when JS_COMPRESSOR_GEM_MISMATCH fires.
 
 ### Detection Pattern Resources

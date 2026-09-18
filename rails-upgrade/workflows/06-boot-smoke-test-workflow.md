@@ -1,8 +1,8 @@
 # Workflow 06: Boot Smoke Test
 
-**Purpose:** Step 4 (codebase grep) only sees the user's own code. Step 4.5 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file. These surface only when something boots Rails. Catching them here, before the report is written, lets them land in fix-before-bump where they belong instead of mid-implementation.
+**Purpose:** Workflow 04 (codebase grep) only sees the user's own code. Workflow 05 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file. These surface only when something boots Rails. Catching them here, before the report is written, lets them land in fix-before-bump where they belong instead of mid-implementation.
 
-**When to use:** Step 4.6 of the upgrade workflow, after gem-compat (Step 4.5) and before report generation (Step 5).
+**When to use:** Workflow 06 of the upgrade workflow, after gem-compat (Workflow 05) and before report generation (Workflow 07).
 
 ## Inputs
 
@@ -85,14 +85,14 @@ For each offending gem:
 
 ### Step 4: Re-run boot
 
-Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Step 5.
+Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Workflow 07.
 
 ## Output
 
-A short report block to merge into Step 5's Comprehensive Upgrade Report:
+A short report block to merge into Workflow 07's Comprehensive Upgrade Report:
 
 ```
-Boot smoke test (Step 4.6):
+Boot smoke test (Workflow 06):
 
   - Triggered: BUNDLE_GEMFILE=Gemfile.next bundle exec rspec --dry-run
   - Result: PASS / FAIL with N gem bumps required
@@ -106,5 +106,5 @@ If the smoke test passes on the first run, record that explicitly — it is a po
 
 ## Notes
 
-- The smoke test does not replace the post-bump test suite run in Step 6. It is a *boot* check, not a feature check. Step 6 still runs the full suite against both versions.
+- The smoke test does not replace the post-bump test suite run in Workflow 09. It is a *boot* check, not a feature check. Workflow 09 still runs the full suite against both versions.
 - Skip this step only if there is no Gemfile.next yet (very early in dual-boot setup). In all other cases, run it.

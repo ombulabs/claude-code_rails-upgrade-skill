@@ -24,4 +24,4 @@
 | 11 Align load_defaults | run, FINAL | run, per hop. **IMPORTANT:** After each hop, align load_defaults to the new version before starting the next hop | skip |
 | 12 Mention cleanup | run | run, after the last hop | skip |
 
-Analysis Only intentionally skips Step 2 (Dual-Boot setup) and Step 3 (Validate Upgrade Path) because the user is not yet committing to an upgrade.
+Analysis Only intentionally skips Workflow 02 (Dual-Boot setup) and Workflow 03 (Validate Upgrade Path) because the user is not yet committing to an upgrade.

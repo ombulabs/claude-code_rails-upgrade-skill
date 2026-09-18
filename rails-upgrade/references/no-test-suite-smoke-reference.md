@@ -2,7 +2,7 @@
 
 **Purpose:** Provide a concrete baseline check when a Rails app has no RSpec or Minitest suite.
 
-**When to use:** Step 1 of the Rails upgrade workflow, only after test-suite detection finds no runnable `spec/` or `test/` suite.
+**When to use:** Workflow 01 (`workflows/01-run-test-suite-workflow.md`), only after test-suite detection finds no runnable `spec/` or `test/` suite.
 
 This is not a replacement for adding tests. It is a minimum boot and routing baseline so the upgrade report can say exactly what was checked before proceeding.
 

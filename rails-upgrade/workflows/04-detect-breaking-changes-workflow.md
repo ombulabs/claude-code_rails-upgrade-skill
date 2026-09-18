@@ -2,7 +2,7 @@
 
 **Purpose:** Run breaking change detection directly using Claude's tools (Grep, Glob, Read)
 
-**When to use:** Step 4 of the upgrade workflow — after tests pass and the upgrade path is validated. (load_defaults alignment is Step 7, *after* detection, not before.)
+**When to use:** Workflow 04 of the upgrade workflow — after tests pass and the upgrade path is validated. (load_defaults alignment is Workflow 11, *after* detection, not before.)
 
 ## Inputs
 

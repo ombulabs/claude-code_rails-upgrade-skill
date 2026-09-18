@@ -2,7 +2,7 @@
 
 **Purpose:** Verify every CI configuration file in the repo matches the versions declared in the upgraded `Gemfile` / `Gemfile.lock`. CI drift (old Ruby version, old Rails matrix, stale service versions) is a frequent cause of red builds on the upgrade PR and is easy to miss because the local test suite passes. Check CI Config Before Opening the PR (stale CI is the most common cause of red builds on upgrade PRs).
 
-**When to use:** Step 6, immediately before declaring the upgrade complete or opening a PR. Also any time the user reports a red CI build after an upgrade PR is opened.
+**When to use:** Workflow 09 Step 6 (`workflows/09-implement-and-upgrade-workflow.md`), immediately before declaring the upgrade complete or opening a PR. Also any time the user reports a red CI build after an upgrade PR is opened.
 
 ## Inputs
 
@@ -38,7 +38,7 @@ Use Glob to find every CI configuration file in the repo. Check all of these loc
 If none are found:
 
 - The app may rely on an external CI system (Heroku CI, Render, etc.) that this skill cannot inspect — flag this to the user and stop; the user has to verify CI themselves.
-- The app may have no CI at all. Do **not** create one from scratch as part of the upgrade — the shape of a CI setup depends on the team's deploy pipeline and is out of scope here. Note it in the report (`No CI files found — skipping CI sync`) and continue with the rest of Step 6; do not block the upgrade on it. Adding CI is a separate decision the team should make outside the upgrade flow.
+- The app may have no CI at all. Do **not** create one from scratch as part of the upgrade — the shape of a CI setup depends on the team's deploy pipeline and is out of scope here. Note it in the report (`No CI files found — skipping CI sync`) and continue with the rest of Workflow 09; do not block the upgrade on it. Adding CI is a separate decision the team should make outside the upgrade flow.
 
 ## Step 2: Read the Gemfile baseline
 
@@ -84,7 +84,7 @@ Gemfile baseline: Ruby 3.3.6, Rails 7.2.2, Node 20
 Overall: 1 file needs changes. BLOCKING.
 ```
 
-If the verdict is `DRIFT` for any file, do not mark Step 6 complete. Apply the edits, re-run the diff, and only proceed when the overall verdict is `OK`.
+If the verdict is `DRIFT` for any file, do not mark Workflow 09 complete. Apply the edits, re-run the diff, and only proceed when the overall verdict is `OK`.
 
 ## Step 5: Apply fixes
 

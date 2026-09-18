@@ -36,4 +36,4 @@ Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
 
 ## Step 4: If current version == latest patch
 
-Proceed to Step 1
+Proceed to Workflow 01 (`workflows/01-run-test-suite-workflow.md`)
