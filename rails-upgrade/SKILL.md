@@ -178,6 +178,12 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `version-guides/upgrade-8.0-to-8.1.md` - Rails 8.0 → 8.1 (bundler-audit)
 
 ### Workflow Guides (Load when generating deliverables)
+- `workflows/00-verify-latest-patch-workflow.md`
+- `workflows/02-setup-next-rails-workflow.md`
+- `workflows/03-validate-upgrade-path-workflow.md`
+- `workflows/09-implement-and-upgrade-workflow.md`
+- `workflows/11-align-load-defaults-workflow.md`
+- `workflows/12-mention-cleanup-workflow.md`
 - `workflows/01-run-test-suite-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
 - `references/no-test-suite-smoke-reference.md` - **Load from Step 1 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
 - `workflows/04-detect-breaking-changes-workflow.md` - How to run breaking change detection directly
@@ -219,24 +225,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 When user requests an upgrade, follow this workflow:
 
 ### Step 0: Verify Latest Patch Version (MANDATORY PRE-STEP)
-```
-⚠️  THIS STEP IS REQUIRED BEFORE ANY OTHER WORK
-
-1. Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
-2. Compare against latest patch for that series:
-   - EOL series (≤ 7.1): use static table in references/multi-hop-strategy-reference.md
-   - Active series (≥ 7.2): query RubyGems API (see references/multi-hop-strategy-reference.md for commands)
-3. If current version < latest patch:
-   - INFORM user: "Your app is on Rails X.Y.Z but the latest patch is X.Y.W"
-   - Guide through Gemfile update and bundle update rails
-   - Run test suite after patch upgrade
-   - Deploy patch upgrade before proceeding
-   - Do NOT proceed to next minor/major until on latest patch
-4. If current version == latest patch:
-   - Proceed to Step 1
-```
-
-**Why patch first:** Patch releases contain security fixes, bug fixes, and additional deprecation warnings. Starting the version hop on the latest patch is safer (the security fixes are already in production) and easier to debug (the new deprecation warnings surface issues that would otherwise show up mid-upgrade).
+See `workflows/00-verify-latest-patch-workflow.md`.
 
 ### Step 1: Run Test Suite (MANDATORY FIRST STEP)
 ```
@@ -262,21 +251,10 @@ When user requests an upgrade, follow this workflow:
 ```
 
 ### Step 2: Set Up Dual-Boot with next_rails (EARLY SETUP)
-```
-DELEGATE to the dual-boot skill for setup and initialization.
-That skill handles:
-- Checking if Gemfile.next already exists (to avoid duplicate `next?` method)
-- Adding next_rails gem and running next_rails --init
-- Installing dependencies for both Rails versions
-- Configuring the Gemfile with `if next?` conditionals
-```
+See `workflows/02-setup-next-rails-workflow.md`.
 
 ### Step 3: Validate Upgrade Path
-```
-1. Check if upgrade is single-hop or multi-hop
-2. If multi-hop, explain sequential requirement
-3. Plan individual hops
-```
+See `workflows/03-validate-upgrade-path-workflow.md`.
 
 ### Step 4: Run Breaking Changes Detection (DIRECT)
 ```
@@ -358,47 +336,13 @@ instead of mid-implementation.
 - **Output:** A preview showing exact configuration file changes (OLD vs NEW), a list of new files that will be created, and a per-file impact assessment (HIGH / MEDIUM / LOW).
 
 ### Step 6: Present Reports & Implement Changes
-```
-1. Present Comprehensive Upgrade Report first
-2. Present app:update Preview Report second
-3. Apply fix-before-bump changes (`kind: breaking` and `kind: deprecation`). Most fixes are direct rewrites — the new API typically works on both sides of the dual-boot pair (e.g., `update_attributes` → `update`). Use `NextRails.next?` only when the fix requires target-version-only APIs that don't exist in the current Rails
-4. Update Gemfile to target Rails version
-5. Run test suite against both versions
-6. **Check CI config matches the upgraded Gemfile** — load `workflows/10-sync-ci-workflow.md`, fix any mismatches before proceeding
-7. Deploy and verify
-```
-
-**Do not fix `load_defaults`-triggered runtime deprecation warnings about *future* Rails versions during this hop.** This caveat covers post-bump runtime warnings emitted by Rails X+1 about behavior scheduled to change in X+2 — typically surfaced once `load_defaults X.Y` flips on in Step 7. Those belong to the *next* upgrade cycle and are addressed before the next version bump.
-
-This is **not** a contradiction of fix-before-bump. The `kind: deprecation` patterns from Step 4's detection are warnings emitted by the *current* Rails version about APIs that go away at the *target* version — they stay in fix-before-bump and should be addressed in this hop.
-
-Triaging tomorrow's deprecation warnings now expands the scope of the current hop and risks shipping a half-finished change.
+See `workflows/09-implement-and-upgrade-workflow.md`.
 
 ### Step 7: Align load_defaults
-```
-⚠️  THIS STEP HAPPENS AFTER THE UPGRADE IS COMPLETE
-
-1. DELEGATE to the rails-load-defaults skill
-2. That skill walks through each config change one at a time, grouped by risk tier
-3. Tests are re-run between each change
-4. Consolidates into config/application.rb when done
-```
+See `workflows/11-align-load-defaults-workflow.md`.
 
 ### Step 8: Mention Cleanup (USER-TRIGGERED)
-```
-⚠️  DO NOT AUTO-RUN. Mention it; let the user decide.
-
-1. Tell the user the cleanup option exists
-2. Delegate to the upgrade-cleanup plugin only when the user explicitly asks
-   ("finish the upgrade", "clean up dual-boot", "drop the NextRails branches")
-3. The cleanup plugin removes NextRails.next? / NextRails.current? branches
-   and retires dual-boot scaffolding. Deprecation triage stays with this
-   skill for the next hop, not with cleanup.
-```
-
-**Sample wording the agent can crib from when prompting the user:**
-
-> Rails X.Y is in. When you're ready to remove dual-boot scaffolding (drop `NextRails.next?` / `NextRails.current?` branches, retire `Gemfile.next`), ask me to clean up. If you're heading straight to the next hop, keeping dual-boot in place is also fine.
+See `workflows/12-mention-cleanup-workflow.md`.
 
 ---
 
