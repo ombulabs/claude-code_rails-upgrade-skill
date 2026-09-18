@@ -602,4 +602,4 @@ A successful upgrade assistance session:
 
 ---
 
-See [CHANGELOG.md](CHANGELOG.md) for version history and current version.
+See [CHANGELOG.md](../CHANGELOG.md) for version history and current version.
