@@ -67,35 +67,6 @@ When proposing code fixes that must work with both the current and target Rails 
 
 ---
 
-## Trigger Patterns
-
-Claude should activate this skill when user says:
-
-**Upgrade Requests:**
-- "Upgrade my Rails app to [version]"
-- "Help me upgrade from Rails [x] to [y]"
-- "What breaking changes are in Rails [version]?"
-- "Plan my upgrade from [x] to [y]"
-- "What Rails version am I using?"
-- "Analyze my Rails app for upgrade"
-- "Find breaking changes in my code"
-- "Check my app for Rails [version] compatibility"
-
-**Specific Report Requests:**
-- "Show me the app:update changes"
-- "Preview configuration changes for Rails [version]"
-- "Generate the upgrade report"
-- "What will change if I upgrade?"
-
-**Upgrade Cleanup Requests (delegate to the `upgrade-cleanup` plugin):**
-- "Finish the upgrade"
-- "Clean up after my Rails upgrade"
-- "Remove the dual-boot setup"
-- "Drop the NextRails branches"
-- "We're done upgrading to Rails [version]"
-
----
-
 ## Available Resources
 
 ### Core Documentation
