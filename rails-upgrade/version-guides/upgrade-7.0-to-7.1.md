@@ -221,7 +221,9 @@ config.active_record.query_log_tags_format = :sqlcommenter  # or :legacy
 #### 8. Cache Format Version 7.1
 
 **What Changed:**
-New cache serialization format available.
+New cache serialization format available. 7.1 also **deprecates** the 6.1 format and removes it in 7.2.
+
+**This usually warns with no line in the codebase to find.** `cache_format_version` is rarely set explicitly — `config.load_defaults 5.1` / `6.0` / `6.1` implies the 6.1 format. An app that has not yet moved `load_defaults` past 6.1 warns on every boot under 7.1 with nothing to grep for, so a clean detection scan is inconclusive here. Check the app's `load_defaults` value instead.
 
 **Fix:**
 ```ruby
@@ -229,7 +231,9 @@ New cache serialization format available.
 config.active_support.cache_format_version = 7.1
 ```
 
-**Warning:** Don't enable until ALL servers are upgraded to 7.1.
+Or resolve it as part of the `load_defaults` bump in Step 7.
+
+**Warning:** Don't enable until ALL servers are upgraded to 7.1. During a rolling deploy, servers still on the old format read new-format entries as misses and vice versa, which can stampede the cache. Deploy the version bump first, then flip the format.
 
 ---
 

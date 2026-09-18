@@ -11,8 +11,8 @@
 # Run with:
 #   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-70-patterns.yml
 #
-# Only OPEN_REDIRECT_PROTECTION is covered so far; the other patterns in this
-# file predate the expectations tooling. Add entries as they are revisited.
+# The patterns without an entry here predate the expectations tooling. Add
+# entries as they are revisited.
 
 OPEN_REDIRECT_PROTECTION:
   match:
@@ -36,3 +36,18 @@ OPEN_REDIRECT_PROTECTION:
     - "    redirect_to user_path(params[:id])"
     # already opted in, the exclude regex must suppress it
     - "    redirect_to \"https://example.com\", allow_other_host: true"
+
+EXPLICIT_TEMPLATE_EXTENSION:
+  match:
+    # the dotted name 6.1 warned about and 7.0 takes literally
+    - "    render template: \"posts/show.html.erb\""
+    - "    render template: 'posts/show.html'"
+    - "    render layout: \"pdf.html\""
+    # the wicked_pdf shape, template: forwarded straight through
+    - "    render pdf: \"report\", template: \"reports/show.html.erb\", layout: \"pdf.html\""
+  no_match:
+    # the fixed form, no extension in the string
+    - "    render template: \"posts/show\""
+    - "    render layout: \"pdf\""
+    # a bare action render is unaffected
+    - "    render :show"
