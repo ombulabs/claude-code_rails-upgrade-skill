@@ -187,6 +187,7 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding and drops `NextRails.next?` / `NextRails.current?` branches. Deprecation triage stays with this skill for the next hop.
 
 ### Reference Materials
+- `references/request-patterns-reference.md` - Which workflows run for each request shape (full upgrade, multi-hop, analysis only). Read at the start of a session.
 - `references/no-test-suite-smoke-reference.md` - **Load from Step 1 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
 - `references/deprecation-warnings-reference.md` - Finding and fixing deprecations
 - `references/staying-current-reference.md` - Keeping up with Rails releases
@@ -225,7 +226,7 @@ When user requests an upgrade, follow this workflow. Run in order, read each fil
 | 11 | Align load_defaults | AFTER THE UPGRADE IS COMPLETE. Delegates to the rails-load-defaults skill | `workflows/11-align-load-defaults-workflow.md` |
 | 12 | Mention cleanup | USER-TRIGGERED. Delegates to the `upgrade-cleanup` plugin only when the user explicitly asks | `workflows/12-mention-cleanup-workflow.md` |
 
-The Purpose column is a summary. Gates live only in each workflow's `## Gates` section.
+The Purpose column is a summary. Gates live only in each workflow's `## Gates` section. Which workflows run depends on the request shape (full upgrade, multi-hop, analysis only): `references/request-patterns-reference.md`.
 
 ---
 
@@ -259,107 +260,6 @@ Before starting ANY upgrade:
 - [ ] Run app with Rails deprecations turned on (configured in config/environment files)
 - [ ] Address existing deprecation warnings
 - [ ] Enable verbose deprecations in test environment
-
----
-
-## Common Request Patterns
-
-### Pattern 1: Full Upgrade Request
-**User says:** "Upgrade my Rails app to 8.1"
-
-**Action - Step 0 (MANDATORY: Verify Latest Patch):**
-1. Read `Gemfile.lock` for exact Rails version
-2. Compare against latest patch for that series (see `references/multi-hop-strategy-reference.md`)
-3. If not on latest patch → Guide user through patch upgrade first
-4. If on latest patch → Proceed to Step 1
-
-**Action - Step 1 (MANDATORY: Verify Tests Pass):**
-1. Load: `workflows/01-run-test-suite-workflow.md`
-2. Detect test framework (RSpec or Minitest)
-3. Run test suite: `bundle exec rspec` or `bundle exec rails test`
-4. If tests FAIL → STOP and help fix tests first
-5. If tests PASS → Record baseline and proceed
-
-**Action - Step 2 (Set Up Dual-Boot):**
-1. DELEGATE to the `dual-boot` skill for setup
-2. Set up next_rails, Gemfile.next, and dual-boot CI
-
-**Action - Step 3 (Validate Upgrade Path):**
-1. Validate upgrade path (single-hop vs multi-hop)
-
-**Action - Step 4 (Run Detection Directly):**
-1. Load: `workflows/04-detect-breaking-changes-workflow.md`
-2. Load: `detection-scripts/patterns/rails-{VERSION}-patterns.yml`
-3. Use Grep/Glob/Read tools to search for each pattern
-4. Collect findings with file:line references
-
-**Action - Step 4.5 (Check Gem Compatibility):**
-1. Load: `workflows/05-check-gem-compatibility-workflow.md` and follow it
-2. Run primary check (`bundle_report compatibility`); escalate to railsbump only when the workflow's conditions trigger
-3. Pass the resulting buckets (required bumps, blockers, already compatible) into Step 5's report
-4. If blockers exist, load `references/gem-compatibility-reference.md` for the fork/replace/vendor playbook
-
-**Action - Step 5 (Generate Reports):**
-1. Load: `workflows/07-generate-upgrade-report-workflow.md`
-2. Load: `workflows/08-generate-app-update-preview-workflow.md`
-3. Generate Comprehensive Upgrade Report (using direct findings)
-4. Generate app:update Preview (using actual config files)
-5. Present both reports to user
-
-**Action - Step 6 (Implement & Upgrade):**
-1. Apply fix-before-bump changes (`kind: breaking` and `kind: deprecation`). Most fixes are direct rewrites — the new API typically works on both sides of the dual-boot pair (e.g., `update_attributes` → `update`). Use `NextRails.next?` only when the fix requires target-version-only APIs that don't exist in the current Rails
-2. Update Gemfile to target Rails version
-3. Run tests against both versions
-4. **Check CI config matches the upgraded Gemfile** (`workflows/10-sync-ci-workflow.md`) — fix any mismatches before declaring Step 6 complete
-5. Deploy and verify
-
-**Action - Step 7 (Align load_defaults - FINAL):**
-1. DELEGATE to the `rails-load-defaults` skill
-2. Walk through each config incrementally after the upgrade is complete
-
-### Pattern 2: Multi-Hop Request
-**User says:** "Help me upgrade from Rails 5.2 to 8.1"
-
-**Action - Step 0 (MANDATORY: Verify Latest Patch):**
-1. Check exact current version from `Gemfile.lock`
-2. If not on latest patch of current series → Upgrade to latest patch first
-3. For multi-hop: This check applies at the START and again after each hop
-
-**Action - Step 1 (MANDATORY: Verify Tests Pass):**
-1. Run test suite BEFORE planning any upgrade work
-2. If tests fail → STOP and fix first
-3. If tests pass → Proceed with planning
-
-**Action - Step 2 (Set Up Dual-Boot):**
-1. DELEGATE to the `dual-boot` skill for setup (if not already set up)
-2. Dual-boot stays active throughout the multi-hop process
-
-**Action - Step 3 (Plan & Execute):**
-1. Explain sequential requirement
-2. Calculate hops: 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1
-3. Reference: `references/multi-hop-strategy-reference.md`
-4. Follow Pattern 1 Steps 4-6 for FIRST hop (5.2 → 6.0)
-5. After first hop complete, repeat for next hops
-6. **IMPORTANT:** After each hop, align load_defaults to the new version before starting the next hop
-
-### Pattern 3: Breaking Changes Analysis Only
-**User says:** "What breaking changes affect my app for Rails 8.0?"
-
-This pattern is analysis-only — it intentionally skips Step 2 (Dual-Boot setup) and Step 3 (Validate Upgrade Path) because the user is not yet committing to an upgrade.
-
-**Action - Step 0 (MANDATORY: Verify Latest Patch):**
-1. Check if on latest patch — warn if not, recommend patching first
-
-**Action - Step 1 (MANDATORY: Verify Tests Pass):**
-1. Run test suite first
-2. If tests fail → Warn user and recommend fixing first
-3. If tests pass → Proceed with analysis
-
-**Action - Step 4 (Run Detection):**
-1. Load: `workflows/04-detect-breaking-changes-workflow.md`
-2. Run detection directly using tools
-3. Present findings summary
-4. Offer to generate full upgrade report
 
 ---
 
