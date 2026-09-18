@@ -177,23 +177,6 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 - `version-guides/upgrade-7.2-to-8.0.md` - Rails 7.2 → 8.0 (Propshaft)
 - `version-guides/upgrade-8.0-to-8.1.md` - Rails 8.0 → 8.1 (bundler-audit)
 
-### Workflow Guides (Load when generating deliverables)
-- `workflows/00-verify-latest-patch-workflow.md`
-- `workflows/02-setup-next-rails-workflow.md`
-- `workflows/03-validate-upgrade-path-workflow.md`
-- `workflows/09-implement-and-upgrade-workflow.md`
-- `workflows/11-align-load-defaults-workflow.md`
-- `workflows/12-mention-cleanup-workflow.md`
-- `workflows/01-run-test-suite-workflow.md` - **MANDATORY FIRST STEP** - How to run and verify test suite
-- `references/no-test-suite-smoke-reference.md` - **Load from Step 1 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
-- `workflows/04-detect-breaking-changes-workflow.md` - How to run breaking change detection directly
-- `workflows/07-generate-upgrade-report-workflow.md` - How to generate upgrade reports
-- `workflows/05-check-gem-compatibility-workflow.md` - **Load in Step 4.5** - Per-lockfile gem compatibility check against the target Rails version. Documents both the primary (`next_rails` `bundle_report compatibility`) and the secondary (railsbump.org API) and the rules for when to escalate.
-- `workflows/06-boot-smoke-test-workflow.md` - **Load in Step 4.6** - Run a Rails-loading command against `Gemfile.next` to catch gem-level runtime incompat that the resolver can't see (gems calling removed Rails internals or `require`-ing removed files).
-- `workflows/10-sync-ci-workflow.md` - **MANDATORY before opening the upgrade PR** - How to verify CI config matches the upgraded Gemfile
-- `workflows/08-generate-app-update-preview-workflow.md` - How to generate app:update previews
-- **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding and drops `NextRails.next?` / `NextRails.current?` branches. Deprecation triage stays with this skill for the next hop.
-
 ### Examples (Load when user needs clarification)
 - `examples/simple-upgrade.md` - Single-hop upgrade example
 - `examples/multi-hop-upgrade.md` - Multi-hop upgrade example
@@ -201,8 +184,10 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 ### External Dependencies
 - **dual-boot skill** - Dual-boot setup and management with next_rails (Step 2) (https://github.com/ombulabs/claude-code_dual-boot-skill)
 - **rails-load-defaults skill** - Incremental load_defaults alignment (Step 7, final step) (https://github.com/ombulabs/claude-code_rails-load-defaults-skill)
+- **`upgrade-cleanup` companion plugin** - User-triggered. Removes dual-boot scaffolding and drops `NextRails.next?` / `NextRails.current?` branches. Deprecation triage stays with this skill for the next hop.
 
 ### Reference Materials
+- `references/no-test-suite-smoke-reference.md` - **Load from Step 1 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
 - `references/deprecation-warnings-reference.md` - Finding and fixing deprecations
 - `references/staying-current-reference.md` - Keeping up with Rails releases
 - `references/breaking-changes-by-version-reference.md` - Quick lookup
@@ -220,42 +205,27 @@ If user requests a multi-hop upgrade (e.g., 5.2 → 8.1):
 
 ---
 
-## High-Level Workflow
+## Workflow index
 
-When user requests an upgrade, follow this workflow:
+When user requests an upgrade, follow this workflow. Run in order, read each file when you reach it. Gates block.
 
-### Step 0: Verify Latest Patch Version (MANDATORY PRE-STEP)
-See `workflows/00-verify-latest-patch-workflow.md`.
+| #  | Name | Purpose | File |
+|----|------|---------|------|
+| 00 | Verify latest patch | MANDATORY PRE-STEP. App on the latest patch of its current series before any minor/major hop | `workflows/00-verify-latest-patch-workflow.md` |
+| 01 | Run test suite | MANDATORY FIRST STEP. How to run and verify test suite; blocks on any failure | `workflows/01-run-test-suite-workflow.md` |
+| 02 | Set up next_rails | EARLY SETUP. Delegated to the skill listed under External Dependencies | `workflows/02-setup-next-rails-workflow.md` |
+| 03 | Validate upgrade path | Single-hop or multi-hop, individual hops planned | `workflows/03-validate-upgrade-path-workflow.md` |
+| 04 | Detect breaking changes | How to run breaking change detection directly | `workflows/04-detect-breaking-changes-workflow.md` |
+| 05 | Check gem compatibility | Per-lockfile gem compatibility check against the target Rails version | `workflows/05-check-gem-compatibility-workflow.md` |
+| 06 | Boot smoke test | Run a Rails-loading command against `Gemfile.next` to catch gem-level runtime incompat that the resolver can't see | `workflows/06-boot-smoke-test-workflow.md` |
+| 07 | Generate upgrade report | How to generate upgrade reports | `workflows/07-generate-upgrade-report-workflow.md` |
+| 08 | Generate app:update preview | How to generate app:update previews | `workflows/08-generate-app-update-preview-workflow.md` |
+| 09 | Implement and upgrade | Present reports, apply fix-before-bump changes, bump the Gemfile, run tests against both versions | `workflows/09-implement-and-upgrade-workflow.md` |
+| 10 | Sync CI config | MANDATORY before opening the upgrade PR. How to verify CI config matches the upgraded Gemfile | `workflows/10-sync-ci-workflow.md` |
+| 11 | Align load_defaults | AFTER THE UPGRADE IS COMPLETE. Delegates to the rails-load-defaults skill | `workflows/11-align-load-defaults-workflow.md` |
+| 12 | Mention cleanup | USER-TRIGGERED. Delegates to the `upgrade-cleanup` plugin only when the user explicitly asks | `workflows/12-mention-cleanup-workflow.md` |
 
-### Step 1: Run Test Suite (MANDATORY FIRST STEP)
-See `workflows/01-run-test-suite-workflow.md`.
-
-### Step 2: Set Up Dual-Boot with next_rails (EARLY SETUP)
-See `workflows/02-setup-next-rails-workflow.md`.
-
-### Step 3: Validate Upgrade Path
-See `workflows/03-validate-upgrade-path-workflow.md`.
-
-### Step 4: Run Breaking Changes Detection (DIRECT)
-See `workflows/04-detect-breaking-changes-workflow.md`.
-
-### Step 4.5: Check Gem Compatibility Against Target Rails
-See `workflows/05-check-gem-compatibility-workflow.md`.
-
-### Step 4.6: Boot Smoke Test on Gemfile.next
-See `workflows/06-boot-smoke-test-workflow.md`.
-
-### Step 5: Load Report Resources & Generate Reports
-See `workflows/07-generate-upgrade-report-workflow.md` and `workflows/08-generate-app-update-preview-workflow.md`.
-
-### Step 6: Present Reports & Implement Changes
-See `workflows/09-implement-and-upgrade-workflow.md`.
-
-### Step 7: Align load_defaults
-See `workflows/11-align-load-defaults-workflow.md`.
-
-### Step 8: Mention Cleanup (USER-TRIGGERED)
-See `workflows/12-mention-cleanup-workflow.md`.
+The Purpose column is a summary. Gates live only in each workflow's `## Gates` section.
 
 ---
 
