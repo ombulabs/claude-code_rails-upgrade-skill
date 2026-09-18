@@ -23,8 +23,8 @@ Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
 
 ## Step 2: Compare against the latest patch for that series
 
-- EOL series (≤ 7.1): use static table in `references/multi-hop-strategy-reference.md`
-- Active series (≥ 7.2): query RubyGems API (see `references/multi-hop-strategy-reference.md` for commands)
+- Series listed in the End-of-Life table of `references/multi-hop-strategy-reference.md`: use that table
+- Any other series: query RubyGems API (see `references/multi-hop-strategy-reference.md` for commands)
 
 ## Step 3: If current version < latest patch
 
