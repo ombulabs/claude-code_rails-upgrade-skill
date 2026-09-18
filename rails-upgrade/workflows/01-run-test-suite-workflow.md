@@ -18,6 +18,18 @@
 - All tests pass (0 failures). If ANY tests fail: STOP the upgrade process, report failing tests to user, offer to help fix failing tests, do NOT proceed until all tests pass
 - If no runnable test suite exists: continue only if boot/routes checks pass and the user accepts the risk of proceeding without real tests
 
+## Pre-upgrade checklist (FastRuby.io best practices, recommended before starting any upgrade)
+
+**Test Coverage Assessment (AUTOMATED)**
+- [x] Run test suite - all tests passing? **← Claude runs this automatically**
+- [x] Check test coverage (aim for >70%) **← Claude captures this if SimpleCov is configured**
+- [ ] Review critical paths have coverage
+
+**Deprecation Warnings**
+- [ ] Run app with Rails deprecations turned on (configured in config/environment files)
+- [ ] Address existing deprecation warnings
+- [ ] Enable verbose deprecations in test environment
+
 ---
 
 ## Why This Step is Critical

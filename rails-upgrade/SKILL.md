@@ -145,39 +145,6 @@ The Purpose column is a summary. Gates live only in each workflow's `## Gates` s
 
 ---
 
-## Pre-Upgrade Checklist (FastRuby.io Best Practices)
-
-Before starting ANY upgrade:
-
-### 1. Test Coverage Assessment (AUTOMATED - Step 1 of Workflow)
-- [x] Run test suite - all tests passing? **← Claude runs this automatically**
-- [x] Check test coverage (aim for >70%) **← Claude captures this if SimpleCov is configured**
-- [ ] Review critical paths have coverage
-
-**Note:** This step is now automated. Claude will run the test suite and BLOCK the upgrade if any tests fail.
-
-### 2. Dependency Audit
-- [ ] Run `bundle outdated`
-- [ ] Check gem compatibility with target Rails version
-- [ ] Identify gems that need upgrading first
-
-### 3. Database Backup
-- [ ] Backup production database
-- [ ] Backup development/staging databases
-- [ ] Verify backup restore process works
-
-### 4. Git Branch Strategy
-- [ ] Create upgrade branch from main/master
-- [ ] Set up CI for upgrade branch
-- [ ] Plan merge strategy
-
-### 5. Deprecation Warnings
-- [ ] Run app with Rails deprecations turned on (configured in config/environment files)
-- [ ] Address existing deprecation warnings
-- [ ] Enable verbose deprecations in test environment
-
----
-
 ## Quality Checklist
 
 Before delivering, verify:

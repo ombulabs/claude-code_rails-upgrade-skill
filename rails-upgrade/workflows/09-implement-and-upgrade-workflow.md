@@ -20,6 +20,18 @@
 - Test suite passes against both versions
 - CI config matches the upgraded Gemfile (`workflows/10-sync-ci-workflow.md`)
 
+## Pre-upgrade checklist (FastRuby.io best practices, recommended before starting any upgrade)
+
+**Database Backup**
+- [ ] Backup production database
+- [ ] Backup development/staging databases
+- [ ] Verify backup restore process works
+
+**Git Branch Strategy**
+- [ ] Create upgrade branch from main/master
+- [ ] Set up CI for upgrade branch
+- [ ] Plan merge strategy
+
 ## Step 1: Present Comprehensive Upgrade Report first
 
 ## Step 2: Present app:update Preview Report second

@@ -18,6 +18,13 @@
 
 - If any blockers exist, `references/gem-compatibility-reference.md` loaded for the fork/replace/vendor playbook and the gem update order. Skip otherwise.
 
+## Pre-upgrade checklist (FastRuby.io best practices, recommended before starting any upgrade)
+
+**Dependency Audit**
+- [ ] Run `bundle outdated`
+- [ ] Check gem compatibility with target Rails version
+- [ ] Identify gems that need upgrading first
+
 ---
 
 ## Two checks, one orchestrator
