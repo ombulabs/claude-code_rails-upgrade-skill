@@ -25,7 +25,7 @@
 - [x] Check test coverage (aim for >70%) **← Claude captures this if SimpleCov is configured**
 - [ ] Review critical paths have coverage
 
-**Deprecation Warnings**
+**Deprecation Warnings** (Step 2 below checks whether deprecation behavior is overridden; these three are the follow-through)
 - [ ] Run app with Rails deprecations turned on (configured in config/environment files)
 - [ ] Address existing deprecation warnings
 - [ ] Enable verbose deprecations in test environment

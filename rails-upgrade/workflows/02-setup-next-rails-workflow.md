@@ -7,6 +7,7 @@
 ## Inputs
 
 - Green test baseline (or accepted partial smoke baseline)
+- Result of the deprecation-behavior sweep from `workflows/01-run-test-suite-workflow.md` Step 2. Hand it to the dual-boot skill so it does not repeat its own sweep.
 
 ## Outputs
 
