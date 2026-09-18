@@ -21,11 +21,10 @@
 
 ## Gates (must be true before the next workflow that runs)
 
+- Report built from `templates/upgrade-report-template.md`, every placeholder replaced
+- Every finding in the report is an actual detection finding with a real file:line reference, no generic examples
+- Custom code flagged with ⚠️ warnings based on detected issues
 - Step 8 quality check passed and the report delivered
-- Always Use Actual Findings (no generic examples in reports)
-- Always Flag Custom Code (with ⚠️ warnings based on detected issues)
-- Always Use Templates (for consistency)
-- Always Check Quality (before delivery)
 
 ---
 
@@ -347,4 +346,4 @@ Before delivering, verify:
 - [ ] Custom code warnings based on actual detected issues
 - [ ] Code examples use user's actual code from affected files
 - [ ] Next steps clearly outlined
-- [ ] Offered to help implement changes
+- [ ] Offered to help implement changes (skip if the user already said they will implement themselves)

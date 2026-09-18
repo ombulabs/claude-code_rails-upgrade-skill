@@ -1,6 +1,6 @@
 # Workflow 12: Mention Cleanup
 
-**Purpose:** Tell the user the cleanup option exists once the upgrade has shipped. Cleanup ends the campaign; between hops the user usually wants to keep dual-boot in place. Mention, Don't Auto-Run, Cleanup.
+**Purpose:** Tell the user the cleanup option exists once the upgrade has shipped. Cleanup ends the campaign; between hops the user usually wants to keep dual-boot in place.
 
 **When to use:** USER-TRIGGERED. DO NOT AUTO-RUN. Mention it; let the user decide.
 

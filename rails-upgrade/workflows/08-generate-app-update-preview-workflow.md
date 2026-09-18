@@ -20,9 +20,9 @@
 
 ## Gates (must be true before the next workflow that runs)
 
-- Preview delivered with every placeholder replaced by actual values
-- Always Use Templates (for consistency)
-- Always Check Quality (before delivery)
+- Preview built from `templates/app-update-preview-template.md`, every placeholder replaced by actual values
+- Diffs based on the user's real current config files, not generic examples
+- Preview delivered
 
 ---
 

@@ -1,6 +1,6 @@
 # Workflow 01: Run Test Suite
 
-**Purpose:** Run and verify the test suite BEFORE any upgrade work begins. ALWAYS Run Test Suite (MANDATORY - no exceptions, no upgrade work until tests pass). Block on Failing Tests (if tests fail, STOP and help fix them before any upgrade work).
+**Purpose:** Run and verify the test suite BEFORE any upgrade work begins. No exceptions: no upgrade work until tests pass, and if tests fail, STOP and help fix them first.
 
 **When to use:** MANDATORY first step for ALL upgrade requests - no exceptions
 
