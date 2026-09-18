@@ -71,9 +71,7 @@ fi
 
 ---
 
-### Step 2: Run the Test Suite
-
-#### 2a. Sweep for deprecation-behavior overrides
+### Step 2: Sweep for deprecation-behavior overrides
 
 Before running the suite, grep for places that change deprecation behavior (raise / silence / disallow) so test results can be interpreted correctly. The obvious places (`config/application.rb`, `config/environments/*.rb`) are not enough. Apps also use the `config.active_support.deprecation =` env DSL, Rails 7.1+ apps use the `deprecators` registry, RSpec autoloads `-r` requires from `.rspec`, and test helpers can install hooks like `RSpec.configure { |c| c.raise_errors_for_deprecations! }`. Miss those and a "the upgrade broke tests" report can really be "every deprecation has been raising for months."
 
@@ -103,7 +101,7 @@ Which forms appear depends on the app's Rails version:
 
 Running this against a Rails 5–7.0 app and seeing no `deprecators` hits is expected, not a gap.
 
-#### 2b. Run the suite
+### Step 3: Run the Test Suite
 
 Execute the appropriate test command:
 
@@ -129,7 +127,7 @@ COVERAGE=true bundle exec rspec
 
 ---
 
-### Step 3: Capture Results
+### Step 4: Capture Results
 
 Parse the test output to extract:
 
@@ -154,7 +152,7 @@ Parse the test output to extract:
 
 ---
 
-### Step 4: Evaluate Results
+### Step 5: Evaluate Results
 
 #### If ALL Tests Pass (0 failures):
 
@@ -204,7 +202,7 @@ Would you like help fixing these failing tests?
 
 ---
 
-### Step 5: Handle Edge Cases
+### Step 6: Handle Edge Cases
 
 #### No Tests Found
 
