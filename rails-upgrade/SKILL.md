@@ -145,38 +145,6 @@ The Purpose column is a summary. Gates live only in each workflow's `## Gates` s
 
 ---
 
-## Quality Checklist
-
-Before delivering, verify:
-
-**For Direct Detection:**
-- [ ] All patterns from version-specific YAML file checked
-- [ ] Grep/Glob tools used correctly for each pattern
-- [ ] File:line references collected for all findings
-- [ ] Context captured for each finding
-
-**For Comprehensive Upgrade Report:**
-- [ ] All {PLACEHOLDERS} replaced with actual values
-- [ ] Used ACTUAL findings from direct detection (not generic examples)
-- [ ] Findings grouped into the two buckets — fix-before-bump (`kind: breaking` and `kind: deprecation`) and fix-when-ready (`kind: migration` and `kind: optional`) — with real file:line references
-- [ ] Custom code warnings based on actual detected issues
-- [ ] Code examples use user's actual code from affected files
-- [ ] Next steps clearly outlined
-
-**For CI Config Check (Step 6, before opening the PR):**
-- [ ] Every CI file in the repo enumerated (GitHub Actions, CircleCI, Jenkins, GitLab, etc.)
-- [ ] Ruby version, Rails matrix, and service versions diffed against the upgraded Gemfile
-- [ ] CI sync report produced with per-file verdict
-- [ ] All DRIFT entries fixed; overall verdict is OK
-
-**For app:update Preview:**
-- [ ] All {PLACEHOLDERS} replaced with actual values
-- [ ] File list matches user's actual config files
-- [ ] Diffs based on real current config vs target version
-- [ ] Next steps clearly outlined
-
----
-
 ## Key Principles
 
 1. **ALWAYS Verify Latest Patch First** (MANDATORY - ensure app is on latest patch of current series before any version hop)

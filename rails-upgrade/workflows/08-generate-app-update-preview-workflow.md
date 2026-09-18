@@ -322,3 +322,14 @@ Need help with any specific file? Let me know!
 **Related Files:**
 - Template: `templates/app-update-preview-template.md`
 - Version guides: `version-guides/upgrade-{FROM}-to-{TO}.md`
+
+---
+
+## Self-review checklist
+
+Before delivering, verify:
+
+- [ ] All {PLACEHOLDERS} replaced with actual values
+- [ ] File list matches user's actual config files
+- [ ] Diffs based on real current config vs target version
+- [ ] Next steps clearly outlined

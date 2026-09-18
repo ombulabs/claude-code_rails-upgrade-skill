@@ -107,3 +107,14 @@ After fixes, re-run Step 3 and regenerate the report. The report is part of the 
 - Dual-boot set up locally but CI was never extended — the matrix still runs only the current `Gemfile`, so the next-Rails build never runs on PRs and breakages land unnoticed.
 - GitHub Actions cache key pinned to old Rails version, causing phantom "works locally, fails in CI" bundle resolution mismatches.
 - Node engine bumped in `package.json` but CI still using an older Node major — asset compilation fails.
+
+---
+
+## Self-review checklist
+
+Before opening the PR, verify:
+
+- [ ] Every CI file in the repo enumerated (GitHub Actions, CircleCI, Jenkins, GitLab, etc.)
+- [ ] Ruby version, Rails matrix, and service versions diffed against the upgraded Gemfile
+- [ ] CI sync report produced with per-file verdict
+- [ ] All DRIFT entries fixed; overall verdict is OK

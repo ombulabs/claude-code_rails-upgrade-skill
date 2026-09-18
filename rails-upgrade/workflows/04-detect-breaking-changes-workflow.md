@@ -405,5 +405,7 @@ Before proceeding to report generation:
 - [ ] Within each bucket, sub-ordered by priority (HIGH → MEDIUM → LOW)
 - [ ] Each finding tagged with both its `kind` and `priority` in the output
 - [ ] Any search errors noted
+- [ ] Grep/Glob tools used correctly for each pattern
+- [ ] Context captured for each finding
 
 ---

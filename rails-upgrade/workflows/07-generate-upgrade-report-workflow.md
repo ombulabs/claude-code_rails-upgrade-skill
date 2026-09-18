@@ -330,3 +330,16 @@ Add 50% if custom code warnings are present.
 - Template: `templates/upgrade-report-template.md`
 - Version guides: `version-guides/upgrade-{FROM}-to-{TO}.md`
 - Testing checklist: `references/testing-checklist-reference.md`
+
+---
+
+## Self-review checklist
+
+Before delivering, verify:
+
+- [ ] All {PLACEHOLDERS} replaced with actual values
+- [ ] Used ACTUAL findings from direct detection (not generic examples)
+- [ ] Findings grouped into the two buckets — fix-before-bump (`kind: breaking` and `kind: deprecation`) and fix-when-ready (`kind: migration` and `kind: optional`) — with real file:line references
+- [ ] Custom code warnings based on actual detected issues
+- [ ] Code examples use user's actual code from affected files
+- [ ] Next steps clearly outlined
