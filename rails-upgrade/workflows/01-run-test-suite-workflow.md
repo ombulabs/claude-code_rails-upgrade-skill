@@ -1,8 +1,22 @@
-# Test Suite Verification Workflow
+# Workflow 01: Run Test Suite
 
 **Purpose:** Run and verify the test suite BEFORE any upgrade work begins
 
 **When to use:** MANDATORY first step for ALL upgrade requests - no exceptions
+
+## Inputs
+
+- The application repository, with its test framework (RSpec, Minitest, or both)
+
+## Outputs
+
+- Baseline metrics (test count, coverage if available)
+- If no runnable test suite exists: the no-test-suite smoke baseline from `references/no-test-suite-smoke-reference.md`, with baseline confidence recorded as partial
+
+## Gates (must be true before the next workflow that runs)
+
+- All tests pass (0 failures). If ANY tests fail: STOP the upgrade process, report failing tests to user, offer to help fix failing tests, do NOT proceed until all tests pass
+- If no runnable test suite exists: continue only if boot/routes checks pass and the user accepts the risk of proceeding without real tests
 
 ---
 
@@ -376,7 +390,7 @@ This workflow integrates with the main upgrade process:
 
 ---
 
-## Quality Checklist
+## Self-review checklist
 
 Before proceeding past this step:
 

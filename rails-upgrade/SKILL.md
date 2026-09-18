@@ -20,7 +20,7 @@ description: Analyzes Rails applications and generates comprehensive upgrade rep
 | Term | Meaning | Where |
 |------|---------|-------|
 | **Workflow** | One numbered unit of the upgrade flow, one file | `workflows/<NN>-<name>-workflow.md` |
-| **Step** | A `## Step N` header inside a workflow file | inside the workflow |
+| **Step** | A `Step N` header inside a workflow file | inside the workflow |
 | **Reference** | Material loaded on demand: lookup tables, playbooks, conditional branches | `references/<name>-reference.md` |
 
 No sub-steps: a "Step 4.1" is either two sequential steps or a conditional branch inside one step (`### A.` / `### B.` headers). Cross-reference a step as file path plus step, e.g. `workflows/01-run-test-suite-workflow.md` Step 4. Not used in headings: Stage, Phase, Sub-step, dotted step numbers.
@@ -228,27 +228,7 @@ When user requests an upgrade, follow this workflow:
 See `workflows/00-verify-latest-patch-workflow.md`.
 
 ### Step 1: Run Test Suite (MANDATORY FIRST STEP)
-```
-⚠️  THIS STEP IS REQUIRED BEFORE ANY OTHER WORK
-
-1. Read: workflows/01-run-test-suite-workflow.md
-2. Detect test framework (RSpec, Minitest, or both)
-3. Run test suite with: bundle exec rspec OR bundle exec rails test
-4. Capture results: total tests, passing, failing, pending
-5. If no runnable test suite exists:
-   - Load: references/no-test-suite-smoke-reference.md
-   - Run the safe read-only smoke baseline: Rails boot, test-env boot when possible, routes load, migration status, and asset/build command if present
-   - Record baseline confidence as partial
-   - Continue only if boot/routes checks pass and the user accepts the risk of proceeding without real tests
-6. If ANY tests fail:
-   - STOP the upgrade process
-   - Report failing tests to user
-   - Offer to help fix failing tests
-   - Do NOT proceed until all tests pass
-7. If all tests pass:
-   - Record baseline metrics (test count, coverage if available)
-   - Proceed to Step 2
-```
+See `workflows/01-run-test-suite-workflow.md`.
 
 ### Step 2: Set Up Dual-Boot with next_rails (EARLY SETUP)
 See `workflows/02-setup-next-rails-workflow.md`.
@@ -257,83 +237,16 @@ See `workflows/02-setup-next-rails-workflow.md`.
 See `workflows/03-validate-upgrade-path-workflow.md`.
 
 ### Step 4: Run Breaking Changes Detection (DIRECT)
-```
-Claude runs detection directly using tools - NO script generation needed
-
-1. Read: workflows/04-detect-breaking-changes-workflow.md
-2. Read: detection-scripts/patterns/rails-{VERSION}-patterns.yml
-3. For each pattern in the patterns file:
-   - Use Grep tool to search for the pattern
-   - Collect file paths and line numbers
-   - Store findings with context
-4. Read: version-guides/upgrade-{FROM}-to-{TO}.md for context
-5. Compile all findings into structured data
-```
+See `workflows/04-detect-breaking-changes-workflow.md`.
 
 ### Step 4.5: Check Gem Compatibility Against Target Rails
-```
-Determines which gems must be bumped before the Rails version change can resolve.
-
-1. Read: workflows/05-check-gem-compatibility-workflow.md and follow it. The
-   workflow documents the primary check (next_rails bundle_report),
-   the conditions for escalating to the secondary (railsbump API),
-   and the bucket mapping for both.
-2. Pass the resulting three buckets — required bumps, blockers,
-   already compatible — into Step 5's report so the gem-update
-   section reflects real per-lockfile data.
-3. If any blockers exist, load references/gem-compatibility-reference.md for
-   the fork/replace/vendor playbook and the gem update order. Skip
-   otherwise.
-```
+See `workflows/05-check-gem-compatibility-workflow.md`.
 
 ### Step 4.6: Boot Smoke Test on Gemfile.next
-```
-Catches the gem-internal incompatibilities that Step 4 (codebase grep) and
-Step 4.5 (resolver-level compat check) cannot see.
-
-A gem can declare loose Rails constraints — no upper bound on activerecord /
-activesupport — and `bundle_report compatibility` plus `bundle install` will
-both call it "compatible." But at runtime, the gem may:
-
-  - call a Rails internal that was removed at the target version
-    (e.g. database_cleaner-active_record 2.1.x calling
-    AR::ConnectionAdapters#schema_migration, removed in Rails 7.2)
-  - require a file that was removed at the target version
-    (e.g. jbuilder 2.11.x doing `require "active_support/proxy_object"`,
-    removed in Rails 8.0)
-
-These surface only when something boots Rails. Catching them here, before
-the report is written, lets them land in fix-before-bump where they belong
-instead of mid-implementation.
-
-1. Read: workflows/06-boot-smoke-test-workflow.md
-2. Run a Rails-loading command against Gemfile.next:
-     BUNDLE_GEMFILE=Gemfile.next bundle exec rspec --dry-run
-   (or `bin/rails runner "puts Rails.version"`, or `bundle exec rspec` if
-   the suite is fast enough — anything that triggers
-   `Bundler.require(*Rails.groups)` and the framework boot.)
-3. If boot fails, capture the LoadError / NoMethodError trace, identify
-   the offending gem (grep the bundle paths for the missing constant or
-   file), check rubygems for a newer version with target-Rails compat,
-   and add the bump to the fix-before-bump bucket for Step 5.
-4. Re-run the boot smoke test until it succeeds. Then proceed to Step 5.
-```
+See `workflows/06-boot-smoke-test-workflow.md`.
 
 ### Step 5: Load Report Resources & Generate Reports
-```
-1. Read: templates/upgrade-report-template.md
-2. Read: templates/app-update-preview-template.md
-3. Read: workflows/07-generate-upgrade-report-workflow.md
-4. Read: workflows/08-generate-app-update-preview-workflow.md
-```
-
-**Deliverable #1: Comprehensive Upgrade Report**
-- **Input:** Direct detection findings + version guide data
-- **Output:** A report covering findings grouped into the two buckets defined in `workflows/04-detect-breaking-changes-workflow.md` — **fix-before-bump** (`kind: breaking` and `kind: deprecation`) and **fix-when-ready** (`kind: migration` and `kind: optional`) — with OLD vs NEW code examples taken from the user's actual files, custom-code warnings flagged with ⚠️, a step-by-step migration plan, a testing checklist, and a rollback plan.
-
-**Deliverable #2: app:update Preview**
-- **Input:** Actual config files + findings
-- **Output:** A preview showing exact configuration file changes (OLD vs NEW), a list of new files that will be created, and a per-file impact assessment (HIGH / MEDIUM / LOW).
+See `workflows/07-generate-upgrade-report-workflow.md` and `workflows/08-generate-app-update-preview-workflow.md`.
 
 ### Step 6: Present Reports & Implement Changes
 See `workflows/09-implement-and-upgrade-workflow.md`.

@@ -1,10 +1,10 @@
-# No-Test-Suite Smoke Workflow
+# No-Test-Suite Smoke Reference
 
 **Purpose:** Provide a concrete baseline check when a Rails app has no RSpec or Minitest suite.
 
 **When to use:** Step 1 of the Rails upgrade workflow, only after test-suite detection finds no runnable `spec/` or `test/` suite.
 
-This workflow is not a replacement for adding tests. It is a minimum boot and routing baseline so the upgrade report can say exactly what was checked before proceeding.
+This is not a replacement for adding tests. It is a minimum boot and routing baseline so the upgrade report can say exactly what was checked before proceeding.
 
 ---
 

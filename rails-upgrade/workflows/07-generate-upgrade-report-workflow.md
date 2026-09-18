@@ -1,4 +1,4 @@
-# Upgrade Report Workflow
+# Workflow 07: Generate Upgrade Report
 
 **Purpose:** Generate comprehensive upgrade reports based on actual detection findings
 
@@ -6,12 +6,22 @@
 
 ---
 
-## Prerequisites
+## Inputs
 
 - Direct detection has been run using Grep/Glob/Read tools
 - Detection findings have been collected with file:line references
 - Target Rails version is known
 - Version guide available for the upgrade
+- `templates/upgrade-report-template.md`
+- Gem compatibility buckets (from Workflow 05) and boot smoke test report block (from Workflow 06)
+
+## Outputs
+
+- **Deliverable #1: Comprehensive Upgrade Report.** A report covering findings grouped into the two buckets defined in `workflows/04-detect-breaking-changes-workflow.md` — **fix-before-bump** (`kind: breaking` and `kind: deprecation`) and **fix-when-ready** (`kind: migration` and `kind: optional`) — with OLD vs NEW code examples taken from the user's actual files, custom-code warnings flagged with ⚠️, a step-by-step migration plan, a testing checklist, and a rollback plan.
+
+## Gates (must be true before the next workflow that runs)
+
+- Step 8 quality check passed and the report delivered
 
 ---
 

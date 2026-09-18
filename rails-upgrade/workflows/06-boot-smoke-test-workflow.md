@@ -1,8 +1,21 @@
-# Boot Smoke Test Workflow
+# Workflow 06: Boot Smoke Test
 
-**When to run:** Step 4.6 of the upgrade workflow, after gem-compat (Step 4.5) and before report generation (Step 5).
+**Purpose:** Step 4 (codebase grep) only sees the user's own code. Step 4.5 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file. These surface only when something boots Rails. Catching them here, before the report is written, lets them land in fix-before-bump where they belong instead of mid-implementation.
 
-**Why this step exists:** Step 4 (codebase grep) only sees the user's own code. Step 4.5 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file.
+**When to use:** Step 4.6 of the upgrade workflow, after gem-compat (Step 4.5) and before report generation (Step 5).
+
+## Inputs
+
+- `Gemfile.next` that resolves (from Workflow 02 and Workflow 05)
+
+## Outputs
+
+- Boot smoke test report block (PASS / FAIL with N gem bumps required), merged into Workflow 07's Comprehensive Upgrade Report
+- Any gem bump added to the fix-before-bump bucket
+
+## Gates (must be true before the next workflow that runs)
+
+- Boot succeeds under `Gemfile.next`. Re-run the boot smoke test until it succeeds.
 
 A booted Rails process is the only signal that catches that class of failure.
 
@@ -17,7 +30,7 @@ In both cases the gem ships in default Rails-generated apps and the user did not
 
 ## Procedure
 
-### 1. Pick a boot trigger
+### Step 1: Pick a boot trigger
 
 Anything that loads `config/application.rb` is sufficient. Cheapest options first:
 
@@ -36,7 +49,7 @@ BUNDLE_GEMFILE=Gemfile.next bundle exec rails test
 
 Use `rails runner` first. If it boots cleanly, escalate to the full test suite — that catches gems whose problematic code only loads under a specific environment (e.g. test-only gems, eager-load-only paths).
 
-### 2. Diagnose a failure
+### Step 2: Diagnose a failure
 
 Boot failures usually show up as one of:
 
@@ -54,7 +67,7 @@ find $(bundle show --paths | tr '\n' ' ') -name "*.rb" 2>/dev/null \
 
 The output points at the gem version that needs to bump.
 
-### 3. Resolve
+### Step 3: Resolve
 
 For each offending gem:
 
@@ -70,7 +83,7 @@ For each offending gem:
    - Why a static check missed it (no upper bound declared)
 4. Bump the floor in the Gemfile (`gem "<gem>", "~> <new-floor>"`) and re-run `bundle install` for both lockfiles.
 
-### 4. Re-run boot
+### Step 4: Re-run boot
 
 Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Step 5.
 

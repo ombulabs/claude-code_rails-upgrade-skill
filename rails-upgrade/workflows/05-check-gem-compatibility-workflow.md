@@ -1,8 +1,22 @@
-# Gem Compatibility Workflow
+# Workflow 05: Check Gem Compatibility
 
-**Purpose:** Produce a per-lockfile gem compatibility report against the target Rails version. Output is three buckets (`required bumps`, `blockers`, `already compatible`) that feed the upgrade report's gem-update section.
+**Purpose:** Determines which gems must be bumped before the Rails version change can resolve. Produce a per-lockfile gem compatibility report against the target Rails version. Output is three buckets (`required bumps`, `blockers`, `already compatible`) that feed the upgrade report's gem-update section.
 
 **When to use:** Step 4.5 of `SKILL.md`, after breaking-change detection and before report generation. The report's `bundle update` plan depends on this output.
+
+## Inputs
+
+- `Gemfile.lock`
+- `next_rails` installed in the project
+- Target Rails version
+
+## Outputs
+
+- Three buckets — required bumps, blockers, already compatible — passed into Workflow 07's report so the gem-update section reflects real per-lockfile data
+
+## Gates (must be true before the next workflow that runs)
+
+- If any blockers exist, `references/gem-compatibility-reference.md` loaded for the fork/replace/vendor playbook and the gem update order. Skip otherwise.
 
 ---
 
