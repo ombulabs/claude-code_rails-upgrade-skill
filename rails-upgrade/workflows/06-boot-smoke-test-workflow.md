@@ -105,4 +105,4 @@ If the smoke test passes on the first run, record that explicitly — it is a po
 ## Notes
 
 - The smoke test does not replace the post-bump test suite run in Workflow 09. It is a *boot* check, not a feature check. Workflow 09 still runs the full suite against both versions.
-- Skip this step only if there is no Gemfile.next yet (very early in dual-boot setup). In all other cases, run it.
+- Skip this step only if there is no `Gemfile.next` that resolves the target Rails version yet (very early in dual-boot setup, or when `Gemfile.next` still resolves the current version). A `Gemfile.next` that resolves the current version is not a target boot and passes vacuously. In all other cases, run it.
