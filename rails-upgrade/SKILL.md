@@ -123,7 +123,7 @@ When proposing code fixes that must work with both the current and target Rails 
 
 ## Workflow index
 
-When user requests an upgrade, follow this workflow. Run in order, read each file when you reach it. Gates block.
+When user requests an upgrade, follow this workflow. Sequential Process is Critical: run in order, read each file when you reach it. Gates block.
 
 | #  | Name | Purpose | File |
 |----|------|---------|------|
@@ -147,22 +147,11 @@ The Purpose column is a summary. Gates live only in each workflow's `## Gates` s
 
 ## Key Principles
 
-1. **ALWAYS Verify Latest Patch First** (MANDATORY - ensure app is on latest patch of current series before any version hop)
-2. **ALWAYS Run Test Suite** (MANDATORY - no exceptions, no upgrade work until tests pass)
-3. **Block on Failing Tests** (if tests fail, STOP and help fix them before any upgrade work)
-4. **Set Up Dual-Boot Early** (dual-boot is Step 2, right after tests pass - run both versions during the entire transition)
-5. **Run Detection Directly** (use Grep/Glob/Read tools - no script generation needed)
-6. **Always Use Actual Findings** (no generic examples in reports)
-7. **Always Flag Custom Code** (with ⚠️ warnings based on detected issues)
-8. **Always Use Templates** (for consistency)
-9. **Always Check Quality** (before delivery)
-10. **Load Workflows as Needed** (don't hold everything in memory)
-11. **Sequential Process is Critical** (patch check → tests → dual-boot → validate path → detection → reports → implement → load_defaults)
-12. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
-13. **Always Use `NextRails.next?` for Dual-Boot Code** (NEVER use `respond_to?` for version branching. DELEGATE to the `dual-boot` skill for patterns and setup.)
-14. **Check CI Config Before Opening the PR** (run `workflows/10-sync-ci-workflow.md` to make sure every CI file matches the upgraded Gemfile — stale CI is the most common cause of red builds on upgrade PRs)
-15. **Align load_defaults After the Version Bump** (load_defaults update happens AFTER the Rails version upgrade is complete)
-16. **Mention, Don't Auto-Run, Cleanup** (after the upgrade ships, mention the `upgrade-cleanup` plugin. Delegate to it only when the user explicitly asks: "finish the upgrade", "clean up dual-boot", "drop the NextRails branches". Cleanup removes `NextRails.next?` / `NextRails.current?` branches and retires dual-boot scaffolding. Deprecation triage stays with this skill for the next hop.)
+1. **Run Detection Directly** (use Grep/Glob/Read tools - no script generation needed)
+2. **Load Workflows as Needed** (don't hold everything in memory)
+3. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
+
+Everything else that used to be listed here lives in the workflow it governs: see each workflow's Purpose and Gates.
 
 ---
 

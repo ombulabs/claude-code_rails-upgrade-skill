@@ -1,6 +1,6 @@
 # Workflow 02: Set Up next_rails Dual-Boot
 
-**Purpose:** Set up dual-boot with next_rails early, right after tests pass, so both Rails versions run during the entire transition.
+**Purpose:** Set up dual-boot with next_rails early, right after tests pass, so both Rails versions run during the entire transition. Set Up Dual-Boot Early (dual-boot is Step 2, right after tests pass - run both versions during the entire transition).
 
 **When to use:** EARLY SETUP, after the test suite passes.
 

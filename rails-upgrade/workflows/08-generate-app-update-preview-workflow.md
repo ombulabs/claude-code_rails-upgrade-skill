@@ -21,6 +21,8 @@
 ## Gates (must be true before the next workflow that runs)
 
 - Preview delivered with every placeholder replaced by actual values
+- Always Use Templates (for consistency)
+- Always Check Quality (before delivery)
 
 ---
 

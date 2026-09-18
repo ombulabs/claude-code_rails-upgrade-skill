@@ -1,6 +1,6 @@
 # Workflow 11: Align load_defaults
 
-**Purpose:** Align `load_defaults` to the new Rails version, one config change at a time, after the version bump is complete.
+**Purpose:** Align `load_defaults` to the new Rails version, one config change at a time, after the version bump is complete. Align load_defaults After the Version Bump (load_defaults update happens AFTER the Rails version upgrade is complete).
 
 **When to use:** THIS STEP HAPPENS AFTER THE UPGRADE IS COMPLETE. In a multi-hop upgrade, after each hop, align load_defaults to the new version before starting the next hop.
 

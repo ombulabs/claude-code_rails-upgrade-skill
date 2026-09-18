@@ -22,6 +22,10 @@
 ## Gates (must be true before the next workflow that runs)
 
 - Step 8 quality check passed and the report delivered
+- Always Use Actual Findings (no generic examples in reports)
+- Always Flag Custom Code (with ⚠️ warnings based on detected issues)
+- Always Use Templates (for consistency)
+- Always Check Quality (before delivery)
 
 ---
 

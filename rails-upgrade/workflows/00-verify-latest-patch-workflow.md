@@ -1,6 +1,6 @@
 # Workflow 00: Verify Latest Patch
 
-**Purpose:** Ensure the app is on the latest patch of its current Rails series before any minor/major hop. Patch releases contain security fixes, bug fixes, and additional deprecation warnings. Starting the version hop on the latest patch is safer (the security fixes are already in production) and easier to debug (the new deprecation warnings surface issues that would otherwise show up mid-upgrade).
+**Purpose:** Ensure the app is on the latest patch of its current Rails series before any minor/major hop. Patch releases contain security fixes, bug fixes, and additional deprecation warnings. Starting the version hop on the latest patch is safer (the security fixes are already in production) and easier to debug (the new deprecation warnings surface issues that would otherwise show up mid-upgrade). ALWAYS Verify Latest Patch First (MANDATORY - ensure app is on latest patch of current series before any version hop).
 
 **When to use:** MANDATORY PRE-STEP. THIS STEP IS REQUIRED BEFORE ANY OTHER WORK. For multi-hop upgrades this check applies at the START and again after each hop.
 
