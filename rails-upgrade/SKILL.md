@@ -15,6 +15,18 @@ description: Analyzes Rails applications and generates comprehensive upgrade rep
 
 ---
 
+## Terminology
+
+| Term | Meaning | Where |
+|------|---------|-------|
+| **Workflow** | One numbered unit of the upgrade flow, one file | `workflows/<NN>-<name>-workflow.md` |
+| **Step** | A `## Step N` header inside a workflow file | inside the workflow |
+| **Reference** | Material loaded on demand: lookup tables, playbooks, conditional branches | `references/<name>-reference.md` |
+
+No sub-steps: a "Step 4.1" is either two sequential steps or a conditional branch inside one step (`### A.` / `### B.` headers). Cross-reference a step as file path plus step, e.g. `workflows/01-run-test-suite-workflow.md` Step 4. Not used in headings: Stage, Phase, Sub-step, dotted step numbers.
+
+---
+
 ## Dependencies
 
 - **dual-boot skill** ([github.com/ombulabs/claude-code_dual-boot-skill](https://github.com/ombulabs/claude-code_dual-boot-skill)) — Sets up and manages dual-boot environments using the `next_rails` gem. Covers setup, `NextRails.next?` code patterns, CI configuration, and post-upgrade cleanup. Must be installed for Step 2 of the upgrade workflow.
