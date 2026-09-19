@@ -15,7 +15,7 @@
 
 ## Gates (must be true before the next workflow that runs)
 
-- Boot succeeds under `Gemfile.next`. Re-run the boot smoke test until it succeeds.
+- Boot succeeds under `Gemfile.next` (re-run the boot smoke test until it does), or the skip condition in Notes applies (no `Gemfile.next` yet) and the report records that the test was not run
 
 ## Real examples this catches
 

@@ -17,8 +17,7 @@
 
 ## Gates (must be true before the next workflow that runs)
 
-- Test suite passes against both versions
-- CI config matches the upgraded Gemfile (`workflows/10-sync-ci-workflow.md`)
+- Test suite passes against both versions. CI config is checked by Workflow 10, which runs next and has its own gate
 
 ## Pre-upgrade checklist (FastRuby.io best practices, recommended before starting any upgrade)
 
