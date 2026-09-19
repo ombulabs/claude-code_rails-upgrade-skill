@@ -6,8 +6,9 @@
 # Catches drift classes that are easy to introduce by hand and easy to miss
 # in review: broken file-path references in prose, orphaned reference /
 # workflow / version-guide files, SKILL.md index rows that don't match what's
-# on disk, gaps in "Step N" header numbering, and pattern-catalog filenames
-# whose derived version disagrees with their own `version:` key.
+# on disk, gaps in "Step N" header numbering, pattern-catalog filenames whose
+# derived version disagrees with their own `version:` key, and numbered
+# version-guide entries (or cross-references to them).
 #
 # Usage: ruby bin/lint-skill   (exits 1 on any error)
 
@@ -187,6 +188,27 @@ Dir.glob(File.join(PATTERNS_DIR, "rails-*-patterns.yml")).sort.each do |f|
   declared_version = doc["version"]
   if declared_version && declared_version.to_s != derived_version
     err(f, "filename implies version #{derived_version} but `version:` key says #{declared_version.inspect}")
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 8. Version-guide entries are not numbered, and nothing points at them by number
+# ---------------------------------------------------------------------------
+# Numbering every breaking-change entry meant renumbering the whole list on each
+# insertion, which conflicts across parallel PRs. Entries are ordered by their
+# priority section instead, and cross-references name the heading.
+NUMBERED_HEADING = /\A\#{2,6} \d+[a-z]?\. /
+BY_NUMBER_REF = /\bSection \d+/
+
+Dir.glob(File.join(SKILLS.fetch("rails-upgrade"), "version-guides", "*.md")).sort.each do |f|
+  File.read(f).each_line.with_index(1) do |line, ln|
+    if line.match?(NUMBERED_HEADING)
+      err(f, "line #{ln}: numbered heading `#{line.strip}` — drop the number, entries are ordered by priority section")
+    end
+
+    if line.match?(BY_NUMBER_REF)
+      err(f, "line #{ln}: cross-reference by number (`#{line[BY_NUMBER_REF]}`) — name the heading instead")
+    end
   end
 end
 

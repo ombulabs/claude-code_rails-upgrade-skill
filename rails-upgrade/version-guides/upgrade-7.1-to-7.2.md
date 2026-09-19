@@ -21,7 +21,7 @@ Rails 7.2 introduces:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. Transaction-Aware Job Enqueuing
+#### Transaction-Aware Job Enqueuing
 
 **What Changed:**
 Jobs enqueued inside a database transaction now wait until the transaction commits before being processed.
@@ -61,7 +61,7 @@ config.active_job.enqueue_after_transaction_commit = :never
 
 ---
 
-#### 2. show_exceptions Requires Symbols
+#### show_exceptions Requires Symbols
 
 **What Changed:**
 `config.action_dispatch.show_exceptions` now requires symbol values instead of booleans.
@@ -94,7 +94,7 @@ config.action_dispatch.show_exceptions = :none      # Was false
 
 ---
 
-#### 3. params Comparison Removed
+#### params Comparison Removed
 
 **What Changed:**
 `ActionController::Parameters` no longer compares equal to `Hash`.
@@ -119,7 +119,7 @@ params[:user].to_h == some_hash
 
 ---
 
-#### 4. ActiveRecord.connection Deprecated
+#### ActiveRecord.connection Deprecated
 
 **What Changed:**
 `ActiveRecord::Base.connection` is deprecated.
@@ -148,7 +148,7 @@ conn.execute("SELECT 1")
 
 ---
 
-#### 5. Rails.application.secrets Removed
+#### Rails.application.secrets Removed
 
 **What Changed:**
 `Rails.application.secrets` is completely removed.
@@ -181,7 +181,7 @@ Rails.application.credentials.dig(:production, :api_key)
 
 ---
 
-#### 6. `ActiveRecord::Migration.check_pending!` Removed
+#### `ActiveRecord::Migration.check_pending!` Removed
 
 **What Changed:**
 `ActiveRecord::Migration.check_pending!` was deprecated in Rails 7.1 and is removed in Rails 7.2. Calling it raises `NoMethodError`. When invoked from `test_helper.rb` or `rails_helper.rb` it breaks test-suite startup; when configured by a healthcheck gem (e.g. [`rails-healthcheck`](https://github.com/linqueta/rails-healthcheck)) it instead raises at runtime on the `/healthcheck` route in production, even with no pending migration. Use `check_all_pending!`, which checks every configured database.
@@ -205,7 +205,7 @@ ActiveRecord::Migration.check_all_pending!
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 7. serialize Requires Type Parameter
+#### serialize Requires Type Parameter
 
 **What Changed:**
 `serialize` now requires explicit `type:` or `coder:` parameter.
@@ -230,7 +230,7 @@ serialize :preferences, coder: JSON
 
 ---
 
-#### 8. fixture_path → fixture_paths
+#### fixture_path → fixture_paths
 
 **What Changed:**
 Singular `fixture_path` deprecated in favor of plural.
@@ -252,7 +252,7 @@ self.fixture_paths = ["#{Rails.root}/test/fixtures"]
 
 ---
 
-#### 9. query_constraints Deprecated
+#### query_constraints Deprecated
 
 **What Changed:**
 `query_constraints` is deprecated.
@@ -265,7 +265,7 @@ has_many :posts, foreign_key: [:author_id, :author_type]
 
 ---
 
-#### 10. Mailer Test args: → params:
+#### Mailer Test args: → params:
 
 **What Changed:**
 Mailer assertion helpers change `args:` to `params:`.
@@ -287,7 +287,7 @@ assert_enqueued_email_with UserMailer, :welcome, params: { user: user }
 
 ---
 
-#### 11. Queue Adapter Must Support `at:` for Testing
+#### Queue Adapter Must Support `at:` for Testing
 
 **What Changed:**
 Tests now require queue adapters to support scheduling with `at:` option.
@@ -303,7 +303,7 @@ If using custom queue adapter in tests, ensure it supports `at:` option for sche
 
 ---
 
-#### 12. alias_attribute Behavior Change
+#### alias_attribute Behavior Change
 
 **What Changed:**
 `alias_attribute` now applies attribute methods to the aliased attribute too.

@@ -43,6 +43,8 @@ Files that carry a type suffix: `-workflow.md`, `-reference.md`, `-template.md`,
 - Organize breaking changes under 🔴 HIGH / 🟡 MEDIUM / 🟢 LOW priority sections.
 - Each breaking change entry should include: "What Changed", a detection pattern, and a BEFORE/AFTER fix.
 - Use `NextRails.next?` (never `respond_to?` or `Gem::Version` comparisons) in dual-boot code examples.
+- **Do NOT number the breaking-change entries.** Headings are `#### Title`, never `#### 3. Title`. The priority section already orders them, and a number means renumbering every later entry on each insertion, which conflicts across parallel PRs.
+- Cross-reference an entry by its heading text in quotes, not by a number: `"Fixture Dates Must Be Cast to Strings"`, never `Section 16`. This holds for the quick-reference tables, for prose in other guides, and for `explanation:` / `fix:` strings in the pattern YAML. `bin/lint-skill` check 8 enforces both rules for markdown under `version-guides/`; the pattern YAML is not scanned, so grep it by hand after a retitle.
 
 ## Detection patterns (`rails-upgrade/detection-scripts/patterns/rails-*-patterns.yml`)
 

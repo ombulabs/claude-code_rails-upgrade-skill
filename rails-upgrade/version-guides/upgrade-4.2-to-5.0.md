@@ -22,7 +22,7 @@ Rails 5.0 is a major release with significant changes:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. Ruby 2.2.2+ Required
+#### Ruby 2.2.2+ Required
 
 **What Changed:**
 Rails 5.0 requires Ruby 2.2.2 or later.
@@ -42,7 +42,7 @@ gem 'test-unit'
 
 ---
 
-#### 2. ApplicationRecord Base Class
+#### ApplicationRecord Base Class
 
 **What Changed:**
 Models now inherit from `ApplicationRecord` instead of `ActiveRecord::Base`.
@@ -71,7 +71,7 @@ end
 
 ---
 
-#### 3. belongs_to Required by Default
+#### belongs_to Required by Default
 
 **What Changed:**
 `belongs_to` associations now require the associated record to exist.
@@ -102,7 +102,7 @@ config.active_record.belongs_to_required_by_default = false
 
 ---
 
-#### 4. Strong Parameters Required
+#### Strong Parameters Required
 
 **What Changed:**
 `protected_attributes` gem no longer works in Rails 5.
@@ -140,7 +140,7 @@ end
 
 ---
 
-#### 5. Parameters No Longer HashWithIndifferentAccess
+#### Parameters No Longer HashWithIndifferentAccess
 
 **What Changed:**
 `params` is now `ActionController::Parameters`, not a hash.
@@ -168,7 +168,7 @@ params.require(:user).permit(:name, :email).to_h.slice(:name, :email)
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. Controller Tests Changed
+#### Controller Tests Changed
 
 **What Changed:**
 `assigns` and `assert_template` are extracted to a gem.
@@ -188,7 +188,7 @@ gem 'rails-controller-testing', group: :test
 
 ---
 
-#### 7. File Upload Testing Changed
+#### File Upload Testing Changed
 
 **What Changed:**
 Use `Rack::Test::UploadedFile` instead of `ActionDispatch::Http::UploadedFile`.
@@ -204,7 +204,7 @@ Rack::Test::UploadedFile.new(file_path, 'image/png')
 
 ---
 
-#### 8. Callback Halting Changed
+#### Callback Halting Changed
 
 **What Changed:**
 Returning `false` from a callback no longer halts the chain.
@@ -233,7 +233,7 @@ end
 
 ---
 
-#### 9. Rails Command Replaces Rake
+#### Rails Command Replaces Rake
 
 **What Changed:**
 Use `rails` instead of `rake` for many commands.
@@ -253,7 +253,7 @@ rails routes
 
 ---
 
-#### 10. `redirect_to :back` Deprecated
+#### `redirect_to :back` Deprecated
 
 **What Changed:**
 `redirect_to :back` is deprecated in Rails 5.0. It still works and emits a deprecation warning, but it is **removed outright in Rails 5.1** — fix all call sites now to avoid a runtime break on the next hop.
