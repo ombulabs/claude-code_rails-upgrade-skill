@@ -22,7 +22,7 @@ Rails 5.1 introduces:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. HashWithIndifferentAccess Indexing Change
+#### HashWithIndifferentAccess Indexing Change
 
 **What Changed:**
 Non-symbol access in `HashWithIndifferentAccess` returns `nil` for non-existent keys instead of raising errors.
@@ -39,7 +39,7 @@ Generally transparent. If you relied on specific behavior with non-string/symbol
 
 ---
 
-#### 2. render :text Removed
+#### render :text Removed
 
 **What Changed:**
 `render text: 'content'` has been removed.
@@ -61,7 +61,7 @@ render plain: 'Hello World'
 
 ---
 
-#### 3. render :nothing Removed
+#### render :nothing Removed
 
 **What Changed:**
 `render nothing: true` has been removed.
@@ -85,7 +85,7 @@ head :no_content
 
 ---
 
-#### 4. render :body Default Layout Removed
+#### render :body Default Layout Removed
 
 **What Changed:**
 `render body:` no longer renders with a layout by default.
@@ -103,7 +103,7 @@ render body: 'raw content', layout: true
 
 ---
 
-#### 5. redirect_to :back Removed
+#### redirect_to :back Removed
 
 **What Changed:**
 `redirect_to :back` was deprecated in Rails 5.0 and **removed** in Rails 5.1. Callers raise at runtime.
@@ -130,7 +130,7 @@ redirect_back(fallback_location: root_path, notice: 'Done!')
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. Positional Arguments in Process Methods
+#### Positional Arguments in Process Methods
 
 **What Changed:**
 Controller test methods now prefer keyword arguments.
@@ -155,7 +155,7 @@ post :create, params: { user: { name: 'Test' } }
 
 ---
 
-#### 7. ActiveRecord.raise_in_transactional_callbacks Removed
+#### ActiveRecord.raise_in_transactional_callbacks Removed
 
 **What Changed:**
 The configuration option has been removed (was deprecated in 5.0).
