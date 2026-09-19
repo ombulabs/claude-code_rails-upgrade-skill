@@ -17,8 +17,8 @@
 | 03 Validate upgrade path | run | run. Explain sequential requirement, calculate hops (e.g. 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1), see `references/multi-hop-strategy-reference.md` | skip | run |
 | 04 Detect breaking changes | run | run, per hop | run. Present findings summary, offer to generate full upgrade report | run |
 | 05 Check gem compatibility | run | run, per hop | skip | run |
-| 06 Boot smoke test | run | run, per hop | skip | run |
-| 07 Generate upgrade report | run | run, per hop | only if the user accepts the offer | run |
+| 06 Boot smoke test | run | run, per hop | skip | run the boot; if it fails, record the required gem bumps in the report instead of editing the Gemfile, since the user will implement |
+| 07 Generate upgrade report | run | run, per hop | only if the user accepts the offer. 05 and 06 did not run, so generate the report without the gem compatibility and boot smoke sections and say so in the report | run |
 | 08 Generate app:update preview | run | run, per hop | skip | run, then stop. Do not offer to implement; the user already said they will |
 | 09 Implement and upgrade | run | run, per hop. After first hop complete, repeat for next hops | skip | skip |
 | 10 Sync CI config | run | run, per hop | skip | skip |
