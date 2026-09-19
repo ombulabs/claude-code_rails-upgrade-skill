@@ -11,13 +11,14 @@
 
 | Workflow | Full Upgrade | Multi-Hop | Analysis Only | Reports Only |
 |----------|--------------|-----------|---------------|--------------|
-| 01 Verify latest patch | run, MANDATORY | run, MANDATORY. This check applies at the START and again after each hop | run. Check if on latest patch — warn if not, recommend patching first | run, MANDATORY |
 | 00 Run test suite | run, MANDATORY. If tests FAIL → STOP and help fix tests first | run, MANDATORY. Run test suite BEFORE planning any upgrade work | run, MANDATORY. If tests fail → Warn user and recommend fixing first. If tests pass → Proceed with analysis | run, MANDATORY |
+| 01 Verify latest patch | run, MANDATORY | run, MANDATORY. This check applies at the START and again after each hop | run. Check if on latest patch — warn if not, recommend patching first | run, MANDATORY |
+| 02 Resolve deprecation warnings | run | run, per hop | run: collect and report the warnings, apply fixes only if the user agrees | run |
+| 03 Validate upgrade path and Ruby | run | run. Explain sequential requirement, calculate hops (e.g. 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1), see `references/multi-hop-strategy-reference.md` | skip | run |
 | 04 Set up next_rails | run | run (if not already set up). Dual-boot stays active throughout the multi-hop process | skip | run. Adding `next_rails` and the `if next?` branch is not the bump the user declined |
-| 03 Validate upgrade path | run | run. Explain sequential requirement, calculate hops (e.g. 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1), see `references/multi-hop-strategy-reference.md` | skip | run |
 | 05 Detect breaking changes | run | run, per hop | run. Present findings summary, offer to generate full upgrade report | run |
 | 06 Check gem compatibility | run | run, per hop | skip | run |
-| 07 Boot smoke test | run | run, per hop | skip | run the boot; if it fails, record the required gem bumps in the report instead of editing the Gemfile, since the user will implement |
+| 07 Boot smoke test and models suite | run | run, per hop | skip | run the boot; if it fails, record the required gem bumps in the report instead of editing the Gemfile, since the user will implement |
 | 08 Generate upgrade report | run | run, per hop | only if the user accepts the offer. 05 and 06 did not run, so generate the report without the gem compatibility and boot smoke sections and say so in the report | run |
 | 09 Generate app:update preview | run | run, per hop | skip | run, then stop. Do not offer to implement; the user already said they will |
 | 10 Implement and upgrade | run | run, per hop. After first hop complete, repeat for next hops | skip | skip |

@@ -128,13 +128,14 @@ When user requests an upgrade, follow this workflow. Sequential Process is Criti
 
 | #  | Name | Purpose | File |
 |----|------|---------|------|
-| 01 | Verify latest patch | MANDATORY PRE-STEP. App on the latest patch of its current series before any minor/major hop | `workflows/01-verify-latest-patch-workflow.md` |
 | 00 | Run test suite | MANDATORY FIRST STEP. How to run and verify test suite; blocks on any failure | `workflows/00-run-test-suite-workflow.md` |
+| 01 | Verify latest patch | MANDATORY. App on the latest patch of its current series before any minor/major hop | `workflows/01-verify-latest-patch-workflow.md` |
+| 02 | Resolve deprecation warnings | Make warnings visible, collect what the current version emits, fix them on the current version | `workflows/02-resolve-deprecation-warnings-workflow.md` |
+| 03 | Validate upgrade path and Ruby | Single-hop or multi-hop, hops planned, Ruby meets the target's minimum | `workflows/03-validate-upgrade-path-workflow.md` |
 | 04 | Set up next_rails | EARLY SETUP. Delegated to the skill listed under External Dependencies | `workflows/04-setup-next-rails-workflow.md` |
-| 03 | Validate upgrade path | Single-hop or multi-hop, individual hops planned | `workflows/03-validate-upgrade-path-workflow.md` |
 | 05 | Detect breaking changes | How to run breaking change detection directly | `workflows/05-detect-breaking-changes-workflow.md` |
 | 06 | Check gem compatibility | Per-lockfile gem compatibility check against the target Rails version | `workflows/06-check-gem-compatibility-workflow.md` |
-| 07 | Boot smoke test | Run a Rails-loading command against `Gemfile.next` to catch gem-level runtime incompat that the resolver can't see | `workflows/07-boot-smoke-test-workflow.md` |
+| 07 | Boot smoke test | Boot under `Gemfile.next` and run the models suite there, to catch what the resolver and the grep can't see | `workflows/07-boot-smoke-test-workflow.md` |
 | 08 | Generate upgrade report | How to generate upgrade reports | `workflows/08-generate-upgrade-report-workflow.md` |
 | 09 | Generate app:update preview | How to generate app:update previews | `workflows/09-generate-app-update-preview-workflow.md` |
 | 10 | Implement and upgrade | Present reports, apply fix-before-bump changes, bump the Gemfile, run tests against both versions | `workflows/10-implement-and-upgrade-workflow.md` |
