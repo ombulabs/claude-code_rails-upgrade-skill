@@ -11,7 +11,7 @@
 
 ---
 
-## Step 0: Upgrade to Latest Patch Release
+## Upgrade to Latest Patch Release
 
 Before beginning any minor or major version hop, ensure you are on the **latest patch release** of your current Rails series. For example, if you are on Rails 3.2.19, upgrade to 3.2.22.5 first.
 
@@ -63,7 +63,7 @@ curl -s https://rubygems.org/api/v1/versions/rails.json | \
       .select { |v| v.start_with?(series) }
       .sort_by { |v| Gem::Version.new(v) }
     puts versions.last
-  ' "7.1."
+  ' "7.2."
 ```
 Replace `"7.2."` with the target series prefix (e.g., `"8.0."`, `"8.1."`).
 
@@ -92,7 +92,7 @@ gem search '^rails$' --versions | grep "^rails " | \
    d. Review CHANGELOG for security fixes and behavioral changes
    e. Deploy patch upgrade to production
    f. Monitor for issues
-4. Once on latest patch, proceed to Step 1 (Map Your Path)
+4. Once on latest patch, proceed to Map Your Path below
 ```
 
 ---
@@ -109,7 +109,7 @@ gem search '^rails$' --versions | grep "^rails " | \
 
 ## Planning a Multi-Hop Upgrade
 
-### Step 1: Map Your Path
+### Map Your Path
 
 Example: Rails 5.2 → 8.1
 
@@ -126,7 +126,7 @@ Example: Rails 5.2 → 8.1
  +-------------------------------------------- Start
 ```
 
-### Step 2: Prioritize Critical Hops
+### Prioritize Critical Hops
 
 **Hardest upgrades (plan extra time):**
 - 5.2 → 6.0 (Zeitwerk)
@@ -139,7 +139,7 @@ Example: Rails 5.2 → 8.1
 - 7.0 → 7.1
 - 8.0 → 8.1
 
-### Step 3: Create Milestones
+### Create Milestones
 
 ```
 Milestone 1: Rails 6.0 (Zeitwerk working)

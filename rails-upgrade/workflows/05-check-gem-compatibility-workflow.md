@@ -1,8 +1,29 @@
-# Gem Compatibility Workflow
+# Workflow 05: Check Gem Compatibility
 
-**Purpose:** Produce a per-lockfile gem compatibility report against the target Rails version. Output is three buckets (`required bumps`, `blockers`, `already compatible`) that feed the upgrade report's gem-update section.
+**Purpose:** Determines which gems must be bumped before the Rails version change can resolve. Produce a per-lockfile gem compatibility report against the target Rails version. Output is three buckets (`required bumps`, `blockers`, `already compatible`) that feed the upgrade report's gem-update section.
 
-**When to use:** Step 4.5 of `SKILL.md`, after breaking-change detection and before report generation. The report's `bundle update` plan depends on this output.
+**When to use:** Workflow 05 of the `SKILL.md` index, after breaking-change detection and before report generation. The report's `bundle update` plan depends on this output.
+
+## Inputs
+
+- `Gemfile.lock`
+- `next_rails` installed in the project
+- Target Rails version
+
+## Outputs
+
+- Three buckets — required bumps, blockers, already compatible — passed into Workflow 07's report so the gem-update section reflects real per-lockfile data
+
+## Gates (must be true before the next workflow that runs)
+
+- If any blockers exist, `references/gem-compatibility-reference.md` loaded for the fork/replace/vendor playbook and the gem update order. Skip otherwise.
+
+## Pre-upgrade checklist (FastRuby.io best practices, recommended before starting any upgrade)
+
+**Dependency Audit**
+- [ ] Run `bundle outdated`
+- [ ] Check gem compatibility with target Rails version
+- [ ] Identify gems that need upgrading first
 
 ---
 
@@ -30,7 +51,7 @@ Reach for the secondary only when:
 bundle exec bundle_report compatibility --rails-version=<target>
 ```
 
-Requires `next_rails` installed in the project (the dual-boot skill installs it in Step 2 of the high-level workflow) and network access (Bundler fetches gem metadata).
+Requires `next_rails` installed in the project (the dual-boot skill installs it in Workflow 02) and network access (Bundler fetches gem metadata).
 
 ### Output shape
 
@@ -172,9 +193,9 @@ When the orchestrator triggered the secondary because of an ambiguous primary re
 
 ## Hand-off to the upgrade plan
 
-Whichever check ran, the output handed to Step 5 is the same three buckets:
+Whichever check ran, the output handed to Workflow 07 is the same three buckets:
 
-1. **Blockers** — incompatible gems with no compatible version, plus any gems where railsbump returned `unknown`/errored and `bundle_report` did not give a clean answer. The hop cannot complete until each one is resolved (see `references/gem-compatibility.md` for the playbook). Mark "pending information" blockers separately so the user knows they may turn into "compatible" or "required bumps" once the missing data lands.
+1. **Blockers** — incompatible gems with no compatible version, plus any gems where railsbump returned `unknown`/errored and `bundle_report` did not give a clean answer. The hop cannot complete until each one is resolved (see `references/gem-compatibility-reference.md` for the playbook). Mark "pending information" blockers separately so the user knows they may turn into "compatible" or "required bumps" once the missing data lands.
 2. **Required bumps** — incompatible gems with a target version. Order top-level gems before their internal dependencies, so bundler can resolve the graph from the root. Example: bump `rspec-rails` before `rspec-mocks` — `rspec-rails` is the gem your Gemfile names directly, and it pulls `rspec-mocks` (and the rest of the rspec-* family) transitively.
 3. **Already compatible** — no action needed, but note the locked version so the user can see headroom.
 

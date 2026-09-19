@@ -1,8 +1,21 @@
-# Direct Detection Workflow
+# Workflow 04: Detect Breaking Changes
 
 **Purpose:** Run breaking change detection directly using Claude's tools (Grep, Glob, Read)
 
-**When to use:** Step 4 of the upgrade workflow — after tests pass and the upgrade path is validated. (load_defaults alignment is Step 7, *after* detection, not before.)
+**When to use:** Workflow 04 of the upgrade workflow — after tests pass and the upgrade path is validated. (load_defaults alignment is Workflow 11, *after* detection, not before.)
+
+## Inputs
+
+- `detection-scripts/patterns/rails-{VERSION}-patterns.yml`
+- `version-guides/upgrade-{FROM}-to-{TO}.md` for context
+
+## Outputs
+
+- All findings compiled into structured data, with file paths and line numbers, grouped by `kind` and sub-ordered by `priority`
+
+## Gates (must be true before the next workflow that runs)
+
+- Every pattern in the patterns file searched with the Grep tool
 
 ---
 
@@ -364,8 +377,8 @@ These are `kind: migration` and `kind: optional` — silent and fully working at
 
 After detection completes:
 
-1. Pass findings to `workflows/upgrade-report-workflow.md`
-2. Pass config file contents to `workflows/app-update-preview-workflow.md`
+1. Pass findings to `workflows/07-generate-upgrade-report-workflow.md`
+2. Pass config file contents to `workflows/08-generate-app-update-preview-workflow.md`
 3. Generate both reports using actual findings
 4. Present to user
 
@@ -380,7 +393,7 @@ After detection completes:
 
 ---
 
-## Quality Checklist
+## Self-review checklist
 
 Before proceeding to report generation:
 
@@ -392,5 +405,7 @@ Before proceeding to report generation:
 - [ ] Within each bucket, sub-ordered by priority (HIGH → MEDIUM → LOW)
 - [ ] Each finding tagged with both its `kind` and `priority` in the output
 - [ ] Any search errors noted
+- [ ] Grep/Glob tools used correctly for each pattern
+- [ ] Context captured for each finding
 
 ---

@@ -1,4 +1,4 @@
-# App Update Preview Workflow
+# Workflow 08: Generate app:update Preview
 
 **Purpose:** Generate a preview of what `rails app:update` will change in configuration files
 
@@ -6,11 +6,23 @@
 
 ---
 
-## Prerequisites
+## Inputs
 
 - Target Rails version known
 - User's current configuration files accessible
 - Version guide available
+- `templates/app-update-preview-template.md`
+- Detection findings (from Workflow 04)
+
+## Outputs
+
+- **Deliverable #2: app:update Preview.** A preview showing exact configuration file changes (OLD vs NEW), a list of new files that will be created, and a per-file impact assessment (HIGH / MEDIUM / LOW).
+
+## Gates (must be true before the next workflow that runs)
+
+- Preview built from `templates/app-update-preview-template.md`, every placeholder replaced by actual values
+- Diffs based on the user's real current config files, not generic examples
+- Preview delivered
 
 ---
 
@@ -312,3 +324,14 @@ Need help with any specific file? Let me know!
 **Related Files:**
 - Template: `templates/app-update-preview-template.md`
 - Version guides: `version-guides/upgrade-{FROM}-to-{TO}.md`
+
+---
+
+## Self-review checklist
+
+Before delivering, verify:
+
+- [ ] All {PLACEHOLDERS} replaced with actual values
+- [ ] File list matches user's actual config files
+- [ ] Diffs based on real current config vs target version
+- [ ] Next steps clearly outlined

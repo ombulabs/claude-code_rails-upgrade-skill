@@ -1,8 +1,34 @@
-# Test Suite Verification Workflow
+# Workflow 01: Run Test Suite
 
-**Purpose:** Run and verify the test suite BEFORE any upgrade work begins
+**Purpose:** Run and verify the test suite BEFORE any upgrade work begins. No exceptions: no upgrade work until tests pass, and if tests fail, STOP and help fix them first.
 
 **When to use:** MANDATORY first step for ALL upgrade requests - no exceptions
+
+## Inputs
+
+- The application repository, with its test framework (RSpec, Minitest, or both)
+
+## Outputs
+
+- Baseline metrics (test count, coverage if available)
+- If no runnable test suite exists: the no-test-suite smoke baseline from `references/no-test-suite-smoke-reference.md`, with baseline confidence recorded as partial
+
+## Gates (must be true before the next workflow that runs)
+
+- All tests pass (0 failures). If ANY tests fail: STOP the upgrade process, report failing tests to user, offer to help fix failing tests, do NOT proceed until all tests pass
+- If no runnable test suite exists: continue only if boot/routes checks pass and the user accepts the risk of proceeding without real tests
+
+## Pre-upgrade checklist (FastRuby.io best practices, recommended before starting any upgrade)
+
+**Test Coverage Assessment (AUTOMATED)**
+- [x] Run test suite - all tests passing? **← Claude runs this automatically**
+- [x] Check test coverage (aim for >70%) **← Claude captures this if SimpleCov is configured**
+- [ ] Review critical paths have coverage
+
+**Deprecation Warnings** (Step 2 below checks whether deprecation behavior is overridden; these three are the follow-through)
+- [ ] Run app with Rails deprecations turned on (configured in config/environment files)
+- [ ] Address existing deprecation warnings
+- [ ] Enable verbose deprecations in test environment
 
 ---
 
@@ -45,9 +71,7 @@ fi
 
 ---
 
-### Step 2: Run the Test Suite
-
-#### 2a. Sweep for deprecation-behavior overrides
+### Step 2: Sweep for deprecation-behavior overrides
 
 Before running the suite, grep for places that change deprecation behavior (raise / silence / disallow) so test results can be interpreted correctly. The obvious places (`config/application.rb`, `config/environments/*.rb`) are not enough. Apps also use the `config.active_support.deprecation =` env DSL, Rails 7.1+ apps use the `deprecators` registry, RSpec autoloads `-r` requires from `.rspec`, and test helpers can install hooks like `RSpec.configure { |c| c.raise_errors_for_deprecations! }`. Miss those and a "the upgrade broke tests" report can really be "every deprecation has been raising for months."
 
@@ -77,7 +101,7 @@ Which forms appear depends on the app's Rails version:
 
 Running this against a Rails 5–7.0 app and seeing no `deprecators` hits is expected, not a gap.
 
-#### 2b. Run the suite
+### Step 3: Run the Test Suite
 
 Execute the appropriate test command:
 
@@ -103,7 +127,7 @@ COVERAGE=true bundle exec rspec
 
 ---
 
-### Step 3: Capture Results
+### Step 4: Capture Results
 
 Parse the test output to extract:
 
@@ -128,7 +152,7 @@ Parse the test output to extract:
 
 ---
 
-### Step 4: Evaluate Results
+### Step 5: Evaluate Results
 
 #### If ALL Tests Pass (0 failures):
 
@@ -145,7 +169,7 @@ Baseline Metrics:
 Proceeding with upgrade assessment...
 ```
 
-**Action:** Continue to Step 2 of the main workflow (Detect Current Version)
+**Action:** Continue to Workflow 02 (`workflows/02-setup-next-rails-workflow.md`)
 
 #### If ANY Tests Fail:
 
@@ -178,7 +202,7 @@ Would you like help fixing these failing tests?
 
 ---
 
-### Step 5: Handle Edge Cases
+### Step 6: Handle Edge Cases
 
 #### No Tests Found
 
@@ -190,14 +214,14 @@ Could not find:
 - test/ directory (Minitest)
 
 This is a significant risk for upgrading. Before proceeding:
-1. Run the no-test-suite smoke baseline in `workflows/no-test-suite-smoke-workflow.md`
+1. Run the no-test-suite smoke baseline in `references/no-test-suite-smoke-reference.md`
 2. Record boot, routes, migration-status, and asset/build results
 3. Recommend adding focused test coverage before or during the first upgrade hop
 
 Do you want to proceed with only a smoke baseline? (This is risky)
 ```
 
-**Action:** Load `workflows/no-test-suite-smoke-workflow.md`, run the safe read-only baseline checks, and mark baseline confidence as `partial` if they pass. If any boot/routes check fails, stop the upgrade until the baseline is fixed or the user explicitly accepts the blocker.
+**Action:** Load `references/no-test-suite-smoke-reference.md`, run the safe read-only baseline checks, and mark baseline confidence as `partial` if they pass. If any boot/routes check fails, stop the upgrade until the baseline is fixed or the user explicitly accepts the blocker.
 
 #### Tests Take Too Long (> 10 minutes)
 
@@ -346,7 +370,7 @@ This workflow integrates with the main upgrade process:
 
 ```
 ┌─────────────────────────────────────────┐
-│  Step 1: Test Suite Verification        │
+│  Workflow 01: Run Test Suite            │
 │  (THIS WORKFLOW)                        │
 │                                         │
 │  ┌─────────────┐    ┌─────────────────┐ │
@@ -369,14 +393,14 @@ This workflow integrates with the main upgrade process:
               │
               ▼
 ┌─────────────────────────────────────────┐
-│  Step 2: Detect Current Version         │
+│  Workflow 02: Set Up next_rails         │
 │  (Continue main workflow)               │
 └─────────────────────────────────────────┘
 ```
 
 ---
 
-## Quality Checklist
+## Self-review checklist
 
 Before proceeding past this step:
 
