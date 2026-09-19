@@ -18,7 +18,7 @@ Rails 8.1 is a minor release with:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. SSL Configuration Commented Out
+#### SSL Configuration Commented Out
 
 **What Changed:**
 SSL configuration is now commented out by default (assumes Kamal handles SSL).
@@ -49,7 +49,7 @@ If using Kamal:
 
 ---
 
-#### 2. pool: → max_connections:
+#### pool: → max_connections:
 
 **What Changed:**
 Database configuration renames `pool:` to `max_connections:`.
@@ -79,7 +79,7 @@ production:
 
 ---
 
-#### 3. bundler-audit Required
+#### bundler-audit Required
 
 **What Changed:**
 Rails 8.1 expects bundler-audit for security vulnerability scanning.
@@ -114,7 +114,7 @@ bundle audit check --update
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 4. Semicolon Query Separator Removed
+#### Semicolon Query Separator Removed
 
 **What Changed:**
 Semicolons (`;`) can no longer be used as query parameter separators.
@@ -136,7 +136,7 @@ Semicolons (`;`) can no longer be used as query parameter separators.
 
 ---
 
-#### 5. Sidekiq Adapter Removed
+#### Sidekiq Adapter Removed
 
 **What Changed:**
 Built-in Sidekiq adapter removed from ActiveJob.
@@ -156,7 +156,7 @@ gem 'sidekiq', '>= 6.5'
 
 ---
 
-#### 6. SuckerPunch Adapter Removed
+#### SuckerPunch Adapter Removed
 
 **What Changed:**
 Built-in SuckerPunch adapter removed.
@@ -170,7 +170,7 @@ gem 'sucker_punch', '>= 3.2'
 
 ---
 
-#### 7. Azure Storage Service Removed
+#### Azure Storage Service Removed
 
 **What Changed:**
 Azure storage service adapter removed from Active Storage.
@@ -190,7 +190,7 @@ azure:
 
 ### 🟢 LOW PRIORITY
 
-#### 8. schema.rb Column Sorting Change
+#### schema.rb Column Sorting Change
 
 **What Changed:**
 Database columns in `schema.rb` are now sorted alphabetically instead of by creation order.
@@ -203,7 +203,7 @@ This is a cosmetic change. Your database structure is unaffected. You may see la
 
 ---
 
-#### 9. MySQL Unsigned Types Deprecation
+#### MySQL Unsigned Types Deprecation
 
 **What Changed:**
 MySQL `unsigned: true` generates deprecation warnings.
@@ -221,7 +221,7 @@ t.check_constraint "count >= 0"
 
 ---
 
-#### 10. .gitignore Update
+#### .gitignore Update
 
 **What Changed:**
 Recommended `.gitignore` pattern for credential keys changed.

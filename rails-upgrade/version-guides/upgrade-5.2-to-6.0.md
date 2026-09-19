@@ -19,7 +19,7 @@ Rails 6.0 is a major release with significant changes:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. Zeitwerk Autoloader
+#### Zeitwerk Autoloader
 
 **What Changed:**
 Rails 6.0 introduces Zeitwerk as the new code autoloader, replacing the classic autoloader.
@@ -52,7 +52,7 @@ rails zeitwerk:check
 
 ---
 
-#### 2. Ruby 2.5+ Required
+#### Ruby 2.5+ Required
 
 **What Changed:**
 Rails 6.0 requires Ruby 2.5.0 or newer.
@@ -70,7 +70,7 @@ rbenv local 2.7.8
 
 ---
 
-#### 3. update_attributes Removed
+#### update_attributes Removed
 
 **What Changed:**
 `update_attributes` and `update_attributes!` are removed.
@@ -92,7 +92,7 @@ user.update(name: 'New Name')
 
 ---
 
-#### 4. belongs_to Required by Default
+#### belongs_to Required by Default
 
 **What Changed:**
 `belongs_to` associations are required by default (presence validation).
@@ -114,7 +114,7 @@ belongs_to :parent_category, optional: true
 
 ---
 
-#### 5. protect_from_forgery Default Changed
+#### protect_from_forgery Default Changed
 
 **What Changed:**
 Default CSRF protection strategy changed to `:exception`.
@@ -137,7 +137,7 @@ end
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. before_filter Removed
+#### before_filter Removed
 
 **What Changed:**
 `before_filter`, `after_filter`, `skip_before_filter` are removed.
@@ -153,7 +153,7 @@ before_action :authenticate_user!
 
 ---
 
-#### 7. render :text Removed
+#### render :text Removed
 
 **What Changed:**
 `render text: 'content'` is removed.
@@ -169,7 +169,7 @@ render plain: 'Hello'
 
 ---
 
-#### 8. render nothing: true Removed
+#### render nothing: true Removed
 
 **What Changed:**
 `render nothing: true` is removed.
@@ -187,7 +187,7 @@ head :no_content
 
 ---
 
-#### 9. ActiveStorage Blob API Changes
+#### ActiveStorage Blob API Changes
 
 **What Changed:**
 `ActiveStorage::Blob.create_after_upload!` is deprecated.

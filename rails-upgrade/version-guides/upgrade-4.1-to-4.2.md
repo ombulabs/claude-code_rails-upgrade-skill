@@ -23,7 +23,7 @@ Rails 4.2 is a minor release that introduces async infrastructure and several ex
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. ActionMailer `#deliver` / `#deliver!` Deprecated
+#### ActionMailer `#deliver` / `#deliver!` Deprecated
 
 **What Changed:**
 `deliver` and `deliver!` are deprecated. The direct, bang-preserving replacements are `deliver_now` and `deliver_now!` (synchronous). `deliver_later` is a new async option that enqueues the mail via ActiveJob.
@@ -54,7 +54,7 @@ UserMailer.welcome(user).deliver_later
 
 ---
 
-#### 2. `respond_with` / Class-Level `respond_to` Extracted
+#### `respond_with` / Class-Level `respond_to` Extracted
 
 **What Changed:**
 The `respond_with` helper and class-level `respond_to` declarations were extracted from Rails core into the [`responders`](https://github.com/heartcombo/responders) gem.
@@ -91,7 +91,7 @@ No code changes needed after adding the gem.
 
 ---
 
-#### 3. Passing AR Object to `.find` / `.exists?` Deprecated
+#### Passing AR Object to `.find` / `.exists?` Deprecated
 
 **What Changed:**
 Passing an ActiveRecord object where an id is expected is deprecated — you must pass the id explicitly.
@@ -115,7 +115,7 @@ User.exists?(current_user.id)
 
 ---
 
-#### 4. Transactional Callback Exception Suppression
+#### Transactional Callback Exception Suppression
 
 **What Changed:**
 Exceptions raised in `after_commit` or `after_rollback` callbacks are still silently rescued by default in 4.2, but Rails now emits a deprecation warning. Rails 5.0+ removes the suppression entirely and always raises.
@@ -138,7 +138,7 @@ Without this flag, bugs in transactional callbacks become silent warnings that y
 
 ---
 
-#### 5. `assert_tag` / `TagAssertions` Deprecated
+#### `assert_tag` / `TagAssertions` Deprecated
 
 **What Changed:**
 `assert_tag` and the `TagAssertions` module are deprecated. Use `assert_select` from `SelectorAssertions` (now in the `rails-dom-testing` gem, bundled with Rails 4.2).
@@ -161,7 +161,7 @@ assert_select "a[href='/foo']"
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. HTML Sanitizer Rewritten (Loofah/Nokogiri)
+#### HTML Sanitizer Rewritten (Loofah/Nokogiri)
 
 **What Changed:**
 `sanitize`, `sanitize_css`, `strip_tags`, and `strip_links` are now backed by [Loofah](https://github.com/flavorjones/loofah) (via Nokogiri). Output may differ for edge-case inputs. `sanitize` also now accepts a `Loofah::Scrubber` — two new scrubbers ship with Rails: `PermitScrubber` and `TargetScrubber`.
@@ -181,7 +181,7 @@ gem 'rails-deprecated_sanitizer'
 
 ---
 
-#### 7. Serialized Attributes with Custom Coder: `nil` Handling
+#### Serialized Attributes with Custom Coder: `nil` Handling
 
 **What Changed:**
 Assigning `nil` to a serialized attribute with a custom coder (e.g., `serialize :metadata, JSON`) now saves `NULL` to the database instead of passing `nil` through the coder. Previously, JSON coder would have stored the string `"null"`.
@@ -201,7 +201,7 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
-#### 8. `config.active_support.test_order` Required
+#### `config.active_support.test_order` Required
 
 **What Changed:**
 Rails 4.2 emits a deprecation warning when `test_order` is not explicitly set. The default becomes `:random`.
@@ -222,7 +222,7 @@ config.active_support.test_order = :random
 
 ---
 
-#### 9. `config.serve_static_assets` Renamed
+#### `config.serve_static_assets` Renamed
 
 **What Changed:**
 `config.serve_static_assets` was renamed to `config.serve_static_files`. In production, the default generated config now uses an ENV var.
@@ -249,7 +249,7 @@ config.serve_static_files = ENV['RAILS_SERVE_STATIC_FILES'].present?
 
 ---
 
-#### 10. Production Log Level Default Changed
+#### Production Log Level Default Changed
 
 **What Changed:**
 The default `config.log_level` in `config/environments/production.rb` changed from `:info` to `:debug`. This makes production logs much noisier.
@@ -263,7 +263,7 @@ config.log_level = :info
 
 ---
 
-#### 11. Masked CSRF Tokens (Per-Request)
+#### Masked CSRF Tokens (Per-Request)
 
 **What Changed:**
 `form_authenticity_token` is now masked and varies per request (SSL attack mitigation). Non-Rails forms or external clients that cache a single token will break.
@@ -280,7 +280,7 @@ Rails form helpers handle masking automatically. If you build forms outside Rail
 
 ### 🟢 LOW PRIORITY
 
-#### 12. Rack Server Bind Host Changed
+#### Rack Server Bind Host Changed
 
 **What Changed:**
 Rails 4.2's bundled Rack binds `rails server` to `localhost` instead of `0.0.0.0` by default. Docker, Vagrant, and remote-access setups break.
@@ -302,7 +302,7 @@ rails server -b 0.0.0.0 -p 3000
 
 ---
 
-#### 13. Foreigner → Native Foreign Keys (Optional)
+#### Foreigner → Native Foreign Keys (Optional)
 
 **What Changed:**
 Rails 4.2 ships with a native foreign-key DSL for migrations. You can now drop the [`foreigner`](https://github.com/matthuhiggins/foreigner) gem if its features are a match.
@@ -330,7 +330,7 @@ t.references :user, foreign_key: true
 
 ---
 
-#### 14. Timecop Replaceable with Built-in Time Helpers
+#### Timecop Replaceable with Built-in Time Helpers
 
 **What Changed:**
 Rails 4.2 adds `travel`, `travel_to`, and `travel_back` test helpers via `ActiveSupport::Testing::TimeHelpers`. These replace most Timecop use cases.
@@ -358,7 +358,7 @@ Keep Timecop if you use its rate feature (e.g., "1 second = 1 hour").
 
 ---
 
-#### 15. RSpec 2 Not Supported
+#### RSpec 2 Not Supported
 
 **What Changed:**
 Rails 4.2 does not support RSpec 2. You must upgrade to RSpec 3 before (or alongside) the Rails upgrade.

@@ -19,7 +19,7 @@ Rails 8.0 is a major release with architectural changes:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. Sprockets → Propshaft
+#### Sprockets → Propshaft
 
 **What Changed:**
 Propshaft is the new default asset pipeline. Sprockets is no longer included by default.
@@ -78,7 +78,7 @@ gem 'propshaft'
 
 ---
 
-#### 2. Multi-Database Configuration for Solid Gems
+#### Multi-Database Configuration for Solid Gems
 
 **What Changed:**
 Rails 8.0 uses Solid Cache/Queue/Cable which may need separate database connections.
@@ -113,7 +113,7 @@ production:
 
 ---
 
-#### 3. assume_ssl Configuration
+#### assume_ssl Configuration
 
 **What Changed:**
 Rails 8.0 introduces `config.assume_ssl` for apps behind SSL-terminating proxies.
@@ -135,7 +135,7 @@ This prevents SSL redirect loops when behind a proxy.
 
 ---
 
-#### 4. sqlite3_deprecated_warning Removed
+#### sqlite3_deprecated_warning Removed
 
 **What Changed:**
 The `sqlite3_deprecated_warning` configuration option is removed.
@@ -150,7 +150,7 @@ Remove this line from your configuration files.
 
 ---
 
-#### 5. Ruby 3.2+ Strictly Required
+#### Ruby 3.2+ Strictly Required
 
 **What Changed:**
 Rails 8.0 requires Ruby 3.2.0 or newer.
@@ -163,7 +163,7 @@ rbenv local 3.3.0
 
 ---
 
-#### 6. `query_constraints:` association option removed (composite foreign keys)
+#### `query_constraints:` association option removed (composite foreign keys)
 
 **What Changed:**
 Rails 8.0 **removes** the `query_constraints:` option on associations (`belongs_to`/`has_many`/etc.). It was deprecated in Rails 7.2 and now raises `ActiveRecord::ConfigurationError` **at class load**, so the app fails to boot.
@@ -198,7 +198,7 @@ This is **behavior-preserving and version-agnostic**: when `foreign_key:` is giv
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 7. Solid Cache (Optional)
+#### Solid Cache (Optional)
 
 **What Changed:**
 Rails 8.0 defaults to Solid Cache for caching (database-backed).
@@ -231,7 +231,7 @@ config.cache_store = :solid_cache_store
 
 ---
 
-#### 8. Solid Queue (Optional)
+#### Solid Queue (Optional)
 
 **What Changed:**
 Rails 8.0 defaults to Solid Queue for background jobs (database-backed).
@@ -264,7 +264,7 @@ config.active_job.queue_adapter = :solid_queue
 
 ---
 
-#### 9. Solid Cable (Optional)
+#### Solid Cable (Optional)
 
 **What Changed:**
 Rails 8.0 defaults to Solid Cable for WebSockets (database-backed).
@@ -295,7 +295,7 @@ production:
 
 ---
 
-#### 10. Docker/Thruster for Production
+#### Docker/Thruster for Production
 
 **What Changed:**
 Rails 8.0 apps include Dockerfile and Thruster gem.
@@ -314,7 +314,7 @@ Thruster provides:
 
 ---
 
-#### 11. Kamal Deployment
+#### Kamal Deployment
 
 **What Changed:**
 Rails 8.0 includes Kamal configuration for deployment.

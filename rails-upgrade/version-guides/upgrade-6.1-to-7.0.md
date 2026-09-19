@@ -19,7 +19,7 @@ Rails 7.0 is a major release focused on frontend modernization:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. Ruby 2.7+ Required
+#### Ruby 2.7+ Required
 
 **What Changed:**
 Rails 7.0 requires Ruby 2.7.0 or newer. Ruby 3.0+ is recommended.
@@ -33,7 +33,7 @@ rbenv local 3.1.4
 
 ---
 
-#### 2. Webpacker → Import Maps / jsbundling-rails
+#### Webpacker → Import Maps / jsbundling-rails
 
 **What Changed:**
 Webpacker is no longer the default. Choose:
@@ -80,7 +80,7 @@ rails javascript:install:esbuild
 
 ---
 
-#### 3. Turbolinks → Turbo
+#### Turbolinks → Turbo
 
 **What Changed:**
 Turbolinks is replaced by Turbo (part of Hotwire).
@@ -134,7 +134,7 @@ document.addEventListener('turbo:load', function() {
 
 ---
 
-#### 4. Rails UJS → Turbo / Stimulus
+#### Rails UJS → Turbo / Stimulus
 
 **What Changed:**
 `rails-ujs` functionality is now handled by Turbo and Stimulus.
@@ -172,7 +172,7 @@ Rails.start()
 
 ---
 
-#### 5. form_with Remote Behavior Change
+#### form_with Remote Behavior Change
 
 **What Changed:**
 `form_with` now submits forms with Turbo (remote by default).
@@ -198,7 +198,7 @@ Rails.start()
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. secrets.yml → credentials
+#### secrets.yml → credentials
 
 **What Changed:**
 `Rails.application.secrets` is deprecated.
@@ -231,7 +231,7 @@ rails credentials:edit --environment production
 
 ---
 
-#### 7. Enum Syntax Changes
+#### Enum Syntax Changes
 
 **What Changed:**
 New enum syntax available (hash form preferred).
@@ -250,7 +250,7 @@ enum :status, { draft: 0, published: 1 }, prefix: true
 
 ---
 
-#### 8. image_tag skip_pipeline Removed
+#### image_tag skip_pipeline Removed
 
 **What Changed:**
 `skip_pipeline` option removed from `image_tag`.
@@ -266,7 +266,7 @@ enum :status, { draft: 0, published: 1 }, prefix: true
 
 ---
 
-#### 9. to_s(:format) Deprecated
+#### to_s(:format) Deprecated
 
 **What Changed:**
 `to_s(:format)` is deprecated in favor of `to_fs(:format)`.
@@ -288,7 +288,7 @@ Date.today.to_fs(:short)
 
 ---
 
-#### 10. redirect_to Open Redirect Protection
+#### redirect_to Open Redirect Protection
 
 **What Changed:**
 `load_defaults 7.0` sets `config.action_controller.raise_on_open_redirects = true`. With it on, `redirect_to` and `redirect_back_or_to` to a host different from the current one raise `ActionController::Redirecting::UnsafeRedirectError` instead of redirecting. This is not a deprecation, there is no warning phase, and it is gated by `load_defaults 7.0`, so an app only sees it once `load_defaults` reaches 7.0, which is often a later hop than the Rails 7.0 bump itself. Internal path/url helpers and model records are unaffected; only dynamic or external destinations break.
@@ -326,7 +326,7 @@ If you are not ready to audit every call site at this hop, you can keep the old 
 
 ---
 
-#### 11. Explicit Format/Handler Extension in `template:` / `layout:`
+#### Explicit Format/Handler Extension in `template:` / `layout:`
 
 **What Changed:**
 Passing a template name containing a `.` — `render template: "posts/show.html.erb"`, `layout: "pdf.html"` — worked on 6.1 and raises `ActionView::MissingTemplate` on 7.0.

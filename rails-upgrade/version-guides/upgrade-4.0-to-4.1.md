@@ -24,7 +24,7 @@ The breaking changes are smaller than 3.2 → 4.0 but several silently change be
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. Dynamic Finders Removed
+#### Dynamic Finders Removed
 
 **What Changed:**
 `activerecord-deprecated_finders` was removed as a Rails dependency. `find_all_by_*`, `find_last_by_*`, `scoped_by_*`, `find_or_initialize_by_*`, and `find_or_create_by_*` no longer work out of the box.
@@ -63,7 +63,7 @@ gem 'activerecord-deprecated_finders'
 
 ---
 
-#### 2. `return` Inside Inline Callback Blocks
+#### `return` Inside Inline Callback Blocks
 
 **What Changed:**
 Using `return` inside an **inline callback block** now raises `LocalJumpError` at callback-execution time. This was never officially supported; a rewrite of `ActiveSupport::Callbacks` in 4.1 closed the accidental support.
@@ -97,7 +97,7 @@ See [rails/rails#13271](https://github.com/rails/rails/pull/13271).
 
 ---
 
-#### 3. Implicit Join References Removed
+#### Implicit Join References Removed
 
 **What Changed:**
 `includes(...).where("other_table.col = ...")` no longer auto-joins the referenced table. The string-parsing heuristic was removed because it produced incorrect SQL in edge cases.
@@ -132,7 +132,7 @@ See [rails/rails#9712](https://github.com/rails/rails/issues/9712) for backgroun
 
 ---
 
-#### 4. PostgreSQL `json` / `hstore` / `array` Columns Return String-Keyed Data
+#### PostgreSQL `json` / `hstore` / `array` Columns Return String-Keyed Data
 
 **What Changed:**
 In 4.0, PostgreSQL `json`, `hstore`, and `array` columns (and any `store_accessor` built on top of them) returned a `HashWithIndifferentAccess` or `ArrayWithIndifferentAccess` — symbol and string access both worked. In 4.1 they return plain `Hash` or `Array` with **string keys only**. Symbol access silently returns `nil`.
@@ -164,7 +164,7 @@ profile.preferences["theme"]
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 5. MultiJSON Removed from Rails
+#### MultiJSON Removed from Rails
 
 **What Changed:**
 Rails 4.1 no longer depends on [`MultiJSON`](https://github.com/intridea/multi_json). Apps that reference `MultiJSON` directly will raise `NameError` once the transitive dependency goes away.
@@ -196,7 +196,7 @@ JSON.parse(str)
 
 ---
 
-#### 6. Cookies Serializer Opt-In (Marshal → JSON / Hybrid)
+#### Cookies Serializer Opt-In (Marshal → JSON / Hybrid)
 
 **What Changed:**
 Apps created before 4.1 keep `Marshal` as the signed/encrypted cookie serializer. Rails 4.1 introduces a JSON serializer and a `:hybrid` mode that reads legacy Marshal cookies and writes new JSON ones — but the default is still `Marshal` unless you opt in.
@@ -215,7 +215,7 @@ Once all live cookies have rotated, switch to `:json` for the leaner path. Note 
 
 ---
 
-#### 7. `default_scope` Chains with Other Scopes
+#### `default_scope` Chains with Other Scopes
 
 **What Changed:**
 In Rails 4.1, `default_scope` conditions are now combined (ANDed) with subsequent scopes instead of being overridden by them. Scopes that intentionally contradicted the default scope now produce zero rows.
@@ -244,7 +244,7 @@ See [this commit](https://github.com/rails/rails/commit/f950b2699f97749ef706c693
 
 ---
 
-#### 8. `ActiveRecord::Relation` Mutator Methods Removed
+#### `ActiveRecord::Relation` Mutator Methods Removed
 
 **What Changed:**
 `#map!`, `#delete_if`, `#compact!`, and other mutator methods are no longer delegated from `Relation` to the underlying array. Call `#to_a` first.
@@ -268,7 +268,7 @@ projects.compact!
 
 ---
 
-#### 9. CSRF Protection Now Covers GET with JS Responses
+#### CSRF Protection Now Covers GET with JS Responses
 
 **What Changed:**
 GET requests with JS responses now enforce CSRF. Test helpers that issue `get` / `post :create, format: :js` must switch to `xhr` so Rails treats the request as XHR.
@@ -296,7 +296,7 @@ See [rails/rails#13345](https://github.com/rails/rails/pull/13345).
 
 ---
 
-#### 10. Flash Message Keys Are Strings
+#### Flash Message Keys Are Strings
 
 **What Changed:**
 Keys in `flash.to_hash` are now strings, not symbols. Code that filters the hash with symbol keys silently no-ops.
@@ -320,7 +320,7 @@ Direct access with either symbol or string still works — the break is specific
 
 ---
 
-#### 11. I18n Enforces Available Locales
+#### I18n Enforces Available Locales
 
 **What Changed:**
 `config.i18n.enforce_available_locales` defaults to `true` in 4.1. Any locale that is not in `I18n.available_locales` raises `I18n::InvalidLocale`. Apps that accepted user-supplied locale parameters without validation will raise on previously-accepted input.
@@ -345,7 +345,7 @@ config.i18n.enforce_available_locales = false
 
 ---
 
-#### 12. `as_json` Millisecond Precision for Time/DateTime/TWZ
+#### `as_json` Millisecond Precision for Time/DateTime/TWZ
 
 **What Changed:**
 `Time`, `DateTime`, and `ActiveSupport::TimeWithZone` serialize to JSON with millisecond precision by default (`2024-01-01T00:00:00.000Z` instead of `2024-01-01T00:00:00Z`). API clients that parse the timestamp as a fixed-length string or match it against a regex break.
@@ -366,7 +366,7 @@ Or update consumers to accept fractional seconds.
 
 ### 🟢 LOW PRIORITY
 
-#### 13. Spring Preloader (New Default)
+#### Spring Preloader (New Default)
 
 **What Changed:**
 New 4.1 apps generate a `Gemfile` with `gem 'spring'` in `:development`, and a `bin/spring` binstub. Spring keeps the Rails environment in memory between commands.
@@ -382,7 +382,7 @@ Run `bundle exec spring binstub --all` to generate Spring-aware binstubs (`bin/r
 
 ---
 
-#### 14. `secrets.yml` (New)
+#### `secrets.yml` (New)
 
 **What Changed:**
 Rails 4.1 introduces `config/secrets.yml` as the recommended home for `secret_key_base` and other app secrets, accessible via `Rails.application.secrets`.
@@ -401,7 +401,7 @@ Migrate reads from `Rails.application.config.secret_key_base` or custom initiali
 
 ---
 
-#### 15. `render :text` Soft-Deprecated
+#### `render :text` Soft-Deprecated
 
 **What Changed:**
 `render :text` was a security-adjacent footgun — it sent `text/html`, so any string with markup would be interpreted by the browser. 4.1 introduces `render :plain`, `render :html`, and `render :body` as precise replacements, and signals that `:text` will be deprecated in a future release.
@@ -424,7 +424,7 @@ render body: "raw"           # no Content-Type header
 
 ---
 
-#### 16. JSON Encoder: Removed Features
+#### JSON Encoder: Removed Features
 
 **What Changed:**
 The 4.1 JSON encoder rewrite drops three features from `as_json` / `to_json`:
@@ -452,7 +452,7 @@ Or migrate `encode_json` implementations into `as_json`, and update clients to p
 
 ---
 
-#### 17. JSON Gem Isolated from Rails Encoder
+#### JSON Gem Isolated from Rails Encoder
 
 **What Changed:**
 `JSON.generate` / `JSON.dump` no longer consult Rails' `as_json`. They serialize arbitrary Ruby objects the way the stdlib `json` gem wants — which differs significantly. Use `obj.to_json` when you want Rails semantics.
@@ -476,7 +476,7 @@ JSON.generate(obj.as_json)
 
 ---
 
-#### 18. Fixtures ERB Evaluated in a Separate Context
+#### Fixtures ERB Evaluated in a Separate Context
 
 **What Changed:**
 Each fixture's ERB template now runs in its own isolated context. Helper methods defined in one fixture (`<% def my_helper; end %>`) are no longer visible from another fixture.
@@ -499,7 +499,7 @@ ActiveRecord::FixtureSet.context_class.send :include, FixtureFileHelpers
 
 ---
 
-#### 19. `ActiveSupport::Callbacks.set_callback` Around-Block Signature
+#### `ActiveSupport::Callbacks.set_callback` Around-Block Signature
 
 **What Changed:**
 The around-callback lambda signature changed from `&block` (yield-style) to a positional `block` argument.
@@ -522,7 +522,7 @@ Rare — only affects apps that build callbacks dynamically with `set_callback`.
 
 ---
 
-#### 20. `ActiveRecord::Migration.check_pending!` Now Redundant in Test Helper
+#### `ActiveRecord::Migration.check_pending!` Now Redundant in Test Helper
 
 **What Changed:**
 `require 'test_help'` now runs pending-migration checks automatically. Explicit calls to `ActiveRecord::Migration.check_pending!` in `test_helper.rb` / `rails_helper.rb` are harmless but unnecessary.
