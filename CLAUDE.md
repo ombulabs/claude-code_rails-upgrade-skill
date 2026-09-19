@@ -28,7 +28,7 @@ The skill body follows the progressive-disclosure practice from the skill-creato
 
 Every workflow file opens with the same header, in this order: numbered title, `**Purpose:**`, `**When to use:**`, `## Inputs` (artifacts handed forward by earlier workflows, nouns), `## Outputs` (artifacts this workflow hands forward, nouns), `## Gates` (boolean stop conditions before the next workflow that runs, predicates), then an optional `## Pre-upgrade checklist` (unchecked FastRuby.io recommendations, not gates), then its Steps, then `## Self-review checklist` where one exists. Inputs and Gates never repeat the same fact. Provenance of a rule belongs in `CHANGELOG.md`, not in the workflow file.
 
-Refer to a whole workflow as "Workflow NN". Refer to a step as the file path plus the step (`workflows/00-run-test-suite-workflow.md` Step 4), never as a bare "Step N of the upgrade workflow". `bin/lint-skill` check 1 validates paths, so a renumber breaks the old path and lint goes red. Bare numbers are invisible to it.
+Refer to a whole workflow as "Workflow NN". Refer to a step as the file path plus the step (`workflows/01-run-test-suite-workflow.md` Step 4), never as a bare "Step N of the upgrade workflow". `bin/lint-skill` check 1 validates paths, so a renumber breaks the old path and lint goes red. Bare numbers are invisible to it.
 
 Inserting a workflow mid-flow renumbers every later file and its inbound links. That is accepted churn; the path check catches every stale link in markdown. Paths inside pattern YAML `explanation:` / `fix:` strings are not scanned by lint, so grep for them by hand after a rename.
 

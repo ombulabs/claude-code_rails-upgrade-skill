@@ -23,7 +23,7 @@ description: Analyzes Rails applications and generates comprehensive upgrade rep
 | **Step** | A `Step N` header inside a workflow file | inside the workflow |
 | **Reference** | Material loaded on demand: lookup tables, playbooks, conditional branches | `references/<name>-reference.md` |
 
-No sub-steps: a "Step 4.1" is either two sequential steps or a conditional branch inside one step (`### A.` / `### B.` headers). Refer to a whole workflow as Workflow NN; refer to a step as file path plus step, e.g. `workflows/00-run-test-suite-workflow.md` Step 4. Not used in headings: Stage, Phase, Sub-step, dotted step numbers.
+No sub-steps: a "Step 4.1" is either two sequential steps or a conditional branch inside one step (`### A.` / `### B.` headers). Refer to a whole workflow as Workflow NN; refer to a step as file path plus step, e.g. `workflows/01-run-test-suite-workflow.md` Step 4. Not used in headings: Stage, Phase, Sub-step, dotted step numbers.
 
 ---
 
@@ -104,7 +104,7 @@ When proposing code fixes that must work with both the current and target Rails 
 ### Reference Materials
 - `references/sequential-strategy-reference.md` - Sequential upgrade rule (no version skipping) and the supported upgrade paths tables. Load in Workflow 03.
 - `references/request-patterns-reference.md` - Which workflows run for each request shape (full upgrade, multi-hop, analysis only, reports only). Read at the start of a session.
-- `references/no-test-suite-smoke-reference.md` - **Load from Workflow 00 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
+- `references/no-test-suite-smoke-reference.md` - **Load from Workflow 01 when no runnable RSpec/Minitest suite exists** - Rails boot, routes, migration-status, and build smoke baseline with partial-confidence reporting
 - `references/deprecation-warnings-reference.md` - Finding and fixing deprecations
 - `references/staying-current-reference.md` - Keeping up with Rails releases
 - `references/breaking-changes-by-version-reference.md` - Quick lookup
@@ -128,10 +128,10 @@ When user requests an upgrade, follow this workflow. Sequential Process is Criti
 
 | #  | Name | Purpose | File |
 |----|------|---------|------|
-| 00 | Run test suite | MANDATORY FIRST STEP. How to run and verify test suite; blocks on any failure | `workflows/00-run-test-suite-workflow.md` |
-| 01 | Verify latest patch | MANDATORY. App on the latest patch of its current series before any minor/major hop | `workflows/01-verify-latest-patch-workflow.md` |
+| 00 | Verify latest patch | MANDATORY PRE-STEP. App on the latest patch of its current series before any minor/major hop | `workflows/00-verify-latest-patch-workflow.md` |
+| 01 | Run test suite | MANDATORY FIRST STEP. How to run and verify test suite; blocks on any failure | `workflows/01-run-test-suite-workflow.md` |
 | 02 | Resolve deprecation warnings | Make warnings visible, collect what the current version emits, fix them on the current version | `workflows/02-resolve-deprecation-warnings-workflow.md` |
-| 03 | Validate upgrade path and Ruby | Single-hop or multi-hop, hops planned, Ruby meets the target's minimum | `workflows/03-validate-upgrade-path-workflow.md` |
+| 03 | Validate upgrade path | Single-hop or multi-hop, individual hops planned | `workflows/03-validate-upgrade-path-workflow.md` |
 | 04 | Set up next_rails | EARLY SETUP. Delegated to the skill listed under External Dependencies | `workflows/04-setup-next-rails-workflow.md` |
 | 05 | Detect breaking changes | How to run breaking change detection directly | `workflows/05-detect-breaking-changes-workflow.md` |
 | 06 | Check gem compatibility | Per-lockfile gem compatibility check against the target Rails version | `workflows/06-check-gem-compatibility-workflow.md` |

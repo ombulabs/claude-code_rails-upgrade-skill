@@ -2,11 +2,11 @@
 
 **Purpose:** Make deprecation warnings visible, collect the ones the current Rails version emits, and fix them on the current version before any dual-boot or version bump. Deprecation warnings are the roadmap of the next hop: what warns on X is what breaks on X+1. Fixing them on X, with the suite green on X, is the cheapest point in the campaign to do it, and it keeps the later diff (Workflow 10) about the version bump only.
 
-**When to use:** After Workflow 01 has the app on the latest patch of its series. Before dual-boot setup (Workflow 04), so no `NextRails.next?` branching is needed: every fix here is an unconditional replacement that the current version already accepts.
+**When to use:** After Workflow 01 has a green baseline on the latest patch of the current series. Before dual-boot setup (Workflow 04), so no `NextRails.next?` branching is needed: every fix here is an unconditional replacement that the current version already accepts.
 
 ## Inputs
 
-- Green test baseline from Workflow 00, plus the result of its Step 2 sweep for deprecation-behavior overrides
+- Green test baseline from Workflow 01, plus the result of its Step 2 sweep for deprecation-behavior overrides
 - `references/deprecation-warnings-reference.md` (how to find, read and fix warnings, per Rails version)
 
 ## Outputs
@@ -30,7 +30,7 @@
 
 ## Step 1: Make sure deprecation warnings are not silenced
 
-Read the Workflow 00 Step 2 sweep result. If anything silences or hides deprecations in the test environment (`config.active_support.deprecation = :silence`, `config.active_support.report_deprecations = false`, an `ActiveSupport::Deprecation.silence` block around suite setup, a `disallowed_warnings` list that swallows them), change the test environment so warnings reach the output:
+Read the Workflow 01 Step 2 sweep result. If anything silences or hides deprecations in the test environment (`config.active_support.deprecation = :silence`, `config.active_support.report_deprecations = false`, an `ActiveSupport::Deprecation.silence` block around suite setup, a `disallowed_warnings` list that swallows them), change the test environment so warnings reach the output:
 
 ```ruby
 # config/environments/test.rb

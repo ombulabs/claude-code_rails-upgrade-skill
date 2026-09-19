@@ -7,7 +7,7 @@
 ## Inputs
 
 - Green test baseline (or accepted partial smoke baseline) with the current-version deprecations resolved (Workflow 02)
-- Result of the deprecation-behavior sweep from `workflows/00-run-test-suite-workflow.md` Step 2
+- Result of the deprecation-behavior sweep from `workflows/01-run-test-suite-workflow.md` Step 2
 - Hand that result to the delegate skill: its setup workflow opens with a sweep that covers the same ground
 
 ## Outputs

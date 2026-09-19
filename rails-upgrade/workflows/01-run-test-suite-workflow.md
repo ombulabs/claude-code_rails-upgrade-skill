@@ -1,4 +1,4 @@
-# Workflow 00: Run Test Suite
+# Workflow 01: Run Test Suite
 
 **Purpose:** Run and verify the test suite BEFORE any upgrade work begins. No exceptions: no upgrade work until tests pass, and if tests fail, STOP and help fix them first.
 
@@ -166,7 +166,7 @@ Baseline Metrics:
 Proceeding with upgrade assessment...
 ```
 
-**Action:** Continue to Workflow 01 (`workflows/01-verify-latest-patch-workflow.md`)
+**Action:** Continue to Workflow 02 (`workflows/02-resolve-deprecation-warnings-workflow.md`)
 
 #### If ANY Tests Fail:
 
@@ -367,7 +367,7 @@ This workflow integrates with the main upgrade process:
 
 ```
 ┌─────────────────────────────────────────┐
-│  Workflow 00: Run Test Suite            │
+│  Workflow 01: Run Test Suite            │
 │  (THIS WORKFLOW)                        │
 │                                         │
 │  ┌─────────────┐    ┌─────────────────┐ │
@@ -390,7 +390,7 @@ This workflow integrates with the main upgrade process:
               │
               ▼
 ┌─────────────────────────────────────────┐
-│  Workflow 01: Verify Latest Patch       │
+│  Workflow 02: Resolve Deprecations      │
 │  (Continue main workflow)               │
 └─────────────────────────────────────────┘
 ```
