@@ -1169,8 +1169,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | Error | See |
 |-------|-----|
 | `ActiveModel::ForbiddenAttributesError` | "Strong Parameters (Replaces attr_accessible)" — use `user_params` not `params[:user]` |
-| Scope returns wrong results or errors | "Scopes" — add lambda |
-| `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`" — move to lambda |
+| Scope returns wrong results or errors | "Scopes", under "Scopes and Association Options Require Lambda" — add lambda |
+| `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`", under "Scopes and Association Options Require Lambda" — move to lambda |
 | `No route matches` | "Routes Require HTTP Method" — add HTTP method |
 | Remote form POST arrives with no session or current user | "Remote Forms Stop Embedding the CSRF Token" — pin `embed_authenticity_token_in_remote_forms` |
 | `ArgumentError: The method .order() must contain arguments.` | "`order` and `reorder` Require Arguments" — name the column, `order(:id)` for `.order.last` |

@@ -197,17 +197,49 @@ end
 # Numbering every breaking-change entry meant renumbering the whole list on each
 # insertion, which conflicts across parallel PRs. Entries are ordered by their
 # priority section instead, and cross-references name the heading.
+#
+# The numbered-heading half applies to version guides only. The by-number
+# cross-reference half applies to every markdown file in the skill, since a
+# pointer into a guide can be written from a workflow or a reference just as
+# easily. A heading that is itself "Section N:" is structure, not a pointer
+# (the upgrade-report workflow numbers the report's own sections that way), so
+# headings are exempt from the cross-reference check.
 NUMBERED_HEADING = /\A\#{2,6} \d+[a-z]?\. /
-BY_NUMBER_REF = /\bSection \d+/
+BY_NUMBER_REF = /\b(?:[Ss]ection|[Ee]ntry|[Ii]tem)s? \#?\d+[a-z]?\b/
+HEADING_LINE = /\A\#{1,6} /
+FENCE = /\A\s*(?:```|~~~)/
 
-Dir.glob(File.join(SKILLS.fetch("rails-upgrade"), "version-guides", "*.md")).sort.each do |f|
-  File.read(f).each_line.with_index(1) do |line, ln|
-    if line.match?(NUMBERED_HEADING)
-      err(f, "line #{ln}: numbered heading `#{line.strip}` — drop the number, entries are ordered by priority section")
+# Lines inside a fenced code block are sample output, not prose: a quoted Rails
+# guide excerpt or a shell transcript may legitimately say "Section 4".
+def each_prose_line(file)
+  in_fence = false
+
+  File.read(file).each_line.with_index(1) do |line, ln|
+    if line.match?(FENCE)
+      in_fence = !in_fence
+      next
     end
 
-    if line.match?(BY_NUMBER_REF)
-      err(f, "line #{ln}: cross-reference by number (`#{line[BY_NUMBER_REF]}`) — name the heading instead")
+    yield(line, ln) unless in_fence
+  end
+end
+
+VERSION_GUIDES = File.join(SKILLS.fetch("rails-upgrade"), "version-guides")
+
+SKILLS.each_value do |skill_dir|
+  markdown_files_for(skill_dir).each do |f|
+    next if File.basename(f) == "CHANGELOG.md" # historical record — it describes numbering that used to exist
+
+    each_prose_line(f) do |line, ln|
+      if f.start_with?(VERSION_GUIDES) && line.match?(NUMBERED_HEADING)
+        err(f, "line #{ln}: numbered heading `#{line.strip}` — drop the number, entries are ordered by priority section")
+      end
+
+      next if line.match?(HEADING_LINE)
+
+      if line.match?(BY_NUMBER_REF)
+        err(f, "line #{ln}: cross-reference by number (`#{line[BY_NUMBER_REF]}`) — name the heading instead")
+      end
     end
   end
 end
