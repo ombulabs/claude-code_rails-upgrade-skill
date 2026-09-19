@@ -1,4 +1,4 @@
-# Workflow 07: Boot Smoke Test
+# Workflow 07: Boot Smoke Test and Models Suite
 
 **Purpose:** Workflow 05 (codebase grep) only sees the user's own code. Workflow 06 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file. These surface only when something boots Rails. Catching them here, before the report is written, lets them land in fix-before-bump where they belong instead of mid-implementation. A booted Rails process is the only signal that catches that class of failure.
 
@@ -12,6 +12,7 @@
 
 - Boot smoke test report block (PASS / FAIL with N gem bumps required), merged into Workflow 08's Comprehensive Upgrade Report
 - Any gem bump added to the fix-before-bump bucket
+- Models suite result under `Gemfile.next`: pass, or the list of failing tests added to the fix-before-bump bucket for Workflow 08
 
 ## Gates (must be true before the next workflow that runs)
 
@@ -84,6 +85,17 @@ For each offending gem:
 ### Step 4: Re-run boot
 
 Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Workflow 08.
+
+### Step 5: Run the models test suite under Gemfile.next
+
+Boot proves the framework loads; the models suite proves the app's own code runs on the target version, with the database, before any report is written:
+
+```bash
+BUNDLE_GEMFILE=Gemfile.next bin/rails test test/models 2>&1 | tee tmp/next-models.log     # Minitest
+BUNDLE_GEMFILE=Gemfile.next bundle exec rspec spec/models 2>&1 | tee tmp/next-models.log   # RSpec
+```
+
+Models first because it is the slice with the most framework surface (Active Record, validations, callbacks) and the least environment surface (no browser, no assets). If it is fast enough, run the full suite instead. Every failure goes into the fix-before-bump bucket with its file:line, so Workflow 08's report lists it and Workflow 10 fixes it. Do not fix anything here; the user has not seen the report yet.
 
 ## Output
 

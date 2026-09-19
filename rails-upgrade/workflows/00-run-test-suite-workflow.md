@@ -166,7 +166,7 @@ Baseline Metrics:
 Proceeding with upgrade assessment...
 ```
 
-**Action:** Continue to Workflow 04 (`workflows/04-setup-next-rails-workflow.md`)
+**Action:** Continue to Workflow 01 (`workflows/01-verify-latest-patch-workflow.md`)
 
 #### If ANY Tests Fail:
 
@@ -390,7 +390,7 @@ This workflow integrates with the main upgrade process:
               │
               ▼
 ┌─────────────────────────────────────────┐
-│  Workflow 04: Set Up next_rails         │
+│  Workflow 01: Verify Latest Patch       │
 │  (Continue main workflow)               │
 └─────────────────────────────────────────┘
 ```
