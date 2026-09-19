@@ -26,6 +26,9 @@ def err(file, detail)
   $errors << "#{file.sub("#{ROOT}/", "")}: #{detail}"
 end
 
+# CHANGELOG.md lives at the repo root, outside every skill dir, so it is never
+# scanned here. If a per-skill CHANGELOG is ever added back, exclude it: its
+# historical entries cite paths that no longer exist.
 def markdown_files_for(skill_dir)
   Dir.glob(File.join(skill_dir, "**", "*.md")).sort
 end
