@@ -1,21 +1,23 @@
-# Workflow 06: Boot Smoke Test
+# Workflow 07: Boot Smoke Test and Models Suite
 
-**Purpose:** Workflow 04 (codebase grep) only sees the user's own code. Workflow 05 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file. These surface only when something boots Rails. Catching them here, before the report is written, lets them land in fix-before-bump where they belong instead of mid-implementation. A booted Rails process is the only signal that catches that class of failure.
+**Purpose:** Workflow 05 (codebase grep) only sees the user's own code. Workflow 06 (`next_rails bundle_report compatibility` / railsbump) only sees declared dependency constraints. Neither can detect a gem that resolves cleanly under the target Rails version but then crashes at boot because it calls a removed method or requires a removed file. These surface only when something boots Rails. Catching them here, before the report is written, lets them land in fix-before-bump where they belong instead of mid-implementation. A booted Rails process is the only signal that catches that class of failure.
 
-**When to use:** Workflow 06 of the upgrade workflow, after gem-compat (Workflow 05) and before report generation (Workflow 07).
+**When to use:** Workflow 07 of the upgrade workflow, after gem-compat (Workflow 06) and before report generation (Workflow 08).
 
 ## Inputs
 
-- `Gemfile.next` that resolves (from Workflow 02 and Workflow 05)
+- `Gemfile.next` that resolves (from Workflow 04 and Workflow 06)
 
 ## Outputs
 
-- Boot smoke test report block (PASS / FAIL with N gem bumps required), merged into Workflow 07's Comprehensive Upgrade Report
+- Boot smoke test report block (PASS / FAIL with N gem bumps required), merged into Workflow 08's Comprehensive Upgrade Report
 - Any gem bump added to the fix-before-bump bucket
+- Models suite result under `Gemfile.next`: pass, or the list of failing tests added to the fix-before-bump bucket for Workflow 08
 
 ## Gates (must be true before the next workflow that runs)
 
 - Boot succeeds under `Gemfile.next` (re-run the boot smoke test until it does), or the skip condition in Notes applies (no `Gemfile.next` yet) and the report records that the test was not run
+- Models suite ran under `Gemfile.next`: pass, or every failure recorded in the fix-before-bump bucket
 
 ## Real examples this catches
 
@@ -83,14 +85,25 @@ For each offending gem:
 
 ### Step 4: Re-run boot
 
-Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Workflow 07.
+Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Workflow 08.
+
+### Step 5: Run the models test suite under Gemfile.next
+
+If Workflow 04 (or the dual-boot skill it delegated to) already ran the full suite under `Gemfile.next` in this session, record that result here and skip to Output; do not run it a third time. Otherwise: boot proves the framework loads; the models suite proves the app's own code runs on the target version, with the database, before any report is written:
+
+```bash
+BUNDLE_GEMFILE=Gemfile.next bin/rails test test/models 2>&1 | tee tmp/next-models.log     # Minitest
+BUNDLE_GEMFILE=Gemfile.next bundle exec rspec spec/models 2>&1 | tee tmp/next-models.log   # RSpec
+```
+
+Models first because it is the slice with the most framework surface (Active Record, validations, callbacks) and the least environment surface (no browser, no assets). If it is fast enough, run the full suite instead. Every failure goes into the fix-before-bump bucket with its file:line, so Workflow 08's report lists it and Workflow 10 fixes it. Do not fix anything here; the user has not seen the report yet.
 
 ## Output
 
-A short report block to merge into Workflow 07's Comprehensive Upgrade Report:
+A short report block to merge into Workflow 08's Comprehensive Upgrade Report:
 
 ```
-Boot smoke test (Workflow 06):
+Boot smoke test (Workflow 07):
 
   - Triggered: BUNDLE_GEMFILE=Gemfile.next bundle exec rspec --dry-run
   - Result: PASS / FAIL with N gem bumps required
@@ -104,5 +117,5 @@ If the smoke test passes on the first run, record that explicitly — it is a po
 
 ## Notes
 
-- The smoke test does not replace the post-bump test suite run in Workflow 09. It is a *boot* check, not a feature check. Workflow 09 still runs the full suite against both versions.
-- Skip this step only if there is no `Gemfile.next` yet (very early in dual-boot setup). If `Gemfile.next` exists but still resolves the current Rails version (check `grep -A1 '^    rails (' Gemfile.next.lock`, or `BUNDLE_GEMFILE=Gemfile.next bundle exec ruby -e 'require "rails"; puts Rails.version'`), the dual-boot setup is incomplete: booting it would test the current version and pass vacuously. Go back to Workflow 02 and finish the `if next?` branch before running this test. In all other cases, run it.
+- The smoke test does not replace the post-bump test suite run in Workflow 10. It is a *boot* check, not a feature check. Workflow 10 still runs the full suite against both versions.
+- Skip this step only if there is no `Gemfile.next` yet (very early in dual-boot setup). If `Gemfile.next` exists but still resolves the current Rails version (check `grep -A1 '^    rails (' Gemfile.next.lock`, or `BUNDLE_GEMFILE=Gemfile.next bundle exec ruby -e 'require "rails"; puts Rails.version'`), the dual-boot setup is incomplete: booting it would test the current version and pass vacuously. Go back to Workflow 04 and finish the `if next?` branch before running this test. In all other cases, run it.
