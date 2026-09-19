@@ -1,8 +1,8 @@
-# Workflow 04: Detect Breaking Changes
+# Workflow 05: Detect Breaking Changes
 
 **Purpose:** Run breaking change detection directly using Claude's tools (Grep, Glob, Read)
 
-**When to use:** Workflow 04 of the upgrade workflow — after tests pass and the upgrade path is validated. (load_defaults alignment is Workflow 11, *after* detection, not before.)
+**When to use:** Workflow 05 of the upgrade workflow — after tests pass and the upgrade path is validated. (load_defaults alignment is Workflow 12, *after* detection, not before.)
 
 ## Inputs
 
@@ -377,8 +377,8 @@ These are `kind: migration` and `kind: optional` — silent and fully working at
 
 After detection completes:
 
-1. Pass findings to `workflows/07-generate-upgrade-report-workflow.md`
-2. Pass config file contents to `workflows/08-generate-app-update-preview-workflow.md`
+1. Pass findings to `workflows/08-generate-upgrade-report-workflow.md`
+2. Pass config file contents to `workflows/09-generate-app-update-preview-workflow.md`
 3. Generate both reports using actual findings
 4. Present to user
 
