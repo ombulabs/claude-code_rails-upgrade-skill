@@ -2,7 +2,7 @@
 
 **Purpose:** Provide a concrete baseline check when a Rails app has no RSpec or Minitest suite.
 
-**When to use:** Workflow 01 (`workflows/01-run-test-suite-workflow.md`), only after test-suite detection finds no runnable `spec/` or `test/` suite.
+**When to use:** Workflow 00 (`workflows/00-run-test-suite-workflow.md`), only after test-suite detection finds no runnable `spec/` or `test/` suite.
 
 This is not a replacement for adding tests. It is a minimum boot and routing baseline so the upgrade report can say exactly what was checked before proceeding.
 
@@ -10,7 +10,7 @@ This is not a replacement for adding tests. It is a minimum boot and routing bas
 
 ## 1. Confirm There Is No Runnable Suite
 
-Check for actual test **files**, not just gem presence. `minitest` ships with every Rails app (it is a transitive dependency of `activesupport` in virtually every `Gemfile.lock`), so a gem match alone does not mean a runnable suite exists. Relying on it sends abandoned-test-setup apps back to `workflows/01-run-test-suite-workflow.md`, which finds nothing to run and bounces them right back here, an infinite loop.
+Check for actual test **files**, not just gem presence. `minitest` ships with every Rails app (it is a transitive dependency of `activesupport` in virtually every `Gemfile.lock`), so a gem match alone does not mean a runnable suite exists. Relying on it sends abandoned-test-setup apps back to `workflows/00-run-test-suite-workflow.md`, which finds nothing to run and bounces them right back here, an infinite loop.
 
 ```bash
 # Test file presence (the deciding signal)
@@ -21,7 +21,7 @@ test -d test && find test -name "*_test.rb" | grep -q .
 grep -E "rspec-rails|minitest-rails" Gemfile
 ```
 
-Treat the app as having **no runnable suite** unless at least one test file is found. If test files do exist, return to `workflows/01-run-test-suite-workflow.md` and run the real suite. Use this fallback only when no runnable suite exists.
+Treat the app as having **no runnable suite** unless at least one test file is found. If test files do exist, return to `workflows/00-run-test-suite-workflow.md` and run the real suite. Use this fallback only when no runnable suite exists.
 
 ---
 

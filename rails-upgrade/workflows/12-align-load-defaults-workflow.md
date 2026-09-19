@@ -1,4 +1,4 @@
-# Workflow 11: Align load_defaults
+# Workflow 12: Align load_defaults
 
 **Purpose:** Align `load_defaults` to the new Rails version, one config change at a time, after the version bump is complete.
 

@@ -1,4 +1,4 @@
-# Workflow 12: Mention Cleanup
+# Workflow 13: Mention Cleanup
 
 **Purpose:** Tell the user the cleanup option exists once the upgrade has shipped. Cleanup ends the campaign; between hops the user usually wants to keep dual-boot in place.
 

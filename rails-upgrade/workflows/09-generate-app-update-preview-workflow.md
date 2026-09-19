@@ -1,4 +1,4 @@
-# Workflow 08: Generate app:update Preview
+# Workflow 09: Generate app:update Preview
 
 **Purpose:** Generate a preview of what `rails app:update` will change in configuration files
 
@@ -12,7 +12,7 @@
 - User's current configuration files accessible
 - Version guide available
 - `templates/app-update-preview-template.md`
-- Detection findings (from Workflow 04)
+- Detection findings (from Workflow 05)
 
 ## Outputs
 

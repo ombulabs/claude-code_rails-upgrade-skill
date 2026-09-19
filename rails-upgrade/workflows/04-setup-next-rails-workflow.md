@@ -1,4 +1,4 @@
-# Workflow 02: Set Up next_rails Dual-Boot
+# Workflow 04: Set Up next_rails Dual-Boot
 
 **Purpose:** Set up dual-boot with next_rails early, right after tests pass, so both Rails versions run during the entire transition.
 
@@ -7,7 +7,7 @@
 ## Inputs
 
 - Green test baseline (or accepted partial smoke baseline)
-- Result of the deprecation-behavior sweep from `workflows/01-run-test-suite-workflow.md` Step 2
+- Result of the deprecation-behavior sweep from `workflows/00-run-test-suite-workflow.md` Step 2
 - Hand that result to the delegate skill: its setup workflow opens with a sweep that covers the same ground
 
 ## Outputs

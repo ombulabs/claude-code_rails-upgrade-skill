@@ -1,4 +1,4 @@
-# Workflow 00: Verify Latest Patch
+# Workflow 01: Verify Latest Patch
 
 **Purpose:** Ensure the app is on the latest patch of its current Rails series before any minor/major hop. Patch releases contain security fixes, bug fixes, and additional deprecation warnings. Starting the version hop on the latest patch is safer (the security fixes are already in production) and easier to debug (the new deprecation warnings surface issues that would otherwise show up mid-upgrade).
 
@@ -36,4 +36,4 @@ Read Gemfile.lock to find exact current Rails version (e.g., 3.2.19)
 
 ## Step 4: If current version == latest patch
 
-Proceed to Workflow 01 (`workflows/01-run-test-suite-workflow.md`)
+Proceed to Workflow 00 (`workflows/00-run-test-suite-workflow.md`)
