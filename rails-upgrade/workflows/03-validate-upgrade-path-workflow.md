@@ -28,4 +28,4 @@ Tell the user that Rails upgrades MUST follow a sequential path and that version
 
 ## Step 3: Plan individual hops
 
-List the hops in order (e.g. 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1). For each hop note the Ruby requirement from the supported paths table. For the hop-by-hop plan, milestones and time budget, read `references/multi-hop-strategy-reference.md`, section "Planning a Multi-Hop Upgrade". Workflows 04 to 12 then run once per hop; Workflows 01 and 02 run again at the start of every hop.
+List the hops in order (e.g. 5.2 → 6.0 → 6.1 → 7.0 → 7.1 → 7.2 → 8.0 → 8.1). For each hop note the Ruby requirement from the supported paths table. For the hop-by-hop plan, milestones and time budget, read `references/multi-hop-strategy-reference.md`, section "Planning a Multi-Hop Upgrade". Workflows 04 to 12 then run once per hop; Workflows 00 to 02 run again at the start of every hop.

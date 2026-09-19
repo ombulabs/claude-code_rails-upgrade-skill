@@ -1,8 +1,8 @@
 # Workflow 04: Set Up next_rails Dual-Boot
 
-**Purpose:** Set up dual-boot with next_rails early, right after tests pass, so both Rails versions run during the entire transition.
+**Purpose:** Set up dual-boot with next_rails early, once the current-version deprecations are resolved and the hop is confirmed, so both Rails versions run during the entire transition.
 
-**When to use:** EARLY SETUP, after Workflow 03 has confirmed the hop and the Ruby. Everything from here on runs on both sides of the dual-boot.
+**When to use:** EARLY SETUP, after Workflow 03 has confirmed the hop. Everything from here on runs on both sides of the dual-boot.
 
 ## Inputs
 

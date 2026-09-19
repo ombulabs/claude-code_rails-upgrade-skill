@@ -13,7 +13,7 @@
 
 - Deprecation inventory: every distinct warning the suite emitted on the current version, with count, first location and status (fixed / deferred with reason)
 - Fixes applied on the current version, suite green after them
-- The inventory is handed to Workflow 08 for the report's deprecation section
+- The inventory is handed to Workflow 08: fixed entries go in the report's baseline, deferred entries in the fix-before-bump bucket with their reason
 
 ## Gates (must be true before the next workflow that runs)
 
@@ -30,14 +30,14 @@
 
 ## Step 1: Make sure deprecation warnings are not silenced
 
-Read the Workflow 01 Step 2 sweep result. If anything silences or hides deprecations in the test environment (`config.active_support.deprecation = :silence`, `config.active_support.report_deprecations = false`, an `ActiveSupport::Deprecation.silence` block around suite setup, a `disallowed_warnings` list that swallows them), change the test environment so warnings reach the output:
+Read the Workflow 01 Step 2 sweep result. If anything silences or hides deprecations in the test environment (`config.active_support.deprecation = :silence`, `config.active_support.report_deprecations = false`, an `ActiveSupport::Deprecation.silence` block around suite setup, `config.active_support.disallowed_deprecation = :silence`), change the test environment so warnings reach the output:
 
 ```ruby
 # config/environments/test.rb
 config.active_support.deprecation = :stderr   # or :log if the team reads log/test.log; :raise is stricter
 ```
 
-Prefer the least invasive change that makes warnings visible; do not turn on `:raise` in this step unless the team already uses it, because a raising suite hides every warning after the first. The behavior table and per-version forms are in `references/deprecation-warnings-reference.md`, section "Deprecation Configuration Options".
+Prefer the least invasive change that makes warnings visible. `references/deprecation-warnings-reference.md` recommends `:raise` as the steady state for development and test; for this collection step use `:stderr` (or `:log`) so one suite run lists every warning, because under `:raise` each warning becomes a test failure and an initializer-time warning aborts the run before anything else is seen. Switch to `:raise` after Step 4 if the team wants it. The behavior table and per-version forms are in the reference, section "Deprecation Configuration Options".
 
 ## Step 2: Run the suite and collect the warnings
 
@@ -50,7 +50,7 @@ grep -h "DEPRECATION WARNING" tmp/deprecations.log | sed 's/^.*DEPRECATION WARNI
 
 Record each distinct warning with its count and the first file:line the message names. For apps that will keep a running inventory across the campaign, `next_rails` ships `DeprecationTracker`; the dual-boot skill's `references/deprecation-tracking.md` shows the RSpec and Minitest setup. Optional here, useful from Workflow 04 on.
 
-Also boot the app once outside the suite (`bin/rails runner 'puts Rails.version'`): initializer-time warnings do not always appear in test output.
+Also boot the app once outside the suite, in the environment Step 1 just made visible: `RAILS_ENV=test bin/rails runner 'puts Rails.version' 2>&1 | grep -i deprecat`. Initializer-time warnings do not always appear in test output, and the development environment logs them to `log/development.log` instead of the terminal.
 
 ## Step 3: Triage each warning
 
@@ -63,11 +63,11 @@ The version guide for this hop (`version-guides/upgrade-{FROM}-to-{TO}.md`) says
 
 ## Step 4: Fix the "fix now" pile on the current version
 
-Apply each fix as an unconditional replacement: the current version already accepts the new form, that is what the warning says. No `NextRails.next?` branch, no dual-boot yet. One commit per warning type keeps the review readable. Re-run the affected tests after each fix and the full suite at the end.
+Apply each fix as an unconditional replacement: the current version already accepts the new form, that is what the warning says. No `NextRails.next?` branch, no dual-boot yet. One exception: when the fix is a config setter that the target version removes (Rails 7.0's `legacy_connection_handling = false` raises on 7.1 boot), defer it to Workflow 10, where it goes in as the bump lands, and note it in the inventory. One commit per warning type keeps the review readable. Re-run the affected tests after each fix and the full suite at the end.
 
 ## Step 5: Record the inventory
 
-Write the inventory (fixed / deferred, counts, locations) where Workflow 08 will find it, for example `tmp/deprecation-inventory.md` or the notes location the user prefers. The upgrade report's deprecation section is built from it.
+Write the inventory (fixed / deferred, counts, locations) where Workflow 08 will find it, for example `tmp/deprecation-inventory.md` or the notes location the user prefers. Workflow 08 lists the deferred entries in the fix-before-bump bucket and the fixed ones in the baseline.
 
 ## Self-review checklist
 

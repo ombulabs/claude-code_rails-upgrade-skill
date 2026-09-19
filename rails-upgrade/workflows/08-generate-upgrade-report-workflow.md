@@ -13,7 +13,8 @@
 - Target Rails version is known
 - Version guide available for the upgrade
 - `templates/upgrade-report-template.md`
-- Gem compatibility buckets (from Workflow 06) and boot smoke test report block (from Workflow 07)
+- Deprecation inventory (from Workflow 02): fixed entries for the baseline, deferred entries for the fix-before-bump bucket
+- Gem compatibility buckets (from Workflow 06), boot smoke test report block and models suite result under `Gemfile.next` (from Workflow 07)
 
 ## Outputs
 

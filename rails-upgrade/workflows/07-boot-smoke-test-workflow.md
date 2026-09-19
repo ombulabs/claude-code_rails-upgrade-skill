@@ -17,6 +17,7 @@
 ## Gates (must be true before the next workflow that runs)
 
 - Boot succeeds under `Gemfile.next` (re-run the boot smoke test until it does), or the skip condition in Notes applies (no `Gemfile.next` yet) and the report records that the test was not run
+- Models suite ran under `Gemfile.next`: pass, or every failure recorded in the fix-before-bump bucket
 
 ## Real examples this catches
 
@@ -88,7 +89,7 @@ Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Wor
 
 ### Step 5: Run the models test suite under Gemfile.next
 
-Boot proves the framework loads; the models suite proves the app's own code runs on the target version, with the database, before any report is written:
+If Workflow 04 (or the dual-boot skill it delegated to) already ran the full suite under `Gemfile.next` in this session, record that result here and skip to Output; do not run it a third time. Otherwise: boot proves the framework loads; the models suite proves the app's own code runs on the target version, with the database, before any report is written:
 
 ```bash
 BUNDLE_GEMFILE=Gemfile.next bin/rails test test/models 2>&1 | tee tmp/next-models.log     # Minitest
