@@ -8,7 +8,7 @@ This is not a replacement for adding tests. It is a minimum boot and routing bas
 
 ---
 
-## Step 1: Confirm There Is No Runnable Suite
+## 1. Confirm There Is No Runnable Suite
 
 Check for actual test **files**, not just gem presence. `minitest` ships with every Rails app (it is a transitive dependency of `activesupport` in virtually every `Gemfile.lock`), so a gem match alone does not mean a runnable suite exists. Relying on it sends abandoned-test-setup apps back to `workflows/01-run-test-suite-workflow.md`, which finds nothing to run and bounces them right back here, an infinite loop.
 
@@ -25,7 +25,7 @@ Treat the app as having **no runnable suite** unless at least one test file is f
 
 ---
 
-## Step 2: Run Rails Boot Checks
+## 2. Run Rails Boot Checks
 
 Start with the cheapest command that loads the Rails environment:
 
@@ -43,7 +43,7 @@ Record PASS or FAIL and the exact error. A boot failure blocks the upgrade until
 
 ---
 
-## Step 3: Check Routes And Migrations
+## 3. Check Routes And Migrations
 
 These commands catch common baseline failures without needing a test suite:
 
@@ -58,7 +58,7 @@ If `db:migrate:status` cannot run because the database is unavailable, report it
 
 ---
 
-## Step 4: Run Asset Or Build Checks When Available
+## 4. Run Asset Or Build Checks When Available
 
 Only run commands that already exist in the app:
 
@@ -73,7 +73,7 @@ Pick the app's actual build path from its files (`package.json`, `vite.config.*`
 
 ---
 
-## Step 5: Optional Manual Smoke URLs
+## 5. Optional Manual Smoke URLs
 
 If the app can boot locally, start the server in the background, capture its PID, and **always shut it down afterward** so an orphaned server does not hold port 3000 and cause conflicts in later steps:
 
