@@ -396,52 +396,16 @@ Update `config.load_defaults` to 7.1
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Code Not Reloading in Development
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Cause:** Wrong `enable_reloading` value
-
-**Fix:**
-```ruby
-# config/environments/development.rb
-config.enable_reloading = true  # Not false!
-```
-
-### Issue: SSL Redirect Loop
-
-**Cause:** `force_ssl = true` behind a proxy
-
-**Fix:**
-Configure your proxy to handle SSL, or:
-```ruby
-config.force_ssl = false
-```
-
-### Issue: Constant Not Found in lib/
-
-**Cause:** Naming doesn't match Zeitwerk expectations
-
-**Fix:**
-Ensure `lib/my_file.rb` defines `MyFile`
-
-### Issue: App Crashes on Boot with `legacy_connection_handling` Error
-
-**Cause:** `config.active_record.legacy_connection_handling` is set in a config file but was removed in Rails 7.1
-
-**Fix:**
-Remove the line entirely from all config files:
-```bash
-grep -rn "legacy_connection_handling" config/
-```
-Delete every occurrence found. For dual-boot compatibility:
-```ruby
-if NextRails.next?
-  # Do nothing — removed in 7.1
-else
-  config.active_record.legacy_connection_handling = false
-end
-```
+| Error | See |
+|-------|-----|
+| Code not reloading in development | "cache_classes → enable_reloading" — `enable_reloading = true` in development |
+| SSL redirect loop behind a proxy | "Force SSL Default in Production" — let the proxy handle SSL or set `force_ssl = false` |
+| Constant not found in `lib/` | "lib/ Autoloaded by Default" — `lib/my_file.rb` must define `MyFile` |
+| Boot crashes on `legacy_connection_handling` | "legacy_connection_handling Removed" — delete every occurrence; guard with `NextRails.next?` while dual-booting |
 
 ---
 

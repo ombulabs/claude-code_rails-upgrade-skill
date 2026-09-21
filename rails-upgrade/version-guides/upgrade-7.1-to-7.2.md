@@ -399,32 +399,15 @@ rails app:update
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Jobs Not Processing
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Cause:** Transaction-aware enqueuing waiting for commit
-
-**Fix:**
-Use `after_commit` callback or check transaction is committed
-
-### Issue: Invalid show_exceptions Value
-
-**Error:** `ArgumentError: Invalid show_exceptions value`
-
-**Fix:**
-```ruby
-config.action_dispatch.show_exceptions = :all  # Not true/false
-```
-
-### Issue: Secrets Method Not Found
-
-**Error:** `NoMethodError: undefined method 'secrets'`
-
-**Fix:**
-```ruby
-Rails.application.credentials.key_name
-```
+| Error | See |
+|-------|-----|
+| Jobs enqueued inside a transaction never run | "Transaction-Aware Job Enqueuing" — enqueue from `after_commit`, or make sure the transaction commits |
+| `ArgumentError: Invalid show_exceptions value` | "show_exceptions Requires Symbols" — `:all`, `:rescuable` or `:none`, not `true` / `false` |
+| `NoMethodError: undefined method 'secrets'` | "Rails.application.secrets Removed" — `Rails.application.credentials.key_name` |
 
 ---
 

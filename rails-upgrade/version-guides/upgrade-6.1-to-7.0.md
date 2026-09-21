@@ -434,39 +434,16 @@ config.load_defaults 7.0
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: `ActionView::MissingTemplate` on an action that worked on 6.1
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Cause:** A `template:` / `layout:` string carrying an explicit `.html.erb` extension. 6.1 warned and tolerated it; 7.0 takes the name literally.
-
-**Fix:** Drop the extension. If the render sits in a non-html `respond_to` branch, also pass `formats: [:html]`.
-
-### Issue: Links with method: :delete Don't Work
-
-**Error:** GET request instead of DELETE
-
-**Cause:** Turbo requires button_to or data-turbo-method
-
-**Fix:**
-```erb
-<%= button_to 'Delete', item, method: :delete %>
-```
-
-### Issue: Forms Submit Twice
-
-**Cause:** Both UJS and Turbo handling forms
-
-**Fix:** Remove rails-ujs completely
-
-### Issue: JavaScript Not Loading
-
-**Cause:** Import Maps not configured
-
-**Fix:**
-```erb
-<%= javascript_importmap_tags %>
-```
+| Error | See |
+|-------|-----|
+| `ActionView::MissingTemplate` on an action that worked on 6.1 | "Explicit Format/Handler Extension in `template:` / `layout:`" — drop the `.html.erb` extension, pass `formats: [:html]` in non-html branches |
+| `method: :delete` links send GET | "Rails UJS → Turbo / Stimulus" — `button_to` or `data-turbo-method` |
+| Forms submit twice | "Rails UJS → Turbo / Stimulus" — remove rails-ujs completely |
+| JavaScript not loading | "Webpacker → Import Maps / jsbundling-rails" — `<%= javascript_importmap_tags %>` |
 
 ---
 

@@ -302,34 +302,15 @@ rails app:update
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Database Connection Pool Error
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** `unknown keyword: pool`
-
-**Cause:** Old configuration syntax
-
-**Fix:**
-```yaml
-max_connections: 5  # Not pool: 5
-```
-
-### Issue: SSL Redirect Not Working
-
-**Cause:** SSL config is commented out
-
-**Fix:**
-Uncomment `force_ssl` and `assume_ssl` in production.rb
-
-### Issue: Sidekiq Jobs Not Processing
-
-**Cause:** Using old Sidekiq version without built-in adapter
-
-**Fix:**
-```ruby
-gem 'sidekiq', '>= 6.5'
-```
+| Error | See |
+|-------|-----|
+| `unknown keyword: pool` | "pool: → max_connections:" — `max_connections: 5` |
+| SSL redirect not working in production | "SSL Configuration Commented Out" — uncomment `force_ssl` and `assume_ssl` in `production.rb` |
+| Sidekiq jobs not processing | "Sidekiq Adapter Removed" — `gem 'sidekiq', '>= 6.5'` |
 
 ---
 

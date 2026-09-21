@@ -291,31 +291,15 @@ rails webpacker:install
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Zeitwerk::NameError
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** `expected file app/models/user_profile.rb to define constant UserProfile`
-
-**Cause:** File naming doesn't match class name
-
-**Fix:** Rename file or class to match
-
-### Issue: Circular Dependency
-
-**Error:** `Circular dependency detected`
-
-**Cause:** Two files require each other
-
-**Fix:** Restructure code or use `require` for specific edge cases
-
-### Issue: NameError in Tests
-
-**Error:** `uninitialized constant`
-
-**Cause:** Tests loading before Zeitwerk setup
-
-**Fix:** Ensure `rails_helper` is properly configured
+| Error | See |
+|-------|-----|
+| `Zeitwerk::NameError: expected file ... to define constant ...` | "Zeitwerk Autoloader" — rename the file or the class to match |
+| `Circular dependency detected` | "Zeitwerk Autoloader" — restructure, `require` only for real edge cases |
+| `uninitialized constant` only in tests | "Zeitwerk Autoloader" — run `bin/rails zeitwerk:check`, check `rails_helper` load order |
 
 ---
 

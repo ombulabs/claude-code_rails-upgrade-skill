@@ -507,55 +507,18 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Email delivery broken after upgrade
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** `NoMethodError: undefined method 'deliver' for #<Mail::Message>`
-
-**Cause:** `deliver` was deprecated in 4.2 and removed in later versions
-
-**Fix:** `Mailer.welcome(user).deliver_now` (or `.deliver_later`)
-
-### Issue: `respond_with` raises NoMethodError
-
-**Error:** `undefined method 'respond_with' for ApplicationController`
-
-**Cause:** Extracted to the `responders` gem
-
-**Fix:** `gem 'responders', '~> 2.0'`
-
-### Issue: Transactional callback bugs became silent
-
-**Symptom:** Data inconsistencies that tests don't catch
-
-**Cause:** Rails 4.2 silently suppresses exceptions in `after_commit` / `after_rollback`
-
-**Fix:** `config.active_record.raise_in_transactional_callbacks = true`
-
-### Issue: Can't reach `rails server` from another machine
-
-**Error:** Connection refused or timeout
-
-**Cause:** Rails 4.2 binds to `localhost` by default
-
-**Fix:** `rails server -b 0.0.0.0`
-
-### Issue: JSON serialized attributes with `nil` now save NULL
-
-**Symptom:** Records that used to store `"null"` now store `NULL`
-
-**Cause:** Serialized attribute nil-handling changed
-
-**Fix:** If the coder's nil string was intentional, assign `JSON.generate(nil)` explicitly. Otherwise, `NULL` is the better default.
-
-### Issue: External forms fail CSRF verification
-
-**Symptom:** `InvalidAuthenticityToken` on forms submitted from static pages
-
-**Cause:** CSRF tokens now masked per-request
-
-**Fix:** Fetch a fresh token per request; don't cache
+| Error | See |
+|-------|-----|
+| `NoMethodError: undefined method 'deliver' for #<Mail::Message>` | "ActionMailer `#deliver` / `#deliver!` Deprecated" — `deliver_now` / `deliver_later` |
+| `undefined method 'respond_with' for ApplicationController` | "`respond_with` / Class-Level `respond_to` Extracted" — `gem 'responders', '~> 2.0'` |
+| Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
+| Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
+| Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
 ---
 
