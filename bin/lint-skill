@@ -26,6 +26,9 @@ def err(file, detail)
   $errors << "#{file.sub("#{ROOT}/", "")}: #{detail}"
 end
 
+# CHANGELOG.md lives at the repo root, outside every skill dir, so it is never
+# scanned here. If a per-skill CHANGELOG is ever added back, exclude it: its
+# historical entries cite paths that no longer exist.
 def markdown_files_for(skill_dir)
   Dir.glob(File.join(skill_dir, "**", "*.md")).sort
 end
@@ -37,7 +40,6 @@ PATH_TOKEN = %r{(?:references|workflows|version-guides|templates|examples|detect
 
 SKILLS.each_value do |skill_dir|
   markdown_files_for(skill_dir).each do |f|
-    next if File.basename(f) == "CHANGELOG.md" # historical record — old paths intentionally no longer exist
 
     File.read(f).each_line.with_index(1) do |line, ln|
       next if line.include?(".github/") # e.g. `.github/workflows/ci.yml` — CI config, not a skill path

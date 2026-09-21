@@ -1,10 +1,21 @@
-# CI Sync Workflow
-
-**When to load:** Step 6, immediately before declaring the upgrade complete or opening a PR. Also any time the user reports a red CI build after an upgrade PR is opened.
+# Workflow 11: Sync CI Config
 
 **Purpose:** Verify every CI configuration file in the repo matches the versions declared in the upgraded `Gemfile` / `Gemfile.lock`. CI drift (old Ruby version, old Rails matrix, stale service versions) is a frequent cause of red builds on the upgrade PR and is easy to miss because the local test suite passes.
 
-This workflow is **mandatory**, not a reminder — produce a written CI sync report and do not open the PR until every CI file matches the Gemfile.
+**When to use:** Workflow 10 Step 6 (`workflows/10-implement-and-upgrade-workflow.md`), immediately before declaring the upgrade complete or opening a PR. Also any time the user reports a red CI build after an upgrade PR is opened. This workflow is **mandatory**, not a reminder — produce a written CI sync report and do not open the PR until every CI file matches the Gemfile.
+
+## Inputs
+
+- The upgraded `Gemfile` / `Gemfile.lock`
+- Every CI configuration file in the repo
+
+## Outputs
+
+- CI sync report with a per-file verdict
+
+## Gates (must be true before the next workflow that runs)
+
+- Overall verdict is `OK`. Do not open the PR until every CI file matches the Gemfile.
 
 ---
 
@@ -25,7 +36,7 @@ Use Glob to find every CI configuration file in the repo. Check all of these loc
 If none are found:
 
 - The app may rely on an external CI system (Heroku CI, Render, etc.) that this skill cannot inspect — flag this to the user and stop; the user has to verify CI themselves.
-- The app may have no CI at all. Do **not** create one from scratch as part of the upgrade — the shape of a CI setup depends on the team's deploy pipeline and is out of scope here. Note it in the report (`No CI files found — skipping CI sync`) and continue with the rest of Step 6; do not block the upgrade on it. Adding CI is a separate decision the team should make outside the upgrade flow.
+- The app may have no CI at all. Do **not** create one from scratch as part of the upgrade — the shape of a CI setup depends on the team's deploy pipeline and is out of scope here. Note it in the report (`No CI files found — skipping CI sync`) and continue with the rest of Workflow 10; do not block the upgrade on it. Adding CI is a separate decision the team should make outside the upgrade flow.
 
 ## Step 2: Read the Gemfile baseline
 
@@ -71,7 +82,7 @@ Gemfile baseline: Ruby 3.3.6, Rails 7.2.2, Node 20
 Overall: 1 file needs changes. BLOCKING.
 ```
 
-If the verdict is `DRIFT` for any file, do not mark Step 6 complete. Apply the edits, re-run the diff, and only proceed when the overall verdict is `OK`.
+If the verdict is `DRIFT` for any file, do not mark Workflow 10 complete. Apply the edits, re-run the diff, and only proceed when the overall verdict is `OK`.
 
 ## Step 5: Apply fixes
 
@@ -94,3 +105,14 @@ After fixes, re-run Step 3 and regenerate the report. The report is part of the 
 - Dual-boot set up locally but CI was never extended — the matrix still runs only the current `Gemfile`, so the next-Rails build never runs on PRs and breakages land unnoticed.
 - GitHub Actions cache key pinned to old Rails version, causing phantom "works locally, fails in CI" bundle resolution mismatches.
 - Node engine bumped in `package.json` but CI still using an older Node major — asset compilation fails.
+
+---
+
+## Self-review checklist
+
+Before opening the PR, verify:
+
+- [ ] Every CI file in the repo enumerated (GitHub Actions, CircleCI, Jenkins, GitLab, etc.)
+- [ ] Ruby version, Rails matrix, and service versions diffed against the upgraded Gemfile
+- [ ] CI sync report produced with per-file verdict
+- [ ] All DRIFT entries fixed; overall verdict is OK
