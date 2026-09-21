@@ -50,7 +50,7 @@ Read `version-guides/upgrade-{FROM}-to-{TO}.md`. For each finding take the entry
 
 ## Step 3: Read the affected files
 
-For every file:line in the findings, read the file so the report shows the user's actual code, never a generic example.
+For every file:line in the findings, read the file so the report shows the user's actual code, never a generic example. When the quoted lines hold a secret value (a key, token or password, anything read from `ENV` or from a secrets or credentials file), keep the key name and replace the value with `<redacted>`; the report may be committed or shared.
 
 ## Step 4: Load the template
 
@@ -60,9 +60,9 @@ Read `templates/upgrade-report-template.md`. It is the shape of the report; this
 
 | Template section | Filled from |
 |------------------|-------------|
-| Header, Executive Summary, Baseline, Patterns checked | Step 1 counts; `{TREE_CHANGES}` from Workflow 04 |
+| Header, Executive Summary, Baseline, Patterns checked | Step 1 counts; `{TREE_CHANGES}` from Workflow 04; `{ONE_PARAGRAPH_SUMMARY}` written last, once the buckets are known |
 | 🛑 Fix Before Bump | Workflow 05 `breaking` + `deprecation` findings; Workflow 02 entries deferred to the bump (only those); Workflow 06 required bumps and blockers; Workflow 07 boot bumps, suite failures and every deprecation warning {TO} emitted. One block per entry, `{HOW_FOUND}` says which. HIGH → MEDIUM → LOW. When the cause is an absent line (no `load_defaults` at all), say so in Affected files instead of inventing a file:line |
-| 📅 Fix When Ready | Workflow 05 `migration` + `optional` findings |
+| 📅 Fix When Ready | Workflow 05 `migration` + `optional` findings, plus anything optional found by hand along the way (a Gemfile line the target declares itself, a config key with a better default) with `{HOW_FOUND}` saying so |
 | Deprecation Warnings on {FROM} | Workflow 02 inventory, one row per distinct warning, status as the template's comment lists |
 | Gem Compatibility | Workflow 06 buckets and the check that produced them. With no bumps and no blockers: the one-line summary, no table |
 | Boot and Tests Under `Gemfile.next` | Workflow 07 output block verbatim, plus the count of {TO} deprecation warnings |
@@ -90,7 +90,8 @@ For each finding, check whether the app has code that interacts with the change:
 | `{DATE}` | today | `September 21, 2026` |
 | `{PROJECT_NAME}` | app directory or `config/application.rb` module | `rubymem` |
 | counts | Step 1 | numbers, never estimates |
-| `{HOW_FOUND}` | how the entry was found, in the reader's words | `pattern catalog`, `warning at boot under Gemfile.next` |
+| `{HOW_FOUND}` | how the entry was found, in the reader's words | `pattern catalog`, `warning at boot under Gemfile.next`, `manual review of the 7.1 source` |
+| `{ONE_PARAGRAPH_SUMMARY}` | three or four plain sentences for someone who reads nothing else | see template comment |
 | `{TREE_CHANGES}` | Workflow 04's edits, committed or not | `Gemfile: next_rails and if next? branch; both lockfiles re-resolved. Uncommitted.` |
 | `{GEM_BLOCKER_COUNT}` / `{GEM_BLOCKER_LIST}` | Workflow 06 | `0` / `none` |
 | `{TARGET_DEP_COUNT}` | distinct `DEPRECATION WARNING` lines from the `Gemfile.next` boot and suite | `2` |
@@ -103,7 +104,7 @@ No effort or risk estimates: they are subjective and the repo does not publish t
 
 - [ ] Every placeholder replaced; no `{PLACEHOLDER}` token left
 - [ ] Every 🛑 and 📅 entry traces to a Step 1 input with a real file:line
-- [ ] Code examples are the user's code
+- [ ] Code examples are the user's code, with secret values redacted
 - [ ] Bucket membership follows `kind`, order inside a bucket follows `priority`
 - [ ] Sections for skipped workflows say "not run" and why, rather than guessing
 - [ ] Plan mentions `Gemfile.next`, never `bundle update rails`; `load_defaults` only in its own section after the bump

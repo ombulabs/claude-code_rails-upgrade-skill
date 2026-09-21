@@ -22,9 +22,13 @@
 | Gems: required bumps / blockers / already compatible | {GEM_BUMPS} / {GEM_BLOCKER_COUNT} / {GEM_OK} |
 | Boot under `Gemfile.next` | {BOOT_RESULT} |
 | Test suite under `Gemfile.next` | {NEXT_SUITE_RESULT} |
+<!-- NEXT_SUITE_RESULT names every suite that ran: unit and system for Minitest apps, the spec suite for RSpec -->
 
 **Baseline on {FROM_FULL}:** {TEST_COUNT} tests, {ASSERTION_COUNT} assertions, {FAILURE_COUNT} failures.
 **Patterns checked:** {PATTERNS_CHECKED} for this hop; {PATTERNS_FIRED} matched.
+
+{ONE_PARAGRAPH_SUMMARY}
+<!-- Three or four plain sentences: how big this hop is for this app, where the findings come from, what kind of work remains. Written for someone who reads nothing else. -->
 
 ---
 
@@ -37,7 +41,7 @@ Everything that raises, fails to boot, or warns on {TO} about behavior that chan
 ### {ISSUE_NAME}
 
 **Kind:** `{KIND}` · **Priority:** {PRIORITY} · **Found:** {COUNT} occurrence(s) · **How found:** {HOW_FOUND}
-<!-- HOW_FOUND: "pattern catalog", "warning at boot under Gemfile.next", "warning in the suite under Gemfile.next", "test failure under Gemfile.next", "gem compatibility check", "deferred from the current-version deprecation pass" -->
+<!-- HOW_FOUND: "pattern catalog", "warning at boot under Gemfile.next", "warning in the suite under Gemfile.next", "test failure under Gemfile.next", "gem compatibility check", "deferred from the current-version deprecation pass", "manual review of the version guide or the target Rails source" -->
 
 **Affected files:**
 {FILE_LIST}
@@ -50,7 +54,8 @@ Everything that raises, fails to boot, or warns on {TO} about behavior that chan
 # {FILE_PATH}:{LINE_NUMBER}
 {ACTUAL_CODE}
 ```
-<!-- For an absent line: show the surrounding block and a comment "# nothing here sets <key>" -->
+<!-- For an absent line: show the surrounding block and a comment "# nothing here sets <key>".
+     Redact secret values (keys, tokens, passwords, anything read from ENV or a secrets/credentials file): keep the key name, replace the value with <redacted>. -->
 
 **Change (after):**
 ```ruby
@@ -72,7 +77,7 @@ Everything that raises, fails to boot, or warns on {TO} about behavior that chan
 
 ## 📅 Fix When Ready ({FIX_WHEN_READY_COUNT})
 
-Silent and working on {TO}; recommended, not tied to the bump. Same block shape as above.
+Silent and working on {TO}; recommended, not tied to the bump. Same block shape as above; entries found by hand (a Gemfile line the target no longer needs, a config key with a better default) belong here too.
 
 {FIX_WHEN_READY_BLOCKS}
 <!-- When empty: "None. All {PATTERNS_CHECKED} patterns for this hop were searched." -->
@@ -96,8 +101,8 @@ Check used: {GEM_CHECK_USED}.
 <!-- "next_rails bundle_report compatibility", "railsbump", or "not run: <reason>" -->
 
 {GEM_SUMMARY}
-<!-- When nothing changes: "All {GEM_OK} direct gems already declare support for {TO}." and no table.
-     Otherwise the table below, one row per gem that needs a bump or has no compatible release. -->
+<!-- When nothing changes: "All {GEM_OK} direct gems already declare support for {TO}. Blockers: none." and omit the table below entirely, header included.
+     Otherwise keep the table, one row per gem that needs a bump or has no compatible release. -->
 
 | Gem | Locked | Needed for {TO} | Bucket |
 |-----|--------|-----------------|--------|
