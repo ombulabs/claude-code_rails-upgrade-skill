@@ -1,0 +1,26 @@
+# Fixture expectations for rails-41-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-41-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not — a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-41-patterns.yml
+
+CACHE_DIGESTS_BACKPORT:
+  match:
+    - "gem 'cache_digests'"
+    - "  gem \"cache_digests\", \"~> 0.3.1\""
+    - "    CacheDigests::TemplateDigestor.digest(name, :html, lookup_context)"
+    - "  CacheDigests.cache = ActiveSupport::Cache::MemoryStore.new"
+  no_match:
+    - "gem 'cache_digest'"
+    - "# gem 'cache_digests'"
+    - "gem 'cache_digests' unless NextRails.next?"
+    - "  ActionView::Digestor.digest(name: name, finder: lookup_context)"
+    - "  config.action_view.cache_template_loading = true"
+    - "  <% cache [@post, 'v3'] do %>"

@@ -162,9 +162,54 @@ profile.preferences["theme"]
 
 ---
 
+#### 5. `cache_digests` Gem Collides with Core Cache Digests
+
+**What Changed:**
+Rails 4.1 ships cache digests in core as `ActionView::Digestor`. The `cache_digests` gem that backported them to 4.0 does not merely go unused, it **collides**. actionview's `action_view/tasks/dependencies.rake` declares `class CacheDigests` inside a `namespace :cache_digests do` block, and a Rake namespace does not scope Ruby constants, so that defines top-level `::CacheDigests`. The gem defines `module CacheDigests`. Class against module on one constant raises while Rails loads its rake tasks:
+
+```
+rake aborted!
+TypeError: CacheDigests is not a class
+actionview-4.1.16/lib/action_view/tasks/dependencies.rake:14
+```
+
+The blast radius is the whole rake surface, not one task: every `rake` invocation dies before running, so asset precompile, db tasks, and any CI step that shells out to rake fail together. It does **not** reproduce under `rails runner` or the test suite, because neither loads rake tasks. A boot smoke test and a green suite can both pass while CI is entirely red.
+
+**Detection Pattern:**
+```ruby
+# Gemfile
+gem 'cache_digests'
+
+# anywhere in app/ lib/ config/
+CacheDigests::TemplateDigestor.digest(...)
+CacheDigests.cache = ...
+```
+
+**Fix:**
+```ruby
+# Gemfile — gate it out of the 4.1 bundle; do not delete it while the current
+# bundle is still 4.0 and depends on it
+gem 'cache_digests' unless NextRails.next?
+```
+
+Then confirm nothing first-party reaches the gem's API, because core's is not call-compatible:
+
+| `cache_digests` gem | Rails 4.1 core |
+|---|---|
+| `CacheDigests::TemplateDigestor.digest(name, format, finder, options)` (positional) | `ActionView::Digestor.digest(name:, finder:, dependencies:, partial:)` (single options hash) |
+| `cache_prefix`, swappable `cache` accessor | gone — fixed `ThreadSafe::Cache` under a monitor, stored only when `Resolver.caching?` |
+| `cache ['v3', @post]` explicitly-versioned key | gone — only `skip_digest: true` remains |
+| `view_cache_dependency` | unchanged, in `ActionView::Helpers::CacheHelper` |
+
+Core's ERB dependency tracker also detects **more** dependencies than the gem's (it parses `layout:` keys and method chains), so fragment digests can move. That is a cold fragment cache on the first deploy, not an error. An app with no `cache` call in any view has nothing to verify here.
+
+Delete the gem outright once the current Rails is 4.1.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
-#### 5. MultiJSON Removed from Rails
+#### 6. MultiJSON Removed from Rails
 
 **What Changed:**
 Rails 4.1 no longer depends on [`MultiJSON`](https://github.com/intridea/multi_json). Apps that reference `MultiJSON` directly will raise `NameError` once the transitive dependency goes away.
@@ -196,7 +241,7 @@ JSON.parse(str)
 
 ---
 
-#### 6. Cookies Serializer Opt-In (Marshal → JSON / Hybrid)
+#### 7. Cookies Serializer Opt-In (Marshal → JSON / Hybrid)
 
 **What Changed:**
 Apps created before 4.1 keep `Marshal` as the signed/encrypted cookie serializer. Rails 4.1 introduces a JSON serializer and a `:hybrid` mode that reads legacy Marshal cookies and writes new JSON ones — but the default is still `Marshal` unless you opt in.
@@ -215,7 +260,7 @@ Once all live cookies have rotated, switch to `:json` for the leaner path. Note 
 
 ---
 
-#### 7. `default_scope` Chains with Other Scopes
+#### 8. `default_scope` Chains with Other Scopes
 
 **What Changed:**
 In Rails 4.1, `default_scope` conditions are now combined (ANDed) with subsequent scopes instead of being overridden by them. Scopes that intentionally contradicted the default scope now produce zero rows.
@@ -244,7 +289,7 @@ See [this commit](https://github.com/rails/rails/commit/f950b2699f97749ef706c693
 
 ---
 
-#### 8. `ActiveRecord::Relation` Mutator Methods Removed
+#### 9. `ActiveRecord::Relation` Mutator Methods Removed
 
 **What Changed:**
 `#map!`, `#delete_if`, `#compact!`, and other mutator methods are no longer delegated from `Relation` to the underlying array. Call `#to_a` first.
@@ -268,7 +313,7 @@ projects.compact!
 
 ---
 
-#### 9. CSRF Protection Now Covers GET with JS Responses
+#### 10. CSRF Protection Now Covers GET with JS Responses
 
 **What Changed:**
 GET requests with JS responses now enforce CSRF. Test helpers that issue `get` / `post :create, format: :js` must switch to `xhr` so Rails treats the request as XHR.
@@ -296,7 +341,7 @@ See [rails/rails#13345](https://github.com/rails/rails/pull/13345).
 
 ---
 
-#### 10. Flash Message Keys Are Strings
+#### 11. Flash Message Keys Are Strings
 
 **What Changed:**
 Keys in `flash.to_hash` are now strings, not symbols. Code that filters the hash with symbol keys silently no-ops.
@@ -320,7 +365,7 @@ Direct access with either symbol or string still works — the break is specific
 
 ---
 
-#### 11. I18n Enforces Available Locales
+#### 12. I18n Enforces Available Locales
 
 **What Changed:**
 `config.i18n.enforce_available_locales` defaults to `true` in 4.1. Any locale that is not in `I18n.available_locales` raises `I18n::InvalidLocale`. Apps that accepted user-supplied locale parameters without validation will raise on previously-accepted input.
@@ -345,7 +390,7 @@ config.i18n.enforce_available_locales = false
 
 ---
 
-#### 12. `as_json` Millisecond Precision for Time/DateTime/TWZ
+#### 13. `as_json` Millisecond Precision for Time/DateTime/TWZ
 
 **What Changed:**
 `Time`, `DateTime`, and `ActiveSupport::TimeWithZone` serialize to JSON with millisecond precision by default (`2024-01-01T00:00:00.000Z` instead of `2024-01-01T00:00:00Z`). API clients that parse the timestamp as a fixed-length string or match it against a regex break.
@@ -366,7 +411,7 @@ Or update consumers to accept fractional seconds.
 
 ### 🟢 LOW PRIORITY
 
-#### 13. Spring Preloader (New Default)
+#### 14. Spring Preloader (New Default)
 
 **What Changed:**
 New 4.1 apps generate a `Gemfile` with `gem 'spring'` in `:development`, and a `bin/spring` binstub. Spring keeps the Rails environment in memory between commands.
@@ -382,7 +427,7 @@ Run `bundle exec spring binstub --all` to generate Spring-aware binstubs (`bin/r
 
 ---
 
-#### 14. `secrets.yml` (New)
+#### 15. `secrets.yml` (New)
 
 **What Changed:**
 Rails 4.1 introduces `config/secrets.yml` as the recommended home for `secret_key_base` and other app secrets, accessible via `Rails.application.secrets`.
@@ -401,7 +446,7 @@ Migrate reads from `Rails.application.config.secret_key_base` or custom initiali
 
 ---
 
-#### 15. `render :text` Soft-Deprecated
+#### 16. `render :text` Soft-Deprecated
 
 **What Changed:**
 `render :text` was a security-adjacent footgun — it sent `text/html`, so any string with markup would be interpreted by the browser. 4.1 introduces `render :plain`, `render :html`, and `render :body` as precise replacements, and signals that `:text` will be deprecated in a future release.
@@ -424,7 +469,7 @@ render body: "raw"           # no Content-Type header
 
 ---
 
-#### 16. JSON Encoder: Removed Features
+#### 17. JSON Encoder: Removed Features
 
 **What Changed:**
 The 4.1 JSON encoder rewrite drops three features from `as_json` / `to_json`:
@@ -452,7 +497,7 @@ Or migrate `encode_json` implementations into `as_json`, and update clients to p
 
 ---
 
-#### 17. JSON Gem Isolated from Rails Encoder
+#### 18. JSON Gem Isolated from Rails Encoder
 
 **What Changed:**
 `JSON.generate` / `JSON.dump` no longer consult Rails' `as_json`. They serialize arbitrary Ruby objects the way the stdlib `json` gem wants — which differs significantly. Use `obj.to_json` when you want Rails semantics.
@@ -476,7 +521,7 @@ JSON.generate(obj.as_json)
 
 ---
 
-#### 18. Fixtures ERB Evaluated in a Separate Context
+#### 19. Fixtures ERB Evaluated in a Separate Context
 
 **What Changed:**
 Each fixture's ERB template now runs in its own isolated context. Helper methods defined in one fixture (`<% def my_helper; end %>`) are no longer visible from another fixture.
@@ -499,7 +544,7 @@ ActiveRecord::FixtureSet.context_class.send :include, FixtureFileHelpers
 
 ---
 
-#### 19. `ActiveSupport::Callbacks.set_callback` Around-Block Signature
+#### 20. `ActiveSupport::Callbacks.set_callback` Around-Block Signature
 
 **What Changed:**
 The around-callback lambda signature changed from `&block` (yield-style) to a positional `block` argument.
@@ -522,7 +567,7 @@ Rare — only affects apps that build callbacks dynamically with `set_callback`.
 
 ---
 
-#### 20. `ActiveRecord::Migration.check_pending!` Now Redundant in Test Helper
+#### 21. `ActiveRecord::Migration.check_pending!` Now Redundant in Test Helper
 
 **What Changed:**
 `require 'test_help'` now runs pending-migration checks automatically. Explicit calls to `ActiveRecord::Migration.check_pending!` in `test_helper.rb` / `rails_helper.rb` are harmless but unnecessary.
@@ -593,6 +638,9 @@ gem 'rails', '~> 4.1.16'  # pin to the last 4.1 patch
 # Only if you depend on removed JSON encoder features
 # gem 'activesupport-json_encoder'
 
+# Required if present: collides with core's ::CacheDigests and aborts every rake task
+gem 'cache_digests' unless NextRails.next?
+
 group :development do
   gem 'spring'
 end
@@ -623,9 +671,11 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 11. Replace `render :text` with `:plain` / `:html` / `:body`.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
+14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 
 ### Phase 6: Testing
 - Run full test suite.
+- Run `bin/rake -T` — it loads every rake task and catches constant collisions the suite and a boot smoke test both miss.
 - Exercise controller specs that hit JS endpoints.
 - Exercise models with `default_scope` and `after_*` callbacks.
 - Verify flash-based UI and any cookie-backed session flows.
@@ -676,6 +726,12 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 **Cause:** `enforce_available_locales` is now `true` by default.
 
 **Fix:** Add the locale to `config.i18n.available_locales`, or disable enforcement if you have a strong reason.
+
+### Issue: Every `rake` task aborts with `TypeError: CacheDigests is not a class`
+
+**Cause:** The `cache_digests` backport gem is still in the 4.1 bundle and collides with the top-level `::CacheDigests` that actionview's `dependencies.rake` defines.
+
+**Fix:** `gem 'cache_digests' unless NextRails.next?` in the Gemfile, then migrate any direct `CacheDigests::*` calls to `ActionView::Digestor`.
 
 ### Issue: API clients fail to parse `2024-01-01T00:00:00.000Z`
 
