@@ -260,6 +260,9 @@ rails solid_queue:install
 
 # Config
 config.active_job.queue_adapter = :solid_queue
+
+# Start the supervisor; without it jobs stay pending
+bin/jobs
 ```
 
 ---
@@ -419,46 +422,15 @@ config.assume_ssl = true
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Assets Not Loading
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** 404 for CSS/JS files
-
-**Cause:** Asset pipeline misconfigured
-
-**Fix for Propshaft:**
-```ruby
-# No config needed - just place files in app/assets/
-```
-
-**Fix for Sprockets:**
-```ruby
-# Ensure sprockets-rails is in Gemfile
-gem 'sprockets-rails'
-```
-
-### Issue: SSL Redirect Loop
-
-**Error:** ERR_TOO_MANY_REDIRECTS
-
-**Cause:** Missing assume_ssl behind proxy
-
-**Fix:**
-```ruby
-config.assume_ssl = true
-```
-
-### Issue: Solid Queue Jobs Not Processing
-
-**Error:** Jobs stuck in pending
-
-**Cause:** Solid Queue supervisor not running
-
-**Fix:**
-```bash
-bin/jobs  # Start job processor
-```
+| Error | See |
+|-------|-----|
+| 404 for CSS / JS files | "Sprockets → Propshaft" — Propshaft needs no config, files go in `app/assets/`; Sprockets needs `gem 'sprockets-rails'` |
+| `ERR_TOO_MANY_REDIRECTS` | "assume_ssl Configuration" — `config.assume_ssl = true` behind a proxy |
+| Solid Queue jobs stuck in pending | "Solid Queue (Optional)" — start the supervisor, `bin/jobs` |
 
 ---
 

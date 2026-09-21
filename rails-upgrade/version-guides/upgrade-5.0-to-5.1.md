@@ -124,7 +124,7 @@ redirect_back(fallback_location: root_path)
 redirect_back(fallback_location: root_path, notice: 'Done!')
 ```
 
-`redirect_back` accepts a `fallback_location:` used when `HTTP_REFERER` is missing — without it, requests with no referer raise `ActionController::RedirectBackError`.
+`redirect_back` requires the `fallback_location:` keyword: it is used when `HTTP_REFERER` is missing, and omitting it raises `ArgumentError: missing keyword: :fallback_location` on every request. `ActionController::RedirectBackError` is the Rails 5.0 `redirect_to :back` symptom, not a `redirect_back` one.
 
 ---
 
@@ -269,42 +269,15 @@ config.load_defaults 5.1
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: ActionView::Template::Error with render
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** `Unknown keyword: text`
-
-**Cause:** `render text:` no longer supported
-
-**Fix:**
-```ruby
-render plain: 'content'
-```
-
-### Issue: `redirect_to :back` raises after the upgrade
-
-**Cause:** `redirect_to :back` was deprecated in Rails 5.0 and **removed** in Rails 5.1. Callers raise at runtime.
-
-**Fix:** Replace every call site with `redirect_back(fallback_location: ...)`:
-```ruby
-# BEFORE (5.0 — raises on 5.1)
-redirect_to :back
-
-# AFTER
-redirect_back(fallback_location: root_path)
-```
-
-### Issue: `redirect_back` itself raises on a request with no referer
-
-**Error:** `ActionController::RedirectBackError` (or `ActionController::ActionControllerError` on newer versions)
-
-**Cause:** `redirect_back` still needs a fallback when `HTTP_REFERER` is missing (direct navigation, bookmarked POSTs, some crawlers).
-
-**Fix:** Always pass `fallback_location:`:
-```ruby
-redirect_back(fallback_location: root_path)
-```
+| Error | See |
+|-------|-----|
+| `ActionView::Template::Error: Unknown keyword: text` | "render :text Removed" — `render plain:` |
+| `redirect_to :back` raises | "redirect_to :back Removed" — `redirect_back(fallback_location: ...)` |
+| `ArgumentError: missing keyword: :fallback_location` | "redirect_to :back Removed" — `redirect_back` requires `fallback_location:` |
 
 ---
 

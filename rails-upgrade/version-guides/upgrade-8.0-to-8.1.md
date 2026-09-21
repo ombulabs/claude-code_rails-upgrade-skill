@@ -52,7 +52,7 @@ If using Kamal:
 #### pool: → max_connections:
 
 **What Changed:**
-Database configuration renames `pool:` to `max_connections:`.
+Database configuration renames `pool:` to `max_connections:`. `pool:` stays as a deprecated alias in 8.1 (warning, not an error); setting both keys to different values raises `Ambiguous configuration`.
 
 **Detection Pattern:**
 ```yaml
@@ -148,10 +148,10 @@ gem 'sidekiq', '< 6.5'
 ```
 
 **Fix:**
-Update Sidekiq to 6.5+ which includes its own adapter:
+Update Sidekiq to 7.3.3+, the first release that ships its own Active Job adapter:
 ```ruby
 # Gemfile
-gem 'sidekiq', '>= 6.5'
+gem 'sidekiq', '>= 7.3.3'
 ```
 
 ---
@@ -251,7 +251,7 @@ gem 'rails', '~> 8.1.0'
 gem 'bundler-audit', group: :development
 
 # Update job adapters if using
-gem 'sidekiq', '>= 6.5'  # If using Sidekiq
+gem 'sidekiq', '>= 7.3.3'  # If using Sidekiq
 ```
 
 ```bash
@@ -302,34 +302,15 @@ rails app:update
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Database Connection Pool Error
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** `unknown keyword: pool`
-
-**Cause:** Old configuration syntax
-
-**Fix:**
-```yaml
-max_connections: 5  # Not pool: 5
-```
-
-### Issue: SSL Redirect Not Working
-
-**Cause:** SSL config is commented out
-
-**Fix:**
-Uncomment `force_ssl` and `assume_ssl` in production.rb
-
-### Issue: Sidekiq Jobs Not Processing
-
-**Cause:** Using old Sidekiq version without built-in adapter
-
-**Fix:**
-```ruby
-gem 'sidekiq', '>= 6.5'
-```
+| Error | See |
+|-------|-----|
+| Deprecation warning for `pool:` in `database.yml`, or `Ambiguous configuration: 'pool' ... and 'max_connections'` | "pool: → max_connections:" — `max_connections: 5`, drop `pool:` |
+| SSL redirect not working in production | "SSL Configuration Commented Out" — uncomment `force_ssl` and `assume_ssl` in `production.rb` |
+| Sidekiq jobs not processing | "Sidekiq Adapter Removed" — `gem 'sidekiq', '>= 7.3.3'` |
 
 ---
 

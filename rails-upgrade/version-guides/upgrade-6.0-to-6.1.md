@@ -260,38 +260,15 @@ config.load_defaults 6.1
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Content-Type Mismatch in API Responses
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** Client receives `text/html` instead of `application/json`
-
-**Cause:** `respond_to#any` Content-Type change
-
-**Fix:**
-```ruby
-format.json { render json: @data }
-```
-
-### Issue: SSL Redirect Loops with POST Requests
-
-**Cause:** 308 status code preserves method, may confuse some proxies
-
-**Fix:**
-```ruby
-config.ssl_options = { redirect: { status: 301 } }
-```
-
-### Issue: Errors Behave Differently
-
-**Error:** `NoMethodError: undefined method 'include?' for #<ActiveModel::Error>`
-
-**Cause:** Errors are now objects, not strings
-
-**Fix:**
-```ruby
-user.errors.where(:email).map(&:message)
-```
+| Error | See |
+|-------|-----|
+| API client receives `text/html` instead of `application/json` | "respond_to#any Content-Type Change" — `format.json { render json: ... }` |
+| SSL redirect loops on POST requests | "HTTPS Redirects Use 308 Status" — `config.ssl_options = { redirect: { status: 301 } }` if the proxy cannot handle 308 |
+| `NoMethodError: undefined method 'include?' for #<ActiveModel::Error>` | "ActiveModel::Errors API Change" — `errors.where(:email).map(&:message)` |
 
 ---
 

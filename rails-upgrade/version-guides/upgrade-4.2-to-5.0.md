@@ -361,38 +361,15 @@ For each model with `belongs_to`:
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Validation Failed - Association Must Exist
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** `Author must exist`
-
-**Cause:** `belongs_to` is now required by default
-
-**Fix:**
-```ruby
-belongs_to :author, optional: true
-```
-
-### Issue: ForbiddenAttributesError
-
-**Error:** `ActiveModel::ForbiddenAttributesError`
-
-**Cause:** Using params directly without permit
-
-**Fix:**
-```ruby
-User.new(user_params)  # Use permitted params
-```
-
-### Issue: Callback Doesn't Stop Save
-
-**Cause:** Returning `false` doesn't halt anymore
-
-**Fix:**
-```ruby
-throw :abort  # Instead of return false
-```
+| Error | See |
+|-------|-----|
+| `Author must exist` validation failure | "belongs_to Required by Default" — `optional: true` where the association is optional |
+| `ActiveModel::ForbiddenAttributesError` | "Strong Parameters Required" — pass permitted params |
+| Callback returning `false` no longer stops the save | "Callback Halting Changed" — `throw :abort` |
 
 ---
 

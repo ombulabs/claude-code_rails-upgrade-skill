@@ -633,55 +633,20 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: App fails with `NameError: uninitialized constant MultiJSON`
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Cause:** MultiJSON no longer pulled in by Rails.
-
-**Fix:** Add `gem 'multi_json'` to the Gemfile, or migrate to `to_json` / `JSON.parse`.
-
-### Issue: `NoMethodError: undefined method 'find_all_by_email'`
-
-**Cause:** Dynamic finders removed.
-
-**Fix:** Rewrite as `where(email: email)` or add `gem 'activerecord-deprecated_finders'` temporarily.
-
-### Issue: Query returns zero rows after upgrade
-
-**Cause:** A scope intended to override `default_scope` is now ANDed with it.
-
-**Fix:** Use `unscope(where: :col)` or `rewhere(col: ...)`.
-
-### Issue: Controller tests raise `ActionController::InvalidAuthenticityToken` on JS endpoints
-
-**Cause:** CSRF now applies to GET + JS.
-
-**Fix:** Use `xhr :verb, :action, ...` instead of `verb :action, format: :js`.
-
-### Issue: `flash.to_hash.except(:notice)` silently keeps `:notice`
-
-**Cause:** Flash keys are strings now.
-
-**Fix:** Use `"notice"` instead of `:notice`.
-
-### Issue: `profile.preferences[:theme]` returns `nil` after upgrade
-
-**Cause:** PG `json` / `hstore` columns return string-keyed `Hash`, not `HashWithIndifferentAccess`.
-
-**Fix:** Index with string keys (`profile.preferences["theme"]`) or use the `store_accessor`-generated method.
-
-### Issue: `I18n::InvalidLocale` raised by a request that worked on 4.0
-
-**Cause:** `enforce_available_locales` is now `true` by default.
-
-**Fix:** Add the locale to `config.i18n.available_locales`, or disable enforcement if you have a strong reason.
-
-### Issue: API clients fail to parse `2024-01-01T00:00:00.000Z`
-
-**Cause:** JSON millisecond precision is on by default.
-
-**Fix:** `ActiveSupport::JSON::Encoding.time_precision = 0`, or update consumers.
+| Error | See |
+|-------|-----|
+| `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
+| `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
+| Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
+| `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
+| `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |
+| `profile.preferences[:theme]` returns `nil` | "PostgreSQL `json` / `hstore` / `array` Columns Return String-Keyed Data" — index with string keys or `store_accessor` |
+| `I18n::InvalidLocale` on a request that worked on 4.0 | "I18n Enforces Available Locales" — add the locale to `config.i18n.available_locales` |
+| API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
 
 ---
 

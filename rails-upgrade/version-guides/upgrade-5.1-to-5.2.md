@@ -306,34 +306,15 @@ config.load_defaults 5.2
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Dirty Tracking Returns False After Save
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** `attribute_changed?` returns `false` after save
-
-**Cause:** Behavior change in Rails 5.2
-
-**Fix:**
-```ruby
-user.saved_change_to_name?  # Use this after save
-```
-
-### Issue: CSRF Token Invalid
-
-**Error:** `ActionController::InvalidAuthenticityToken`
-
-**Cause:** per_form_csrf_tokens now default
-
-**Fix:**
-Ensure forms include fresh CSRF token, or disable feature.
-
-### Issue: Cookies Reset After Upgrade
-
-**Cause:** Cookie encryption format changed
-
-**Fix:**
-Expected behavior. Users need to re-authenticate once.
+| Error | See |
+|-------|-----|
+| `attribute_changed?` returns `false` after save | "Active Record attribute_changed? Behavior" — `saved_change_to_attribute?` |
+| `ActionController::InvalidAuthenticityToken` on forms that worked on 5.1 | "per_form_csrf_tokens Default Changed" — fresh token per form, or disable the feature |
+| Users logged out once after deploy | "Cookie Expiry Format Changed" — expected, one re-authentication |
 
 ---
 
