@@ -13,6 +13,7 @@
 - Boot smoke test report block (PASS / FAIL with N gem bumps required), merged into Workflow 08's Comprehensive Upgrade Report
 - Any gem bump added to the fix-before-bump bucket
 - Models suite result under `Gemfile.next`: pass, or the list of failing tests added to the fix-before-bump bucket for Workflow 08
+- Every distinct `DEPRECATION WARNING` line the target version emitted at boot or during the suite, each added to the fix-before-bump bucket. On the hops the QA runs covered, this was where the real findings came from
 
 ## Gates (must be true before the next workflow that runs)
 
@@ -36,7 +37,7 @@ Anything that loads `config/application.rb` is sufficient. Cheapest options firs
 
 ```bash
 # Cheapest: just boot the framework
-BUNDLE_GEMFILE=Gemfile.next bundle exec rails runner "puts Rails.version"
+DISABLE_SPRING=1 BUNDLE_GEMFILE=Gemfile.next bundle exec rails runner "puts Rails.version"
 
 # Slightly heavier: load the test environment without running specs
 BUNDLE_GEMFILE=Gemfile.next bundle exec rspec --dry-run
@@ -92,11 +93,12 @@ Repeat steps 1–3 until boot succeeds under `Gemfile.next`. Then proceed to Wor
 If Workflow 04 (or the dual-boot skill it delegated to) already ran the full suite under `Gemfile.next` in this session, record that result here and skip to Output; do not run it a third time. Otherwise: boot proves the framework loads; the models suite proves the app's own code runs on the target version, with the database, before any report is written:
 
 ```bash
-BUNDLE_GEMFILE=Gemfile.next bin/rails test test/models 2>&1 | tee tmp/next-models.log     # Minitest
-BUNDLE_GEMFILE=Gemfile.next bundle exec rspec spec/models 2>&1 | tee tmp/next-models.log   # RSpec
+DISABLE_SPRING=1 BUNDLE_GEMFILE=Gemfile.next bin/rails test test/models 2>&1 | tee tmp/next-models.log     # Minitest
+DISABLE_SPRING=1 BUNDLE_GEMFILE=Gemfile.next bundle exec rspec spec/models 2>&1 | tee tmp/next-models.log   # RSpec
+grep -h "DEPRECATION WARNING" tmp/next-models.log | sed 's/^.*DEPRECATION WARNING: //' | sort | uniq -c
 ```
 
-Models first because it is the slice with the most framework surface (Active Record, validations, callbacks) and the least environment surface (no browser, no assets). If it is fast enough, run the full suite instead. Every failure goes into the fix-before-bump bucket with its file:line, so Workflow 08's report lists it and Workflow 10 fixes it. Do not fix anything here; the user has not seen the report yet.
+Models first because it is the slice with the most framework surface (Active Record, validations, callbacks) and the least environment surface (no browser, no assets). If it is fast enough, run the full suite instead. Every failure goes into the fix-before-bump bucket with its file:line, and so does every distinct deprecation warning the target version printed (the grep above): a warning on {TO} is a break on {TO}+1. Workflow 08's report lists them and Workflow 10 fixes them. Do not fix anything here; the user has not seen the report yet. `DISABLE_SPRING=1` matters: a warm Spring server can answer from the other Rails version.
 
 ## Output
 
