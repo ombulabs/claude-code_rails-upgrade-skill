@@ -13,7 +13,7 @@
 
 - Deprecation inventory: every distinct warning the suite emitted on the current version, with count, first location and status (fixed / deferred with reason)
 - Fixes applied on the current version, suite green after them
-- The inventory is handed to Workflow 08: fixed entries go in the report's baseline, deferred entries in the fix-before-bump bucket with their reason
+- The inventory is handed to Workflow 08: fixed entries go in the report's baseline; entries deferred to the bump (setter removed on the target) go in the fix-before-bump bucket; entries deferred to a later hop or owned by a gem stay in the report's inventory table with that status
 
 ## Gates (must be true before the next workflow that runs)
 
@@ -67,7 +67,7 @@ Apply each fix as an unconditional replacement: the current version already acce
 
 ## Step 5: Record the inventory
 
-Write the inventory (fixed / deferred, counts, locations) where Workflow 08 will find it, for example `tmp/deprecation-inventory.md` or the notes location the user prefers. Workflow 08 lists the deferred entries in the fix-before-bump bucket and the fixed ones in the baseline.
+Write the inventory (fixed / deferred, counts, locations) where Workflow 08 will find it, for example `tmp/deprecation-inventory.md` or the notes location the user prefers. Workflow 08 lists fixed entries in the baseline, the ones deferred to the bump in the fix-before-bump bucket, and the rest in the inventory table with their status.
 
 ## Self-review checklist
 

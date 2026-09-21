@@ -2,192 +2,187 @@
 
 **Generated:** {DATE}
 **Project:** {PROJECT_NAME}
-**Current Version:** {FROM}
-**Target Version:** {TO}
+**Current version:** {FROM_FULL}, latest patch of its series
+**Target version:** {TO_FULL}
+**Dual-boot:** `Gemfile.next` resolves {TO_FULL}; the default `Gemfile` stays on {FROM_FULL} until the pin changes (see the plan)
+
+**Changes made while producing this report:** {TREE_CHANGES}
+<!-- e.g. "Gemfile: next_rails gem and if next? branch added; Gemfile.lock and Gemfile.next.lock re-resolved. Uncommitted." or "none" -->
 
 ---
 
 ## Executive Summary
 
-| Metric | Value |
-|--------|-------|
-| Total Issues Found | {TOTAL_COUNT} |
-| High Priority | {HIGH_COUNT} |
-| Medium Priority | {MEDIUM_COUNT} |
-| Low Priority | {LOW_COUNT} |
-| Estimated Effort | {EFFORT} |
-| Risk Level | {RISK_LEVEL} |
+| | Count |
+|--|-------|
+| 🛑 Fix before bump | {FIX_BEFORE_COUNT} |
+| 📅 Fix when ready | {FIX_WHEN_READY_COUNT} |
+| Deprecation warnings on {FROM}: fixed / deferred | {DEP_FIXED} / {DEP_DEFERRED} |
+| Deprecation warnings emitted by {TO} at boot or in the suite | {TARGET_DEP_COUNT} |
+| Gems: required bumps / blockers / already compatible | {GEM_BUMPS} / {GEM_BLOCKER_COUNT} / {GEM_OK} |
+| Boot under `Gemfile.next` | {BOOT_RESULT} |
+| Test suite under `Gemfile.next` | {NEXT_SUITE_RESULT} |
+<!-- NEXT_SUITE_RESULT names every suite that ran: unit and system for Minitest apps, the spec suite for RSpec -->
+
+**Baseline on {FROM_FULL}:** {TEST_COUNT} tests, {ASSERTION_COUNT} assertions, {FAILURE_COUNT} failures.
+**Patterns checked:** {PATTERNS_CHECKED} for this hop; {PATTERNS_FIRED} matched.
+
+{ONE_PARAGRAPH_SUMMARY}
+<!-- Three or four plain sentences: how big this hop is for this app, where the findings come from, what kind of work remains. Written for someone who reads nothing else. -->
 
 ---
 
-## Breaking Changes Analysis
+## 🛑 Fix Before Bump ({FIX_BEFORE_COUNT})
 
-<!-- Repeat this section for each issue found -->
+Everything that raises, fails to boot, or warns on {TO} about behavior that changes there. All of it lands before the default `Gemfile` moves to {TO}. Ordered HIGH → MEDIUM → LOW. Sources: the pattern catalog, the deprecation warnings {TO} emitted at boot or in the suite, the gem bumps the boot check needed, the test failures under `Gemfile.next`, and the current-version fixes deferred because their setter is removed on {TO}.
 
-### 🔴 {ISSUE_NAME}
+<!-- Repeat this block for each finding -->
 
-**Priority:** {PRIORITY}
-**Found:** {COUNT} occurrence(s)
-**Affected Files:**
+### {ISSUE_NAME}
+
+**Kind:** `{KIND}` · **Priority:** {PRIORITY} · **Found:** {COUNT} occurrence(s) · **How found:** {HOW_FOUND}
+<!-- HOW_FOUND: "pattern catalog", "warning at boot under Gemfile.next", "warning in the suite under Gemfile.next", "test failure under Gemfile.next", "gem compatibility check", "deferred from the current-version deprecation pass", "manual review of the version guide or the target Rails source" -->
+
+**Affected files:**
 {FILE_LIST}
+<!-- When the cause is an absent line (for example no config.load_defaults at all), write "no line sets this; the {FROM} default applies" and name the file where the line belongs -->
 
-#### What Changed in Rails {TO}
-{EXPLANATION}
+**What changes in Rails {TO}:** {EXPLANATION}
 
-#### Your Code (Before)
+**Your code (before):**
 ```ruby
 # {FILE_PATH}:{LINE_NUMBER}
 {ACTUAL_CODE}
 ```
+<!-- For an absent line: show the surrounding block and a comment "# nothing here sets <key>".
+     Redact secret values (keys, tokens, passwords, anything read from ENV or a secrets/credentials file): keep the key name, replace the value with <redacted>. -->
 
-#### Required Change (After)
+**Change (after):**
 ```ruby
 {FIXED_CODE}
 ```
 
-#### ⚠️ Custom Code Warning
-{WARNING_IF_APPLICABLE}
+{DUAL_BOOT_NOTE}
+<!-- DUAL_BOOT_NOTE is one of:
+     - nothing, when the new form works on both Rails versions (the usual case: a direct rewrite)
+     - "Two-sided: the new API does not exist on {FROM}. Branch with `NextRails.next?` (target form on top, current form below) and drop the branch at cleanup."
+     - "Setter removed on {TO}: apply it as the default pin changes, not before." -->
+
+{CUSTOM_CODE_WARNING}
+<!-- "⚠️ Custom code: <file> <what it does> <why it interacts with this change>", only when detected -->
+
+<!-- End repeat block -->
 
 ---
 
-<!-- End repeat section -->
+## 📅 Fix When Ready ({FIX_WHEN_READY_COUNT})
 
-## Migration Plan
+Silent and working on {TO}; recommended, not tied to the bump. Same block shape as above; entries found by hand (a Gemfile line the target no longer needs, a config key with a better default) belong here too.
 
-### Phase 1: Preparation
-**Time:** 30 minutes
-
-- [ ] Create git branch: `git checkout -b rails-{TO_SLUG}-upgrade`
-- [ ] Backup database
-- [ ] Run current test suite - verify all passing
-- [ ] Note current test coverage: __%
-
-### Phase 2: Dependency Updates
-**Time:** {DEP_TIME}
-
-- [ ] Update Gemfile:
-  ```ruby
-  gem 'rails', '~> {TO}'
-  ```
-- [ ] Run `bundle update rails`
-- [ ] Update conflicting gems as needed
-
-### Phase 3: Breaking Changes
-**Time:** {BREAKING_TIME}
-
-{BREAKING_CHANGE_TASKS}
-
-### Phase 4: Configuration
-**Time:** 30 minutes
-
-- [ ] Run `rails app:update`
-- [ ] Review each configuration change (see app:update Preview below)
-- [ ] Update `config.load_defaults` to {TO_SHORT}
-
-### Phase 5: Testing
-**Time:** {TEST_TIME}
-
-- [ ] Run full test suite
-- [ ] Fix failing tests
-- [ ] Manual testing of critical paths
-- [ ] Deploy to staging
+{FIX_WHEN_READY_BLOCKS}
+<!-- When empty: "None. All {PATTERNS_CHECKED} patterns for this hop were searched." -->
 
 ---
 
-## Testing Checklist
+## Deprecation Warnings on {FROM}
 
-### Automated Tests
-- [ ] Unit tests passing
-- [ ] Controller tests passing
-- [ ] Integration tests passing
-- [ ] System tests passing
+The warnings the current version emits, collected before any dual-boot work.
 
-### Manual Testing
-- [ ] User authentication
-- [ ] Core CRUD operations
-- [ ] File uploads
-- [ ] Background jobs
-- [ ] Email delivery
-- [ ] API endpoints (if applicable)
-
-### Performance Checks
-- [ ] Boot time acceptable
-- [ ] Request times similar to before
-- [ ] No N+1 queries introduced
-
----
-
-## Rollback Plan
-
-If issues arise after deployment:
-
-### Immediate Rollback (< 5 minutes)
-```bash
-git checkout main
-bundle install
-rails db:rollback STEP=N  # if migrations ran
-```
-
-### Database Restore (if needed)
-```bash
-# Restore from backup taken in Phase 1
-pg_restore -d {DATABASE_NAME} backup.dump
-```
-
-### Cache Clear
-```bash
-rails tmp:clear
-rails cache:clear
-```
-
----
-
-## app:update Preview
-
-Files that will change when running `rails app:update`:
-
-| File | Change Type | Impact |
-|------|-------------|--------|
-{APP_UPDATE_FILE_LIST}
-
-### Recommended Approach
-
-```bash
-# Interactive mode (review each change)
-rails app:update
-
-# For each prompt:
-# Y - accept change
-# n - skip change
-# d - view diff
-```
+| Warning | Count | Status | Note |
+|---------|-------|--------|------|
+{DEPRECATION_INVENTORY_ROWS}
+<!-- Status: fixed (already in the baseline above) / deferred to the bump (setter removed on {TO}; also listed in Fix Before Bump) / deferred to a later hop (about a version after {TO}) / gem-owned (belongs to the gem's own update) -->
 
 ---
 
 ## Gem Compatibility
 
-Gems that may need updating:
+Check used: {GEM_CHECK_USED}.
+<!-- "next_rails bundle_report compatibility", "railsbump", or "not run: <reason>" -->
 
-| Gem | Current | Required | Status |
-|-----|---------|----------|--------|
-{GEM_COMPATIBILITY_TABLE}
+{GEM_SUMMARY}
+<!-- When nothing changes: "All {GEM_OK} direct gems already declare support for {TO}. Blockers: none." and omit the table below entirely, header included.
+     Otherwise keep the table, one row per gem that needs a bump or has no compatible release. -->
+
+| Gem | Locked | Needed for {TO} | Bucket |
+|-----|--------|-----------------|--------|
+{GEM_ROWS}
+
+Blockers (no released version supports {TO}): {GEM_BLOCKER_LIST}.
+
+---
+
+## Boot and Tests Under `Gemfile.next`
+
+```
+{BOOT_SMOKE_BLOCK}
+```
+
+Suite under `Gemfile.next`: {NEXT_SUITE_RESULT}. Deprecation warnings {TO} emitted during boot or the suite: {TARGET_DEP_COUNT}; each one is a Fix Before Bump entry above. Test failures, if any, are Fix Before Bump entries too.
+
+---
+
+## Plan
+
+The analysis is done; this is what remains, in order. How the work is split into branches and pull requests is the team's call.
+
+### Fix before bump
+- [ ] Every 🛑 entry above, on both sides of the dual-boot. Direct rewrite unless the entry says two-sided
+- [ ] Suite green on `Gemfile` and on `Gemfile.next`
+{BREAKING_CHANGE_TASKS}
+
+### Bump the default pin
+- [ ] Database backup taken and a restore tested
+- [ ] `Gemfile`: change the `else` branch's pin to {TO_FULL} so both sides resolve {TO}; leave the `if next?` / `else` structure, `Gemfile.next` and `Gemfile.next.lock` in place until cleanup
+- [ ] `bundle install` for both lockfiles; suite green on both
+- [ ] Configuration: apply the app:update preview (deliverable 2) file by file on the {TO} side; do not run `rails app:update` blind. Keys that do not exist on {FROM} go under a `NextRails.next?` guard until cleanup
+- [ ] Do not change `config.load_defaults` yet (see below)
+- [ ] CI configuration matches the upgraded Gemfile: Ruby version, Rails matrix, service versions
+- [ ] Deploy and verify
+
+### Fix when ready
+- [ ] The 📅 entries, at the team's pace
+
+### Align `load_defaults`
+- [ ] After the bump ships and is stable, move `config.load_defaults` to {TO} one setting at a time, running the suite between settings
+
+### Cleanup
+- [ ] When the team is ready and not heading straight into the next hop: remove the `NextRails.next?` branches, the `if next?` / `else` structure and `Gemfile.next`
+
+---
+
+## Testing Checklist
+
+Run after the fix-before-bump work and again after the default pin changes. Tailor the manual list to this app's routes, mailers and jobs; drop what it does not have.
+
+- [ ] Unit, controller, integration and system tests green on both Gemfiles
+- [ ] {MANUAL_CHECKS}
+- [ ] Boot time and request times comparable to {FROM}; no new N+1
+
+---
+
+## Rollback Plan
+
+Dual-boot is the rollback: the {FROM} side stays intact until cleanup.
+
+- Before the default pin changes: nothing to roll back; the default side never moved.
+- After the default pin changes: set the `else` branch's pin back to {FROM_FULL}, `bundle install`, redeploy. Roll back migrations only if {TO} added any (`rails db:rollback STEP=N`).
+- Cache: `bin/rails runner 'Rails.cache.clear'` and `rails tmp:clear` if the cache format version changed.
+- Database: restore the backup taken before the pin change only if data changed shape.
 
 ---
 
 ## Post-Upgrade Tasks
 
-- [ ] Update CI configuration if needed
-- [ ] Update deployment scripts
-- [ ] Update documentation
-- [ ] Notify team of changes
-- [ ] Monitor error rates after deploy
-- [ ] Review performance metrics
+- [ ] CI configuration reviewed and attached to the upgrade pull request
+- [ ] Deployment scripts and Dockerfile on the new Ruby / Rails pins
+- [ ] Team notified; error rates and performance watched after deploy
 
 ---
 
 ## Resources
 
-- [Rails {TO} Release Notes](https://guides.rubyonrails.org/7_2_release_notes.html)
+- [Rails {TO} Release Notes](https://guides.rubyonrails.org/{TO_UNDERSCORE}_release_notes.html)
 - [Rails Upgrade Guide](https://guides.rubyonrails.org/upgrading_ruby_on_rails.html)
 - [FastRuby.io Rails Upgrade Blog](https://www.fastruby.io/blog)
 
@@ -195,10 +190,9 @@ Gems that may need updating:
 
 ## Next Steps
 
-1. Review this report thoroughly
-2. Address HIGH priority issues first
-3. Run the test suite after each change
-4. Let me know if you need help with any specific issue!
+1. Review this report; the app:update preview is deliverable 2
+2. Start with the HIGH entries under Fix Before Bump
+3. Run both suites after each change
 
 ---
 
