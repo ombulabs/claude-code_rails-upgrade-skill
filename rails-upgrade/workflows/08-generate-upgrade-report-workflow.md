@@ -1,18 +1,16 @@
 # Workflow 08: Generate Upgrade Report
 
-**Purpose:** Generate comprehensive upgrade reports based on actual detection findings
+**Purpose:** Fill `templates/upgrade-report-template.md` with what Workflows 00 to 07 produced, so the user gets one document with every finding in its bucket, the user's own code, and a migration plan that matches the dual-boot flow the skill follows.
 
-**When to use:** After direct detection has been run and findings have been collected
+**When to use:** After Workflow 07. Deliverable 1 of two; the app:update preview is Workflow 09.
 
 ---
 
 ## Inputs
 
-- Direct detection has been run using Grep/Glob/Read tools
-- Detection findings have been collected with file:line references
-- Target Rails version is known
-- Version guide available for the upgrade
-- `templates/upgrade-report-template.md`
+- Detection findings with `kind`, `priority` and file:line (from Workflow 05)
+- Exact current and target versions, patch status (from Workflow 00), baseline suite numbers (from Workflow 01)
+- `version-guides/upgrade-{FROM}-to-{TO}.md` and `templates/upgrade-report-template.md`
 - Deprecation inventory (from Workflow 02): fixed entries for the baseline, deferred entries for the fix-before-bump bucket
 - Gem compatibility buckets (from Workflow 06), boot smoke test report block and models suite result under `Gemfile.next` (from Workflow 07)
 
@@ -25,312 +23,101 @@
 - Report built from `templates/upgrade-report-template.md`, every placeholder replaced
 - Every finding in the report is an actual detection finding with a real file:line reference, no generic examples
 - Custom code flagged with ⚠️ warnings based on detected issues
+- Migration plan uses `Gemfile.next` and defers `load_defaults` to Workflow 12; no effort or risk estimate
 - Step 8 quality check passed and the report delivered
 
 ---
 
-## Step-by-Step Workflow
+## Step 1: Gather the inputs
 
-### Step 1: Parse Detection Findings
+Collect, without re-deriving anything:
 
-Extract from the detection findings:
+| From | What |
+|------|------|
+| Workflow 00 | exact current version, whether it is the latest patch |
+| Workflow 01 | test count, assertions, failures on the current version |
+| Workflow 02 | deprecation inventory: fixed entries, deferred entries with reason |
+| Workflow 05 | findings with `kind`, `priority`, file:line, already in the two buckets |
+| Workflow 06 | gem buckets: required bumps, blockers, already compatible; which check ran |
+| Workflow 07 | boot smoke block, gem bumps found at boot, models suite result and failures |
 
-```
-1. Total issues found
-2. List of HIGH priority issues with counts
-3. List of MEDIUM priority issues with counts
-4. Affected file paths
-5. Project statistics (job count, controller count, etc.)
-```
+Everything in the report comes from these. If a run skipped a workflow (request shape, blocked step), the corresponding section says so instead of being invented.
 
-**Example findings to extract:**
-```
-⚠️  Found 5 breaking change(s) that need fixing:
-   - Sprockets usage: 3 occurrence(s)
-   - SSL configuration: 2 occurrence(s)
+## Step 2: Load the version guide
 
-📋 AFFECTED FILES
-config/environments/production.rb
-Gemfile
-config/initializers/assets.rb
-```
+Read `version-guides/upgrade-{FROM}-to-{TO}.md`. For each finding take the entry's "What Changed" text and its BEFORE / AFTER fix; the `Common Issues — Quick Reference` table maps models-suite failures back to an entry by symptom.
 
----
+## Step 3: Read the affected files
 
-### Step 2: Load Version Guide
+For every file:line in the findings, read the file so the report shows the user's actual code, never a generic example.
 
-Read the version-specific upgrade guide:
+## Step 4: Load the template
 
-```
-Read: version-guides/upgrade-{FROM}-to-{TO}.md
-```
+Read `templates/upgrade-report-template.md`. It is the shape of the report; this workflow does not restate it.
 
-Extract:
-- All breaking changes for this version
-- Migration steps
-- Code examples (OLD vs NEW)
-- Known issues and workarounds
+## Step 5: Fill the template
 
----
+| Template section | Filled from |
+|------------------|-------------|
+| Header, Executive Summary, Baseline | Step 1 counts |
+| 🛑 Fix Before Bump | Workflow 05 `breaking` + `deprecation` findings, plus Workflow 02 deferred entries, plus Workflow 06 required bumps and blockers, plus Workflow 07 boot bumps and models-suite failures. One block per entry, `{SOURCE_WORKFLOW}` names where it came from. HIGH → MEDIUM → LOW |
+| 📅 Fix When Ready | Workflow 05 `migration` + `optional` findings |
+| Deprecation Warnings on {FROM} | Workflow 02 inventory, one row per distinct warning |
+| Gem Compatibility | Workflow 06 buckets and the check that produced them |
+| Boot and Models Suite | Workflow 07 output block verbatim |
+| Migration Plan | fixed phases; `{BREAKING_CHANGE_TASKS}` is one checkbox per 🛑 entry |
+| Everything else | as written in the template |
 
-### Step 3: Read Affected Files
+Dual-boot rule for the "Change (after)" block: most fixes are direct rewrites because the new API exists on both sides; write the new form once and leave `{DUAL_BOOT_NOTE}` empty. Use the two-sided note, with a `NextRails.next?` branch, only when the new API does not exist on {FROM}, and the removed-setter note when the current-version fix raises on {TO}. Never `respond_to?`. This is the same rule as Workflow 10 Step 3 and the dual-boot skill.
 
-For each file listed in findings, read the actual content:
+## Step 6: Add custom code warnings
 
-```
-For each affected_file in findings:
-  Read: {affected_file}
-  Store: file_contents for context
-```
-
-This allows generating reports with the user's actual code, not generic examples.
-
----
-
-### Step 4: Load Report Template
-
-Read the report template:
-
-```
-Read: templates/upgrade-report-template.md
-```
-
----
-
-### Step 5: Generate Report Sections
-
-#### Section 1: Executive Summary
+For each finding, check whether the app has code that interacts with the change: initializers touching the affected area, monkey patches of the affected classes, non-standard configuration, third-party gem integrations. Write the warning only when you found something, naming the file and what it does:
 
 ```markdown
-# Rails {FROM} → {TO} Upgrade Report
-
-**Generated:** {DATE}
-**Project:** {PROJECT_NAME}
-**Current Version:** {FROM}
-**Target Version:** {TO}
-
-## Summary
-
-- **Total Issues Found:** {TOTAL_COUNT}
-- **High Priority:** {HIGH_COUNT}
-- **Medium Priority:** {MEDIUM_COUNT}
-- **Estimated Effort:** {EFFORT}
+⚠️ Custom code: `config/initializers/custom_loader.rb` registers its own autoload paths; Zeitwerk will read them differently. Review and test.
 ```
 
-#### Section 2: Breaking Changes Analysis
-
-For each issue found in findings:
-
-```markdown
-### 🔴 {ISSUE_NAME}
-
-**Priority:** HIGH
-**Found:** {COUNT} occurrence(s)
-**Affected Files:**
-{FILE_LIST}
-
-#### What Changed
-{EXPLANATION_FROM_VERSION_GUIDE}
-
-#### Your Code (Before)
-\```ruby
-{ACTUAL_CODE_FROM_USER_FILES}
-\```
-
-#### Required Change (After — Dual-Boot with `NextRails.next?`)
-\```ruby
-# Dual-boot compatible: uses NextRails.next? (NOT respond_to?)
-if NextRails.next?
-  {FIXED_CODE_FOR_TARGET_VERSION}
-else
-  {ORIGINAL_CODE_FOR_CURRENT_VERSION}
-end
-\```
-
-#### Final Code (After upgrade is complete, remove dual-boot branch)
-\```ruby
-{FIXED_CODE_FOR_TARGET_VERSION}
-\```
-
-⚠️ **Custom Code Warning:** {WARNING_IF_APPLICABLE}
-```
-
-> **Note:** All code examples use `NextRails.next?` for dual-boot compatibility.
-> Never use `respond_to?` for version branching — it is hard to understand, hard to
-> maintain, and obscures the intent of the code. See SKILL.md for details.
-
-#### Section 3: Step-by-Step Migration Plan
-
-```markdown
-## Migration Plan
-
-### Phase 1: Preparation
-- [ ] Backup database
-- [ ] Create upgrade branch
-- [ ] Run current test suite (ensure passing)
-
-### Phase 2: Dependency Updates
-- [ ] Update Gemfile with target Rails version
-- [ ] Run `bundle update rails`
-- [ ] Update dependent gems as needed
-
-### Phase 3: Breaking Changes
-{GENERATE_TASK_LIST_FROM_FINDINGS}
-
-### Phase 4: Configuration
-- [ ] Run `rails app:update`
-- [ ] Review and merge configuration changes
-- [ ] Update load_defaults to {VERSION}
-
-### Phase 5: Testing
-- [ ] Run full test suite
-- [ ] Fix failing tests
-- [ ] Test critical paths manually
-- [ ] Deploy to staging
-```
-
-#### Section 4: Testing Checklist
-
-```markdown
-## Testing Checklist
-
-### Automated Tests
-- [ ] Unit tests passing
-- [ ] Integration tests passing
-- [ ] System tests passing
-
-### Manual Testing
-- [ ] User authentication/authorization
-- [ ] File uploads (Active Storage)
-- [ ] Background jobs
-- [ ] Mailers
-- [ ] API endpoints
-- [ ] Asset loading (CSS/JS)
-```
-
-#### Section 5: Rollback Plan
-
-```markdown
-## Rollback Plan
-
-If issues arise after deployment:
-
-1. **Immediate:** `git checkout main && bundle install && rails db:migrate`
-2. **Database:** Restore from backup if migrations ran
-3. **Cache:** Clear Rails cache `rails tmp:clear`
-4. **Assets:** Recompile `rails assets:precompile`
-```
-
----
-
-### Step 6: Add Custom Code Warnings
-
-For each issue, check if user has custom code that might be affected:
-
-**Patterns to flag:**
-- Custom initializers related to the breaking change
-- Monkey-patching of affected classes
-- Non-standard configurations
-- Third-party gem integrations
-
-**Warning format:**
-```markdown
-⚠️ **Custom Code Warning:**
-Your file `config/initializers/custom_loader.rb` contains custom autoloading logic.
-This may conflict with Zeitwerk. Review and test thoroughly.
-```
-
----
-
-### Step 7: Populate Template
-
-Replace all placeholders:
+## Step 7: Replace every placeholder
 
 | Placeholder | Source | Example |
 |-------------|--------|---------|
-| `{FROM}` | Current version | "7.2" |
-| `{TO}` | Target version | "8.0" |
-| `{DATE}` | Current date | "January 30, 2025" |
-| `{PROJECT_NAME}` | From findings | "my-rails-app" |
-| `{TOTAL_COUNT}` | Sum of issues | "5" |
-| `{HIGH_COUNT}` | High priority count | "3" |
-| `{MEDIUM_COUNT}` | Medium priority count | "2" |
-| `{EFFORT}` | Based on issue count | "6-8 hours" |
+| `{FROM}` / `{TO}` | minor versions | `7.0` / `7.1` |
+| `{FROM_FULL}` / `{TO_FULL}` | exact versions | `7.0.10` / `7.1.6` |
+| `{TO_UNDERSCORE}` | target minor with underscore, for the release-notes URL | `7_1` |
+| `{DATE}` | today | `September 21, 2026` |
+| `{PROJECT_NAME}` | app directory or `config/application.rb` module | `rubymem` |
+| counts | Step 1 | numbers, never estimates |
+| `{SOURCE_WORKFLOW}` | which workflow produced the entry | `Workflow 05`, `Workflow 07 models suite` |
+
+No effort or risk estimates: they are subjective and the repo does not publish them (see `CLAUDE.md`, version guides rule).
+
+## Step 8: Quality check
+
+- [ ] Every placeholder replaced; no `{` left
+- [ ] Every 🛑 and 📅 entry traces to a Step 1 input with a real file:line
+- [ ] Code examples are the user's code
+- [ ] Bucket membership follows `kind`, order inside a bucket follows `priority`
+- [ ] Sections for skipped workflows say "not run" and why, rather than guessing
+- [ ] Migration plan mentions `Gemfile.next`, never `bundle update rails`; `load_defaults` only in Phase 5
+
+## Step 9: Deliver
+
+Present the report, then state that the app:update preview (Workflow 09) follows. Offer to start Phase 1 unless the user already said they will implement themselves.
 
 ---
 
-### Step 8: Quality Check
+## Report quality standards
 
-Before delivering:
+**Code examples must be real.** Bad: `config.some_setting = true`. Good: the line from `config/environments/production.rb:42`.
 
-- [ ] All placeholders replaced with actual values
-- [ ] All code examples are from user's actual files
-- [ ] Breaking changes match what was found in findings
-- [ ] Custom code warnings included where appropriate
-- [ ] Migration plan is actionable
-- [ ] Testing checklist is comprehensive
-- [ ] Rollback plan is clear
+**Warnings must be specific.** Bad: "you might have custom code". Good: "`config/initializers/sprockets.rb` configures the asset pipeline and needs migration to Propshaft".
+
+**Nothing invented.** A section whose source workflow did not run says so. A count is a count.
 
 ---
 
-### Step 9: Deliver Report
-
-Present the complete report to the user:
-
-```markdown
-# Here's your comprehensive upgrade report
-
-I've analyzed your project and found {TOTAL_COUNT} issues that need addressing.
-
-[FULL REPORT CONTENT]
-
-## Next Steps
-
-1. Review this report
-2. Start with HIGH priority issues
-3. Run `rails app:update` for configuration changes
-4. Run test suite after each change
-5. Let me know if you need help with any specific issue!
-```
-
----
-
-## Report Quality Standards
-
-### Code Examples Must Be Real
-
-❌ **Bad:** Generic example code
-```ruby
-# Generic example
-config.some_setting = true
-```
-
-✅ **Good:** User's actual code from their files
-```ruby
-# From config/environments/production.rb:42
-config.force_ssl = true
-```
-
-### Warnings Must Be Specific
-
-❌ **Bad:** "You might have custom code"
-
-✅ **Good:** "Your `config/initializers/sprockets.rb` contains custom asset pipeline configuration that will need migration to Propshaft"
-
-### Effort Estimates
-
-| Issues | Effort |
-|--------|--------|
-| 1-3 | 1-2 hours |
-| 4-6 | 3-4 hours |
-| 7-10 | 5-8 hours |
-| 11+ | 1-2 days |
-
-Add 50% if custom code warnings are present.
-
----
-
-**Related Files:**
+**Related files:**
 - Template: `templates/upgrade-report-template.md`
 - Version guides: `version-guides/upgrade-{FROM}-to-{TO}.md`
 - Testing checklist: `references/testing-checklist-reference.md`
