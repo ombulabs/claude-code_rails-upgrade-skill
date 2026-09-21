@@ -260,6 +260,9 @@ rails solid_queue:install
 
 # Config
 config.active_job.queue_adapter = :solid_queue
+
+# Start the supervisor; without it jobs stay pending
+bin/jobs
 ```
 
 ---

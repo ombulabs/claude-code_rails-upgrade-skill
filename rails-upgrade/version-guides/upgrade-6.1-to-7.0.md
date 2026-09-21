@@ -172,6 +172,9 @@ Rails.start()
 
 ---
 
+Remove `@rails/ujs` (and `rails-ujs`) completely once Turbo is in; with both loaded, forms submit twice.
+
+
 #### form_with Remote Behavior Change
 
 **What Changed:**

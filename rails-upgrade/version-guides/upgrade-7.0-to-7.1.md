@@ -174,6 +174,9 @@ Ensure files in `lib/` follow Zeitwerk naming:
 config.active_record.legacy_connection_handling = false
 config.active_record.legacy_connection_handling = true
 ```
+```bash
+grep -rn "legacy_connection_handling" config/
+```
 
 **Fix:**
 ```ruby

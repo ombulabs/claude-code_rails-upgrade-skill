@@ -124,7 +124,7 @@ redirect_back(fallback_location: root_path)
 redirect_back(fallback_location: root_path, notice: 'Done!')
 ```
 
-`redirect_back` accepts a `fallback_location:` used when `HTTP_REFERER` is missing — without it, requests with no referer raise `ActionController::RedirectBackError`.
+`redirect_back` requires the `fallback_location:` keyword: it is used when `HTTP_REFERER` is missing, and omitting it raises `ArgumentError: missing keyword: :fallback_location` on every request. `ActionController::RedirectBackError` is the Rails 5.0 `redirect_to :back` symptom, not a `redirect_back` one.
 
 ---
 
@@ -277,7 +277,7 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `ActionView::Template::Error: Unknown keyword: text` | "render :text Removed" — `render plain:` |
 | `redirect_to :back` raises | "redirect_to :back Removed" — `redirect_back(fallback_location: ...)` |
-| `ActionController::RedirectBackError` on a request with no referer | "redirect_to :back Removed" — always pass `fallback_location:` |
+| `ArgumentError: missing keyword: :fallback_location` | "redirect_to :back Removed" — `redirect_back` requires `fallback_location:` |
 
 ---
 

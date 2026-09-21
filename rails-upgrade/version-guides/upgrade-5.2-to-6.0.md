@@ -52,6 +52,9 @@ rails zeitwerk:check
 
 ---
 
+`Circular dependency detected` means two files require each other at load time; restructure so one side does not need the other at load, and keep an explicit `require` for the rare edge case only.
+
+
 #### Ruby 2.5+ Required
 
 **What Changed:**
