@@ -22,7 +22,7 @@ Rails 5.2 introduces:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. Bootsnap Required for Performance
+#### Bootsnap Required for Performance
 
 **What Changed:**
 Rails 5.2 recommends bootsnap for faster boot times.
@@ -40,7 +40,7 @@ require 'bootsnap/setup'
 
 ---
 
-#### 2. Cookie Expiry Format Changed
+#### Cookie Expiry Format Changed
 
 **What Changed:**
 Signed/encrypted cookie expiry timestamps are now embedded in the cookie value.
@@ -59,7 +59,7 @@ Rails.application.config.action_dispatch.use_authenticated_cookie_encryption = t
 
 ---
 
-#### 3. Active Record attribute_changed? Behavior
+#### Active Record attribute_changed? Behavior
 
 **What Changed:**
 `attribute_changed?` and related methods now return `false` after saving, even if the record was changed.
@@ -86,7 +86,7 @@ user.saved_changes[:name]
 
 ---
 
-#### 4. ActiveStorage Attachment Changes
+#### ActiveStorage Attachment Changes
 
 **What Changed:**
 Active Storage is new and becomes the recommended approach for file uploads.
@@ -105,7 +105,7 @@ rails db:migrate
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 5. Encrypted Secrets → Credentials
+#### Encrypted Secrets → Credentials
 
 **What Changed:**
 `secrets.yml.enc` is replaced by `credentials.yml.enc`.
@@ -131,7 +131,7 @@ Rails.application.credentials.api_key
 
 ---
 
-#### 6. DSL for Content Security Policy
+#### DSL for Content Security Policy
 
 **What Changed:**
 New DSL for configuring Content Security Policy.
@@ -151,7 +151,7 @@ end
 
 ---
 
-#### 7. force_ssl Now 301 Redirect
+#### force_ssl Now 301 Redirect
 
 **What Changed:**
 `force_ssl` now uses 301 (permanent) redirects instead of 302.
@@ -167,7 +167,7 @@ config.ssl_options = { redirect: { status: 302 } }
 
 ---
 
-#### 8. per_form_csrf_tokens Default Changed
+#### per_form_csrf_tokens Default Changed
 
 **What Changed:**
 `per_form_csrf_tokens` is now enabled by default.

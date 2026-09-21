@@ -21,7 +21,7 @@ Rails 4.0 is a major release with significant changes:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. Ruby 1.9.3+ Required
+#### Ruby 1.9.3+ Required
 
 **What Changed:**
 Rails 3.2.x is the last version to support Ruby 1.8.7.
@@ -37,7 +37,7 @@ rbenv install 2.1.10
 
 ---
 
-#### 2. Strong Parameters (Replaces attr_accessible)
+#### Strong Parameters (Replaces attr_accessible)
 
 **What Changed:**
 Mass assignment protection moved from models to controllers.
@@ -109,12 +109,12 @@ require 'strong_parameters' unless NextRails.next?
 
 ---
 
-#### 3. Scopes and Association Options Require Lambda
+#### Scopes and Association Options Require Lambda
 
 **What Changed:**
 ActiveRecord scopes must use a lambda. Additionally, association options like `:conditions`, `:order`, `:extend`, `:uniq`, and `:finder_sql` that were previously passed as hash options must now be expressed as lambda arguments. This is one of the most impactful changes in a typical Rails 3.2 → 4.0 upgrade.
 
-##### 3a. Scopes
+##### Scopes
 
 **Detection Pattern:**
 ```ruby
@@ -136,7 +136,7 @@ default_scope { where(deleted_at: nil) }
 default_scope { order('created_at ASC') }
 ```
 
-##### 3b. Association `:conditions` hash → lambda with `where()`
+##### Association `:conditions` hash → lambda with `where()`
 
 This is the **most common** change in large codebases. All `:conditions` on `has_many`, `has_one`, and `belongs_to` must move into a lambda.
 
@@ -163,7 +163,7 @@ has_one :spouse, -> { where(relationship: 'Spouse') }, class_name: 'Contact'
 has_many :items, -> { where('access_type != "public"') }
 ```
 
-##### 3c. Association `:conditions` with proc → lambda with owner parameter
+##### Association `:conditions` with proc → lambda with owner parameter
 
 When conditions reference the owning object (common in multi-key associations), the proc must become a lambda that receives the owner as a parameter.
 
@@ -198,7 +198,7 @@ has_one :active_visit, ->(owner) {
 }, class_name: "Visit"
 ```
 
-##### 3d. Association `:order` → lambda with `order()`
+##### Association `:order` → lambda with `order()`
 
 **Detection Pattern:**
 ```ruby
@@ -218,7 +218,7 @@ has_many :items, -> { order('position ASC') }
 has_one :user, -> { order('id DESC') }
 ```
 
-##### 3e. Association `:extend` → `extending` inside lambda
+##### Association `:extend` → `extending` inside lambda
 
 **Detection Pattern:**
 ```ruby
@@ -237,7 +237,7 @@ has_many :items, -> { extending SomeExtension }
 belongs_to :item, -> { extending ContentExtension }, foreign_key: :content_id
 ```
 
-##### 3f. Combined `:conditions` + `:order` + `:extend` → single lambda
+##### Combined `:conditions` + `:order` + `:extend` → single lambda
 
 When multiple options need to move into the lambda, combine them:
 
@@ -252,7 +252,7 @@ has_many :flu_shots, -> { where(immunization_type_id: 4).order('estimated_date D
   class_name: 'Immunization'
 ```
 
-##### 3g. `has_many :through` with `:uniq` → lambda
+##### `has_many :through` with `:uniq` → lambda
 
 **Detection Pattern:**
 ```ruby
@@ -272,7 +272,7 @@ has_and_belongs_to_many :groups, -> { distinct }
 # Note: uniq was later deprecated in favor of distinct
 ```
 
-##### 3h. `has_many :through` with `:readonly` option removed
+##### `has_many :through` with `:readonly` option removed
 
 **Detection Pattern:**
 ```ruby
@@ -288,7 +288,7 @@ has_many :items, through: :joins, readonly: false
 has_many :items, through: :joins
 ```
 
-##### 3i. `:finder_sql` deprecated
+##### `:finder_sql` deprecated
 
 **Detection Pattern:**
 ```ruby
@@ -315,7 +315,7 @@ end
 
 ---
 
-#### 4. Dynamic Finders Deprecated
+#### Dynamic Finders Deprecated
 
 **What Changed:**
 Dynamic finders like `find_all_by_*` are deprecated.
@@ -342,7 +342,7 @@ User.find_or_create_by(email: email)
 
 ---
 
-#### 5. Routes Require HTTP Method
+#### Routes Require HTTP Method
 
 **What Changed:**
 The `match` method no longer defaults to all HTTP methods.
@@ -367,7 +367,7 @@ get '/home' => 'home#index'
 
 ---
 
-#### 6. Remote Forms Stop Embedding the CSRF Token
+#### Remote Forms Stop Embedding the CSRF Token
 
 **What Changed:**
 `config.action_view.embed_authenticity_token_in_remote_forms` defaults to `false` in
@@ -461,7 +461,7 @@ submit path changes again.
 
 ---
 
-#### 7. `order` and `reorder` Require Arguments
+#### `order` and `reorder` Require Arguments
 
 **What Changed:**
 Rails 3.2 defined `order` as:
@@ -559,7 +559,7 @@ method` warning; wrap it as `Arel.sql("patient_groups.id")`. `Arel.sql` exists s
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 8. `rescue_action` Removed — Use `rescue_from`
+#### `rescue_action` Removed — Use `rescue_from`
 
 **What Changed:**
 The `rescue_action` method was removed in Rails 4.0 with no deprecation warning. Use `rescue_from` instead.
@@ -591,7 +591,7 @@ Note: `rescue_from` does not support `super`, so re-raise the exception if neede
 
 ---
 
-#### 9. Partial Magic Variables Removed
+#### Partial Magic Variables Removed
 
 **What Changed:**
 In Rails 3.2, rendering a partial automatically defined a local variable named after the partial (set to `nil` if no object/collection was passed). Rails 4.0 only defines this variable when rendering with `collection:` or `object:` options. Partials that rely on the implicit variable will raise `undefined local variable or method` errors.
@@ -648,7 +648,7 @@ Results need manual review — only partials rendered without `collection:`, `ob
 
 ---
 
-#### 10. `cache_key` Timestamp Format Changed
+#### `cache_key` Timestamp Format Changed
 
 **What Changed:**
 The `cache_timestamp_format` changed from `:number` to `:nsec`, producing longer, more precise cache keys. This can break code that compares or stores cache keys as strings.
@@ -677,7 +677,7 @@ If your code stores cache keys externally (e.g., in Redis, a database, or a back
 
 ---
 
-#### 11. Observers Extracted
+#### Observers Extracted
 
 **What Changed:**
 ActiveRecord Observers are no longer included by default.
@@ -690,7 +690,7 @@ gem 'rails-observers'
 
 ---
 
-#### 12. ActionController Sweeper Extracted
+#### ActionController Sweeper Extracted
 
 **What Changed:**
 Sweepers are no longer included.
@@ -701,11 +701,11 @@ Sweepers are no longer included.
 gem 'rails-observers'
 ```
 
-Note: This is the same gem as #11 (Observers) — `rails-observers` bundles both Observers and Sweepers.
+Note: This is the same gem as "Observers Extracted" — `rails-observers` bundles both Observers and Sweepers.
 
 ---
 
-#### 13. Action Caching Extracted
+#### Action Caching Extracted
 
 **What Changed:**
 `caches_page` and `caches_action` are no longer included.
@@ -724,7 +724,7 @@ gem 'actionpack-action_caching'
 
 ---
 
-#### 14. ActiveResource Extracted
+#### ActiveResource Extracted
 
 **What Changed:**
 ActiveResource is no longer included.
@@ -737,7 +737,7 @@ gem 'activeresource'
 
 ---
 
-#### 15. Plugins No Longer Supported
+#### Plugins No Longer Supported
 
 **What Changed:**
 Rails 4.0 dropped support for `vendor/plugins`.
@@ -749,7 +749,7 @@ Rails 4.0 dropped support for `vendor/plugins`.
 
 ---
 
-#### 16. Bidirectional `dependent: :destroy` Now Recurses Forever
+#### Bidirectional `dependent: :destroy` Now Recurses Forever
 
 **What Changed:**
 Rails 3.2 registered `belongs_to ..., dependent: :destroy` as an **after_destroy**, in a `belongs_to`-specific `configure_dependency` (`activerecord-3.2.x/lib/active_record/associations/builder/belongs_to.rb`):
@@ -841,7 +841,7 @@ By the time `after_destroy` runs, this row is gone, so the reciprocal cascade re
 
 ### 🟢 LOW PRIORITY (but commonly encountered)
 
-#### 17. Fixture Dates Must Be Cast to Strings
+#### Fixture Dates Must Be Cast to Strings
 
 **What Changed:**
 Rails 4 is stricter about date parsing in YAML fixtures. Dynamic date expressions like `<%= 3.days.ago %>` can produce `invalid date` errors in tests.
@@ -864,7 +864,7 @@ accepted_at: "<%= 3.days.ago.to_s(:db) %>"
 
 ---
 
-#### 18. `config.eager_load` Required in All Environments
+#### `config.eager_load` Required in All Environments
 
 **What Changed:**
 Rails 4.0 requires `config.eager_load` to be set in every environment file. Without it, Rails raises an error on boot.
@@ -880,7 +880,7 @@ config.eager_load = false
 
 ---
 
-#### 19. `config.assets.compress` Removed
+#### `config.assets.compress` Removed
 
 **What Changed:**
 The `config.assets.compress` directive no longer works in Rails 4. It has been replaced by specific compressor settings.
@@ -902,7 +902,7 @@ config.assets.css_compressor = :sass
 
 ---
 
-#### 20. `ActiveSupport::BufferedLogger` Renamed
+#### `ActiveSupport::BufferedLogger` Renamed
 
 **What Changed:**
 `ActiveSupport::BufferedLogger` was renamed to `ActiveSupport::Logger`.
@@ -926,7 +926,7 @@ Logger.const_get(Rails.configuration.log_level.to_s.upcase)
 
 ---
 
-#### 21. `config.paths["config/routes"]` Key Changed
+#### `config.paths["config/routes"]` Key Changed
 
 **What Changed:**
 The config path key for routes changed from `"config/routes"` to `"config/routes.rb"`.
@@ -947,7 +947,7 @@ config.paths["config/routes.rb"].concat(...)
 
 ---
 
-#### 22. `select('distinct ...').pluck` → `.distinct.pluck`
+#### `select('distinct ...').pluck` → `.distinct.pluck`
 
 **What Changed:**
 Rails 4 introduced the `.distinct` query method as the preferred way to get distinct results.
@@ -968,7 +968,7 @@ relation.distinct.pluck(:assigned_to_id)
 
 ---
 
-#### 23. `assign_attributes` Method Signature Changed
+#### `assign_attributes` Method Signature Changed
 
 **What Changed:**
 In Rails 3.2, `assign_attributes` accepted an options hash as a second argument. In Rails 4.0, the options argument was removed and the method was aliased to `attributes=`.
@@ -991,7 +991,7 @@ assign_attributes(new_attributes)
 
 ---
 
-#### 24. Validation Callback API Changed
+#### Validation Callback API Changed
 
 **What Changed:**
 The internal method `_run_validation_callbacks` was replaced with `run_callbacks(:validation)`.
@@ -1012,7 +1012,7 @@ run_callbacks(:validation)
 
 ---
 
-#### 25. Test Request Headers API Changed
+#### Test Request Headers API Changed
 
 **What Changed:**
 In controller specs, setting request headers changed from `request.env` to `request.headers`.
@@ -1033,7 +1033,7 @@ request.headers.merge!(headers)
 
 ---
 
-#### 26. `ActiveRecord::ImmutableRelation` Error
+#### `ActiveRecord::ImmutableRelation` Error
 
 **What Changed:**
 In Rails 4, calling methods like `count` on a relation that has already been loaded or modified can raise `ActiveRecord::ImmutableRelation`.
@@ -1048,7 +1048,7 @@ Rewrite the query to avoid modifying a frozen relation, e.g., use `.distinct.cou
 
 ---
 
-#### 27. PaperTrail Version Models Require `VersionConcern`
+#### PaperTrail Version Models Require `VersionConcern`
 
 **What Changed:**
 If using PaperTrail with custom version models (subclassing `Version`), Rails 4 requires explicitly including `PaperTrail::VersionConcern`.
@@ -1168,21 +1168,21 @@ Error → section lookup for the most common errors encountered during this upgr
 
 | Error | See |
 |-------|-----|
-| `ActiveModel::ForbiddenAttributesError` | Section 2 (Strong Parameters) — use `user_params` not `params[:user]` |
-| Scope returns wrong results or errors | Section 3a (Scopes) — add lambda |
-| `Unknown key: :conditions` | Section 3b (Association conditions) — move to lambda |
-| `No route matches` | Section 5 (Routes) — add HTTP method |
-| Remote form POST arrives with no session or current user | Section 6 (Remote form CSRF) — pin `embed_authenticity_token_in_remote_forms` |
-| `ArgumentError: The method .order() must contain arguments.` | Section 7 (order/reorder) — name the column, `order(:id)` for `.order.last` |
-| `ArgumentError: Direction should be :asc or :desc` | Section 7 (order/reorder) — hash values must be `:asc` / `:desc`; use strings across joins |
-| `NoMethodError: undefined method 'rescue_action'` | Section 8 (rescue_action) — use `rescue_from` |
-| `undefined local variable or method` in partial | Section 9 (Partial magic variables) — pass `locals:` |
-| Cache misses after upgrade | Section 10 (cache_key format) — changed to `:nsec` |
-| `invalid date` in fixtures | Section 17 (Fixture dates) — cast with `.to_s(:db)` |
-| `eager_load is set to nil` | Section 18 (config.eager_load) — set in all environments |
-| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | Section 20 (BufferedLogger) — renamed to `ActiveSupport::Logger` |
-| `ActiveRecord::ImmutableRelation` | Section 26 (ImmutableRelation) — use `.distinct.count` |
-| Controller specs don't see custom headers | Section 25 (Test headers) — use `request.headers.merge!` |
+| `ActiveModel::ForbiddenAttributesError` | "Strong Parameters (Replaces attr_accessible)" — use `user_params` not `params[:user]` |
+| Scope returns wrong results or errors | "Scopes", under "Scopes and Association Options Require Lambda" — add lambda |
+| `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`", under "Scopes and Association Options Require Lambda" — move to lambda |
+| `No route matches` | "Routes Require HTTP Method" — add HTTP method |
+| Remote form POST arrives with no session or current user | "Remote Forms Stop Embedding the CSRF Token" — pin `embed_authenticity_token_in_remote_forms` |
+| `ArgumentError: The method .order() must contain arguments.` | "`order` and `reorder` Require Arguments" — name the column, `order(:id)` for `.order.last` |
+| `ArgumentError: Direction should be :asc or :desc` | "`order` and `reorder` Require Arguments" — hash values must be `:asc` / `:desc`; use strings across joins |
+| `NoMethodError: undefined method 'rescue_action'` | "`rescue_action` Removed — Use `rescue_from`" |
+| `undefined local variable or method` in partial | "Partial Magic Variables Removed" — pass `locals:` |
+| Cache misses after upgrade | "`cache_key` Timestamp Format Changed" — changed to `:nsec` |
+| `invalid date` in fixtures | "Fixture Dates Must Be Cast to Strings" — cast with `.to_s(:db)` |
+| `eager_load is set to nil` | "`config.eager_load` Required in All Environments" — set in all environments |
+| `NameError: uninitialized constant ActiveSupport::BufferedLogger` | "`ActiveSupport::BufferedLogger` Renamed" — renamed to `ActiveSupport::Logger` |
+| `ActiveRecord::ImmutableRelation` | "`ActiveRecord::ImmutableRelation` Error" — use `.distinct.count` |
+| Controller specs don't see custom headers | "Test Request Headers API Changed" — use `request.headers.merge!` |
 
 ---
 
