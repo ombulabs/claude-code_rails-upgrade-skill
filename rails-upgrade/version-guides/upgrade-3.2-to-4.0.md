@@ -459,6 +459,80 @@ instead; Rails 3.2 ignores the option.
 
 ---
 
+#### Deprecated Association Options Raise on Ruby 2.3+
+
+**What Changed:**
+On Rails 4.0, activerecord-deprecated_finders keeps the old association options
+(`:conditions`, `:order`, `:include`, `:readonly`, `:uniq`, `:select`, `:limit`,
+`:offset`, `:group`, `:having`) working with a deprecation warning. On Ruby 2.3 or newer
+it does not: loading, joining or eager loading any association that uses one raises
+
+```
+ArgumentError: wrong number of arguments (given 0, expected 1)
+```
+
+with a backtrace through `spawn_methods.rb` and the gem's `association_builder.rb`. Ruby
+2.3 added `Hash#to_proc`, and Rails 4.0's `Relation#merge!` asks `respond_to?(:to_proc)`
+before `is_a?(Hash)`, so the options hash the gem merges into the association scope is run
+as a proc with no argument. Rails 4.1 checks for a Hash first. The declaration itself
+loads with only the warning, so the app boots and the error appears in requests and specs.
+On Ruby 2.2 or older none of this applies.
+
+**Detection Pattern:**
+```bash
+# Ruby 2.3 or newer on the app
+cat .ruby-version; grep -n "^ruby" Gemfile
+# associations still using a deprecated option
+grep -rnE "(has_many|has_one|belongs_to|has_and_belongs_to_many).*(conditions|order|include|readonly|uniq|select|limit)(:|\s*=>)" app/models/
+```
+
+**Fix:**
+The durable fix is the rewrite in "Scopes and Association Options Require Lambda": once
+no association uses a deprecated option, the error cannot happen. Because the lambda
+argument raises on Rails 3.2, put the rewritten declaration behind `NextRails.next?`.
+
+To bump first and rewrite later, load an initializer on the next side only that restores
+the Ruby 2.2 behavior. It needs both patches. With the `merge!` patch alone, a Hash-valued
+`:conditions` stops raising and is silently dropped, because the gem also calls `to_proc`
+on it and gets nil back, so the association returns every row.
+
+```ruby
+# config/initializers/deprecated_association_options_ruby23.rb
+if NextRails.next?
+  ActiveRecord::Relation.class_eval do
+    def merge!(other) # :nodoc:
+      if other.is_a?(Hash)
+        ActiveRecord::Relation::HashMerger.new(self, other).merge
+      elsif !other.is_a?(ActiveRecord::Relation) && other.respond_to?(:to_proc)
+        instance_exec(&other)
+      else
+        ActiveRecord::Relation::Merger.new(self, other).merge
+      end
+    end
+  end
+
+  ActiveRecord::Associations::Builder::DeprecatedOptionsProc.class_eval do
+    def to_proc
+      options = self.options
+      proc do |owner|
+        if options[:where].is_a?(Proc)
+          context = owner || self
+          where(context.instance_eval(&options[:where])).merge!(options.except(:where))
+        else
+          merge(options)
+        end
+      end
+    end
+  end
+end
+```
+
+Add a spec that loads one association of each kind and checks the rows it returns, since
+a silently dropped condition is the failure to guard against. Delete the initializer when
+the rewrite is done, and before the 4.1 hop.
+
+---
+
 #### Remote Forms Stop Embedding the CSRF Token
 
 **What Changed:**
@@ -1431,6 +1505,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Scope returns wrong results or errors | "Scopes", under "Scopes and Association Options Require Lambda" — add lambda |
 | `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`", under "Scopes and Association Options Require Lambda" — move to lambda |
 | `ArgumentError: Unknown key: extend` | "`belongs_to` / `has_one` `:extend` → `extending` inside lambda", under "Scopes and Association Options Require Lambda": move the module into `extending` |
+| `ArgumentError: wrong number of arguments (given 0, expected 1)` from `spawn_methods.rb` when an association loads | "Deprecated Association Options Raise on Ruby 2.3+": rewrite to a scope lambda or add the two-patch initializer |
 | `No route matches` | "Routes Require HTTP Method" — add HTTP method |
 | A scoped route 404s and `rake routes` shows an extra segment | "A Symbol Passed to Route `scope` Becomes a Path Segment" — drop the Symbol, keep `path:` |
 

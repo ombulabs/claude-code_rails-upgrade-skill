@@ -190,6 +190,20 @@ FINDER_SQL:
   no_match:
     - "  has_many :items, -> { where(active: true) }"
 
+ASSOCIATION_OPTIONS_RUBY_23:
+  # Flags a Ruby 2.3+ version in the Gemfile or .ruby-version.
+  match:
+    - "ruby '2.3.8'"
+    - 'ruby "2.4.10"'
+    - "2.3.8"
+    - "ruby-2.3.1"
+  no_match:
+    - "ruby '2.2.10'"
+    - "2.1.10"
+    - "ruby-2.0.0-p648"
+    - "gem 'rake', '2.3.1'"
+    - "# ruby '2.3.8'"
+
 FIND_ALL_BY:
   match:
     - "Model.send(:find_all_by_name, v)"
