@@ -141,3 +141,17 @@ SCOPE_NAME_COLLISION:
     - "  Post.none"
     - "  # scope :none, -> { where('1 = 0') }"
     - "  def self.none; where('1 = 0'); end"
+
+FINDER_SQL:
+  match:
+    - "  has_many :comments, :finder_sql => 'SELECT * FROM comments WHERE approved = 1'"
+    - "  has_many :comments, finder_sql: proc { \"SELECT * FROM comments WHERE post_id = #{id}\" }"
+    - "  has_many :tags, counter_sql: 'SELECT COUNT(*) FROM tags'"
+    - "  has_and_belongs_to_many :groups, :finder_sql => 'SELECT * FROM groups'"
+    - "    :counter_sql => 'SELECT COUNT(*) FROM comments WHERE approved = 1',"
+  no_match:
+    - "  has_many :comments, -> { where(approved: true) }"
+    - "  # has_many :comments, :finder_sql => 'SELECT * FROM comments'"
+    - "  Comment.find_by_sql('SELECT * FROM comments')"
+    - "  Comment.count_by_sql('SELECT COUNT(*) FROM comments')"
+    - "  options[:finder_sql]"

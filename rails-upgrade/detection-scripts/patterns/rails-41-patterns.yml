@@ -153,6 +153,16 @@ upgrade_findings:
       fix: "Rename the scope, or delete it when the built-in method already does the job. A hand-written `scope :none, -> { where('1 = 0') }` is covered by `Model.none`, available since Rails 4.0, which returns an empty chainable relation without querying the database. A scope defined in a concern raises in every model that includes the concern, so fix it once in the concern. The rename works on Rails 4.0 as well, so it needs no NextRails.next? branch"
       variable_name: "SCOPE_NAME_COLLISION"
 
+    - name: "Association :finder_sql / :counter_sql option"
+      kind: breaking
+      pattern: "\\b:?(finder_sql|counter_sql)(:|\\s*=>)"
+      exclude: "^\\s*#"
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 removed the `:finder_sql` and `:counter_sql` association options, which 4.0 accepted with a deprecation warning. On `has_many` they are now unknown keys: `ArgumentError: Unknown key: :finder_sql` while the class body runs, so the model fails to load. On `has_and_belongs_to_many` 4.1 passes only a fixed list of options to the `has_many :through` it builds, so the option is dropped with no error and the association runs the normal join-table query instead of the custom SQL. activerecord-deprecated_finders does not restore either option"
+      fix: "Replace the SQL with a scope on the association: `has_many :comments, -> { where(approved: true) }`, or `->(owner) { ... }` when the SQL used the owner's attributes. The scope is added to the normal foreign-key condition, while finder_sql replaced the whole query, so set `foreign_key:` / `primary_key:` when the SQL did not join on the default key. SQL that does not fit a scope becomes a method that calls `find_by_sql`. Drop `:counter_sql`; `count` / `size` then count through the rewritten association. The scope form also works on Rails 4.0, so the rewrite can land before the version bump"
+      variable_name: "FINDER_SQL"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking

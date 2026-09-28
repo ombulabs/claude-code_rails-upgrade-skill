@@ -459,6 +459,43 @@ Rename every caller along with the scope. A scope defined in a concern raises in
 
 ---
 
+#### Association `:finder_sql` and `:counter_sql` Removed
+
+**What Changed:**
+Rails 4.0 accepted `:finder_sql` and `:counter_sql` on collection associations with a deprecation warning. Rails 4.1 removes both. On `has_many` they are now unknown keys, and the model fails to load:
+
+```
+ArgumentError: Unknown key: :finder_sql. Valid keys are: :class_name, ...
+```
+
+On `has_and_belongs_to_many` there is no error. Rails 4.1 builds the association as a `has_many :through` and passes only a fixed list of options to it, so `:finder_sql` is dropped and the association runs the normal join-table query instead of the custom SQL. `activerecord-deprecated_finders` does not restore either option.
+
+**Detection Pattern:**
+```ruby
+has_many :comments, :finder_sql => 'SELECT * FROM comments WHERE approved = 1'
+has_many :tags, counter_sql: 'SELECT COUNT(*) FROM tags'
+has_and_belongs_to_many :groups, :finder_sql => '...'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+has_many :approved_comments, class_name: 'Comment',
+  finder_sql: proc { "SELECT * FROM comments WHERE post_id = #{id} AND approved = 1" }
+
+# AFTER
+has_many :approved_comments, -> { where(approved: true) }, class_name: 'Comment'
+
+# SQL that does not fit a scope becomes a method
+def approved_comments
+  Comment.find_by_sql(["SELECT * FROM comments WHERE post_id = ? AND approved = 1", id])
+end
+```
+
+The scope is added to the normal foreign-key condition, while `:finder_sql` replaced the whole query. Set `foreign_key:` / `primary_key:` when the SQL did not join on the default key. Drop `:counter_sql`: `count` and `size` then count through the rewritten association. The scope form also works on Rails 4.0, so the rewrite can land before the version bump.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -932,6 +969,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 15. Wrap every non-callable `scope` body in a lambda (`scope :active, -> { where(active: true) }`).
 15. Pass a block to every `default_scope` that takes a relation or a hash (`default_scope { where(deleted_at: nil) }`).
 15. Rename any scope whose name matches an Active Record class method (`none`, `all`, `count`, ...), or delete it if the built-in does the same job.
+15. Replace `:finder_sql` / `:counter_sql` association options with a scope or a `find_by_sql` method.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -969,6 +1007,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'call'` when a scope runs | "Scopes With a Non-Callable Body Removed": wrap the body in `-> { ... }` |
 | `ArgumentError: Support for calling #default_scope without a block is removed` when a model loads | "`default_scope` Without a Block Raises": wrap the argument in a block |
 | `ArgumentError: You tried to define a scope named ... but Active Record already defined a class method with the same name` | "Scope Names That Collide with Active Record Class Methods Raise": rename or delete the scope |
+| `ArgumentError: Unknown key: :finder_sql` (or `:counter_sql`) when a model loads | "Association `:finder_sql` and `:counter_sql` Removed": move the SQL into a scope |
+| A `has_and_belongs_to_many` with `:finder_sql` returns different rows | "Association `:finder_sql` and `:counter_sql` Removed": the option is silently dropped, move the SQL into a scope |
 
 ---
 
