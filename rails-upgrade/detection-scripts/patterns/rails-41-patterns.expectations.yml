@@ -156,6 +156,8 @@ SCOPE_NAME_COLLISION:
     - "  scope :named, ->(q) { where(name: q) }"
     - "  scope :public_posts, -> { where(public: true) }"
     - "  scope :parents, -> { where(parent_id: nil) }"
+    - "  scope :name?, -> { where.not(name: nil) }"
+    - "  scope :limit!, -> { limit(1) }"
     - "  Post.none"
     - "  # scope :none, -> { where('1 = 0') }"
     - "  def self.none; where('1 = 0'); end"

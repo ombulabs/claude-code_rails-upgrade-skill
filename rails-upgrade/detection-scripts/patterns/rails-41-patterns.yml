@@ -144,10 +144,10 @@ upgrade_findings:
 
     - name: "scope named after an Active Record class method"
       kind: breaking
-      pattern: "^\\s*scope(?:\\s+|\\s*\\(\\s*):(none|all|first|last|take|create|new|select|group|order|limit|offset|where|find|count|sum|average|minimum|maximum|distinct|joins|includes|references|private|public|protected|allocate|name|parent|superclass)\\b"
+      pattern: "^\\s*scope(?:\\s+|\\s*\\(\\s*):(none|all|first|last|take|create|new|select|group|order|limit|offset|where|find|count|sum|average|minimum|maximum|distinct|joins|includes|references|private|public|protected|allocate|name|parent|superclass)(?:[\\s,)]|$)"
       exclude: ""
       search_paths:
-        - "app/"
+        - "app/models/"
         - "lib/"
       explanation: "Rails 4.1 raises ArgumentError while the class body runs when a scope name matches a class method Active Record already defines: `You tried to define a scope named \"none\" on the model \"Post\", but Active Record already defined a class method with the same name.` Rails 4.0 let the scope replace the method with no warning. The model fails to load, so with eager loading the app does not boot. Rails 4.1 also rejects eight names outright, whatever the model defines: private, public, protected, allocate, new, name, parent and superclass, so `scope :public, -> { where(public: true) }` raises too. The pattern lists those eight plus the common query, finder and calculation names; any other name that matches an Active Record class method raises the same way"
       fix: "Rename the scope, or delete it when the built-in method already does the job. A hand-written `scope :none, -> { where('1 = 0') }` is covered by `Model.none`, available since Rails 4.0, which returns an empty chainable relation without querying the database. A scope defined in a concern raises in every model that includes the concern, so fix it once in the concern. The rename works on Rails 4.0 as well, so it needs no NextRails.next? branch"
