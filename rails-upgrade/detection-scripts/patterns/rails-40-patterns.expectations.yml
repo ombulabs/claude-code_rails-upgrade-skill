@@ -127,8 +127,25 @@ DEFAULT_SCOPE_WITHOUT_BLOCK:
   match:
     - "  default_scope where(active: true)"
     - "  default_scope :order => 'created_at'"
+    - "  default_scope order: 'created_at ASC'"
+    # parenthesized call form
+    - "  default_scope(where(active: true))"
+    # any relation method, not only where / order
+    - "  default_scope select([arel_table[:id], arel_table[:name]])"
+    - "  default_scope includes(:account)"
   no_match:
     - "  default_scope { where(active: true) }"
+    - "  default_scope  {where(active: true)}"
+    - "  default_scope do"
+    # a lambda or proc argument is callable, no warning on 4.0
+    - "  default_scope -> { where(active: true) }"
+    - "  default_scope(-> { where(active: true) })"
+    - "  default_scope lambda { where(active: true) }"
+    # a class-method override is a different shape
+    - "  def self.default_scope"
+    # comments and look-alike names
+    - "  # default_scope where(active: true)"
+    - "  default_scopes.any?"
 
 ASSOCIATION_CONDITIONS:
   match:

@@ -49,7 +49,7 @@ upgrade_findings:
 
     - name: "default_scope without block"
       kind: "breaking"
-      pattern: "default_scope\\s+(where|order|:order)"
+      pattern: "^[ \\t]*default_scope(?:[ \\t]+|[ \\t]*\\(\\s*)(?!\\(*\\s*(?:\\{|do\\b|->|lambda\\b|proc\\b|Proc\\.new\\b))\\S"
       exclude: ""
       search_paths:
         - "app/models/"
