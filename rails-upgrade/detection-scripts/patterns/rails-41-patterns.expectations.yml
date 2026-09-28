@@ -74,3 +74,26 @@ ASSOCIATION_READONLY:
     - "  has_many :tags, -> { readonly }, through: :taggings"
     - "  has_many :tags, -> { readonly(false) }, through: :taggings"
     - "  has_many :tags, through: :taggings"
+
+# The scanner matches file content, so a body on the next line
+# (`scope :active,` then `where(...)` below it) is caught there; a fixture
+# line can only show the single-line shapes.
+SCOPE_WITHOUT_LAMBDA:
+  match:
+    - "  scope :active, where(active: true)"
+    - "  scope :recent, order('created_at DESC')"
+    - "  scope :with_author, joins(:author).where(authors: { active: true })"
+    - "  scope :sorted, scoped.order(:name)"
+    - "  scope :published, :conditions => { published: true }"
+    - "  scope :visible, conditions: { hidden: false }"
+  no_match:
+    - "  scope :active, -> { where(active: true) }"
+    - "  scope :active,->{ where(active: true) }"
+    - "  scope :by_flag, ->(flag) { where(active: flag) }"
+    - "  scope :active, lambda { where(active: true) }"
+    - "  scope :active, proc { where(active: true) }"
+    - "  scope :active, Proc.new { where(active: true) }"
+    - "  scope :search, (proc { |q| where('name LIKE ?', q) })"
+    - "  # scope :archived, where(archived: true)"
+    - "  default_scope { where(deleted_at: nil) }"
+    - "  def self.active; where(active: true); end"

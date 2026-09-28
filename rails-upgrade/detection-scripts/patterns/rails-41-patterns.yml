@@ -122,6 +122,16 @@ upgrade_findings:
       fix: "readonly: true becomes a scope lambda: has_many :tags, -> { readonly }, through: :taggings. readonly: false can usually just be deleted: Rails 4.1 removed implicit_readonly, so records loaded through a join are no longer marked readonly and there is nothing left to undo. If the association needs to stay writable on 4.0 too, use -> { readonly(false) } instead. The lambda form works on 4.0 and 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :readonly on has_many / has_one / belongs_to; it does not help habtm"
       variable_name: "ASSOCIATION_READONLY"
 
+    - name: "scope with a non-callable body"
+      kind: breaking
+      pattern: "^[ \\t]*scope\\s+:\\w+\\s*,(?!\\s*\\(?\\s*(?:->|lambda\\b|Proc\\.|proc\\b|['\"]))"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 removed support for a scope body that is not callable, such as `scope :active, where(active: true)`. Rails 4.0 accepted it with a deprecation warning. Rails 4.1 still defines the scope without complaint, but every call runs `body.call`, so the first use raises `NoMethodError: undefined method 'call'` on the stored relation. The error shows up when the scope runs, not when the model loads, so a boot check passes. The hash form (`scope :active, conditions: { active: true }`) fails the same way unless activerecord-deprecated_finders is in the bundle; that gem only rescues the hash form, not a relation body"
+      fix: "Wrap the body in a lambda: `scope :active, -> { where(active: true) }`. Rewrite a hash body as query methods inside the lambda: `scope :recent, -> { order('created_at DESC') }`. The lambda form works on Rails 4.0 too, so the change can land before the version bump with no NextRails.next? branch"
+      variable_name: "SCOPE_WITHOUT_LAMBDA"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking

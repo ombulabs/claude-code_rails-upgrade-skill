@@ -38,12 +38,12 @@ upgrade_findings:
       variable_name: "REQUIRE_STRONG_PARAMS"
 
     - name: "Scope without lambda"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "scope\\s+:\\w+\\s*,\\s*where"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 requires all scopes to use a lambda"
+      explanation: "Rails 4.0 deprecates a scope body that is not callable: `scope :active, where(...)` is still accepted but emits a deprecation warning when the model loads, and Rails 4.1 removes support. On 4.0 the stored relation is also returned as-is, so conditions chained before the scope are dropped from the query: `Model.where(x: 1).active` runs only the scope's own conditions"
       fix: "Change scope :name, where(...) to scope :name, -> { where(...) }"
       variable_name: "SCOPE_WITHOUT_LAMBDA"
 
