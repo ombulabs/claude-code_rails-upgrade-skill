@@ -509,27 +509,30 @@ on it and gets nil back, so the association returns every row.
 ```ruby
 # config/initializers/deprecated_association_options_ruby23.rb
 if NextRails.next?
-  ActiveRecord::Relation.class_eval do
-    def merge!(other) # :nodoc:
-      if other.is_a?(Hash)
-        ActiveRecord::Relation::HashMerger.new(self, other).merge
-      elsif !other.is_a?(ActiveRecord::Relation) && other.respond_to?(:to_proc)
-        instance_exec(&other)
-      else
-        ActiveRecord::Relation::Merger.new(self, other).merge
+  # The gem defines DeprecatedOptionsProc only once ActiveRecord::Base loads.
+  ActiveSupport.on_load(:active_record) do
+    ActiveRecord::Relation.class_eval do
+      def merge!(other) # :nodoc:
+        if other.is_a?(Hash)
+          ActiveRecord::Relation::HashMerger.new(self, other).merge
+        elsif !other.is_a?(ActiveRecord::Relation) && other.respond_to?(:to_proc)
+          instance_exec(&other)
+        else
+          ActiveRecord::Relation::Merger.new(self, other).merge
+        end
       end
     end
-  end
 
-  ActiveRecord::Associations::Builder::DeprecatedOptionsProc.class_eval do
-    def to_proc
-      options = self.options
-      proc do |owner|
-        if options[:where].is_a?(Proc)
-          context = owner || self
-          where(context.instance_eval(&options[:where])).merge!(options.except(:where))
-        else
-          merge(options)
+    ActiveRecord::Associations::Builder::DeprecatedOptionsProc.class_eval do
+      def to_proc
+        options = self.options
+        proc do |owner|
+          if options[:where].is_a?(Proc)
+            context = owner || self
+            where(context.instance_eval(&options[:where])).merge!(options.except(:where))
+          else
+            merge(options)
+          end
         end
       end
     end
@@ -874,6 +877,7 @@ a cold cache after the deploy is fine, no change is needed.
 
 **Skill behavior:** When this change is detected, ask the user which approach they prefer.
 The right choice depends on whether anything outside the cache relies on the key format.
+
 ---
 
 #### Observers Extracted
