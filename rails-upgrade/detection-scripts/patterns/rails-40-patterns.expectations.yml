@@ -161,10 +161,22 @@ ASSOCIATION_ORDER:
     - "  has_many :items, :sort_order => 'asc'"
 
 ASSOCIATION_EXTEND:
+  # Only belongs_to and has_one lose :extend at 4.0; collections keep it.
   match:
-    - "  has_many :items, :extend => ItemsExtension"
+    - "  belongs_to :account, extend: AccountLookup"
+    - "  has_one :profile, :extend => ProfileMethods"
+    - "  belongs_to :owner, foreign_key: :owner_id, class_name: 'User', extend: OwnerMethods"
+    # (a declaration that continues after a trailing comma is matched across
+    # lines by the scanner, which this per-line fixture cannot show)
   no_match:
+    # collection associations still accept :extend on 4.0
+    - "  has_many :items, :extend => ItemsExtension"
+    - "  has_and_belongs_to_many :tags, extend: TagMethods"
     - "  has_many :items, -> { extending ItemsExtension }"
+    - "  belongs_to :account, -> { extending(AccountLookup) }"
+    # a has_one that only mentions an extension in its class name
+    - "  has_one :extended_profile, class_name: 'ProfileExtension'"
+    - "  # belongs_to :account, extend: AccountLookup"
 
 ASSOCIATION_UNIQ:
   match:

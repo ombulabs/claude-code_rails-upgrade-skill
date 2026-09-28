@@ -77,14 +77,14 @@ upgrade_findings:
       fix: "Move order into a scope lambda: has_many :items, -> { order('position ASC') }. Works on Rails 3.2 and 4.0+"
       variable_name: "ASSOCIATION_ORDER"
 
-    - name: "Association :extend option"
+    - name: "belongs_to / has_one :extend option"
       kind: "breaking"
-      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?extend(:|\\s*=>)"
+      pattern: "^[ \\t]*(?:belongs_to|has_one)\\b(?:[^\\n]|,[ \\t]*\\n)*?\\bextend(?::|[ \\t]*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :extend from associations. Unlike :conditions / :order / :uniq / :readonly, activerecord-deprecated_finders does NOT restore :extend, so this one actually breaks at the 4.0 hop and stays breaking. Use extending() inside a scope lambda"
-      fix: "Move extend into a scope lambda: has_many :items, -> { extending SomeExtension }"
+      explanation: "Rails 4.0 keeps `:extend` only for collection associations (`has_many`, `has_and_belongs_to_many`). On `belongs_to` and `has_one` the option was dropped from the valid keys, so the declaration raises `ArgumentError: Unknown key: extend` while the model loads. Rails 3.2 accepted it on every macro and applied the module to the relation that loads the target. activerecord-deprecated_finders does not add it back. `has_many ..., extend: SomeModule` still works on 4.0 without a warning and is not flagged. The pattern also follows a declaration onto the next line after a trailing comma. Not visible to it: a helper that builds the options hash (`options[:extend] = SomeModule` before calling `belongs_to`), so grep for `[:extend]` as well"
+      fix: "Move the module into a scope lambda with `extending`: `belongs_to :account, -> { extending(AccountLookup) }, foreign_key: :owner_id`. The lambda argument raises `ArgumentError: wrong number of arguments (given 3, expected 1..2)` on Rails 3.2, so branch the declaration with `NextRails.next?` and keep the 3.2 form on the current side. Merge any `:conditions` / `:order` on the same declaration into the same lambda. One behavior difference to check: Rails 3.2 loads a singular target with `first` and Rails 4.0 with `take`, so an extension that overrides `first` stops being called"
       variable_name: "ASSOCIATION_EXTEND"
 
     - name: "Association :uniq option"
