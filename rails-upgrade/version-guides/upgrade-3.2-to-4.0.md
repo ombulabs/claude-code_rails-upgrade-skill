@@ -483,7 +483,8 @@ ArgumentError: wrong number of arguments (given 0, expected 1)
 with a backtrace through `spawn_methods.rb` and the gem's `association_builder.rb`. Ruby
 2.3 added `Hash#to_proc`, and Rails 4.0's `Relation#merge!` asks `respond_to?(:to_proc)`
 before `is_a?(Hash)`, so the options hash the gem merges into the association scope is run
-as a proc with no argument. Rails 4.1 checks for a Hash first. The declaration itself
+as a proc with no argument. Rails 4.1.15 moved the Hash check first; 4.1.0 through 4.1.14
+keep the 4.0 order. The declaration itself
 loads with only the warning, so the app boots and the error appears in requests and specs.
 On Ruby 2.2 or older none of this applies.
 
@@ -538,7 +539,9 @@ end
 
 Add a spec that loads one association of each kind and checks the rows it returns, since
 a silently dropped condition is the failure to guard against. Delete the initializer when
-the rewrite is done, and before the 4.1 hop.
+the rewrite is done, and finish the rewrite before the 4.1 hop: 4.1.0 through 4.1.14 keep
+the same `merge!` order, and from 4.1.15 a Hash-valued `:conditions` kept through the gem
+is dropped without an error.
 
 ---
 
