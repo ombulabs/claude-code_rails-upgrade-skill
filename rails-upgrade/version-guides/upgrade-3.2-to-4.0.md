@@ -170,7 +170,8 @@ has_many :items, -> { where('access_type != "public"') }
 ```
 
 The AFTER forms do not run on Rails 3.2: its association macros take only `(name, options)`, so a lambda
-second argument raises `ArgumentError: wrong number of arguments (given 3, expected 1..2)` at class load.
+second argument fails while the model loads: an `ArgumentError` or a `NoMethodError`, depending on the
+macro and on whether options follow the lambda.
 During dual boot, put the lambda form behind `NextRails.next?` and keep the 3.2 form on the other branch,
 or apply the rewrite after the bump. This holds for every association lambda in this section.
 
@@ -260,8 +261,7 @@ end
 ```
 
 The branch is needed because Rails 3.2 does not accept a scope lambda as the second
-argument of an association macro (`ArgumentError: wrong number of arguments (given 3,
-expected 1..2)`). `has_many :items, extend: SomeExtension` can stay as it is.
+argument of an association macro: the declaration fails while the model loads. `has_many :items, extend: SomeExtension` can stay as it is.
 
 ##### Combined `:conditions` + `:order` + `:extend` → single lambda
 
