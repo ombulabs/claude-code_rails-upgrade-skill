@@ -687,7 +687,7 @@ REMOTE_FORM_CSRF_TOKEN:
     - '  <%= form_tag(search_path, remote: true) do %>'
     - '= form_for @person, :remote => true, html: { class: "opt-in-form" } do |f|'
     - '= simple_form_for @user, remote: true do |f|'
-    - '= form_for [clinic, patient], url: settings_path, remote: true do |f|'
+    - '= form_for [account, project], url: settings_path, remote: true do |f|'
   no_match:
     # remote link_to: UJS builds the form and its token itself
     - '= link_to "Delete", user_path(user), remote: true, method: :delete'

@@ -180,34 +180,38 @@ When conditions reference the owning object (common in multi-key associations), 
 
 **Detection Pattern:**
 ```ruby
-belongs_to :clinic_patient_link, primary_key: :person_id, foreign_key: :person_id,
-  conditions: clinic_id_conditions_proc, extend: MultiKeyAssociation::BelongsTo
-has_many :actions, primary_key: :patient_id, foreign_key: :patient_id,
+belongs_to :membership, primary_key: :user_id, foreign_key: :user_id,
+  conditions: proc { { account_id: account_id } }, extend: MembershipLookup
+has_many :events, primary_key: :user_id, foreign_key: :user_id,
   conditions: proc { ["created_at BETWEEN ? AND ?", start_at, end_at] }
-has_one :active_visit, class_name: "Visit",
+has_one :latest_order, class_name: "Order",
   conditions: proc { ["created_at >= ?", some_date] }, order: 'created_at DESC'
 ```
 
 **Fix:**
 ```ruby
 # BEFORE
-belongs_to :clinic_patient_link, primary_key: :person_id, foreign_key: :person_id,
-  conditions: clinic_id_conditions_proc, extend: MultiKeyAssociation::BelongsTo
+belongs_to :membership, primary_key: :user_id, foreign_key: :user_id,
+  conditions: proc { { account_id: account_id } }, extend: MembershipLookup
 
-# AFTER — this pattern is rare and complex; verify manually
-belongs_to :clinic_patient_link, ->(object) {
-  where(clinic_id_conditions_proc.call(object)).extending(MultiKeyAssociation::BelongsTo)
-}, primary_key: :person_id, foreign_key: :person_id
+# AFTER: rare and easy to get wrong, verify each one by hand
+belongs_to :membership, ->(owner) {
+  where(account_id: owner.account_id).extending(MembershipLookup)
+}, primary_key: :user_id, foreign_key: :user_id
 
 # BEFORE
-has_one :active_visit, class_name: "Visit",
+has_one :latest_order, class_name: "Order",
   conditions: proc { ["created_at >= ?", some_date] }, order: 'created_at DESC'
 
 # AFTER
-has_one :active_visit, ->(owner) {
+has_one :latest_order, ->(owner) {
   where("created_at >= ?", owner.some_date).order('created_at DESC')
-}, class_name: "Visit"
+}, class_name: "Order"
 ```
+
+On 3.2 the proc runs with `self` set to the owner, so bare names like `account_id` read the
+owner's attributes. Inside the Rails 4 lambda `self` is the relation, so each of them has
+to become `owner.account_id`.
 
 ##### Association `:order` → lambda with `order()`
 
@@ -266,12 +270,12 @@ When multiple options need to move into the lambda, combine them:
 **Fix:**
 ```ruby
 # BEFORE
-has_many :flu_shots, class_name: 'Immunization',
-  conditions: { immunization_type_id: 4 }, order: 'estimated_date DESC'
+has_many :featured_posts, class_name: 'Post',
+  conditions: { category_id: 4 }, order: 'published_at DESC'
 
 # AFTER
-has_many :flu_shots, -> { where(immunization_type_id: 4).order('estimated_date DESC') },
-  class_name: 'Immunization'
+has_many :featured_posts, -> { where(category_id: 4).order('published_at DESC') },
+  class_name: 'Post'
 ```
 
 ##### `has_many :through` with `:uniq` → lambda
