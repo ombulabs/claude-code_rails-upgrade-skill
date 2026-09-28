@@ -436,13 +436,14 @@ Rails 4.1 checks each scope name against the class methods Active Record already
 ArgumentError: You tried to define a scope named "none" on the model "Post", but Active Record already defined a class method with the same name.
 ```
 
-Rails 4.0 let the scope replace the method with no warning. The model now fails to load, so with eager loading the app does not boot. One case to look for: a hand-written `none` scope from before `Model.none` was added in Rails 4.0.
+Rails 4.0 let the scope replace the method with no warning. The model now fails to load, so with eager loading the app does not boot. Eight names are rejected on every model, whatever it defines: `private`, `public`, `protected`, `allocate`, `new`, `name`, `parent` and `superclass`. A `scope :public, -> { where(public: true) }` for a boolean `public` column is an easy one to miss. One case to look for: a hand-written `none` scope from before `Model.none` was added in Rails 4.0.
 
 **Detection Pattern:**
 ```ruby
 scope :none, -> { where('1 = 0') }
 scope :all, -> { where(archived: false) }
 scope :count, -> { select('COUNT(*)') }
+scope :public, -> { where(public: true) }
 ```
 
 **Fix:**
