@@ -193,6 +193,7 @@ FINDER_SQL:
 ASSOCIATION_OPTIONS_RUBY_23:
   # Flags a Ruby 2.3+ version in the Gemfile or .ruby-version.
   match:
+    - "ruby 2.4.10"
     - "ruby '2.3.8'"
     - 'ruby "2.4.10"'
     - "2.3.8"
@@ -379,6 +380,7 @@ CACHE_KEY_FORMAT:
     - "    self.etag = cache_key"
     - "    Sync.push(key: cache_key)"
   no_match:
+    - "  def self.cache_key"
     # the app's own cache_key method taking an argument, or defining one
     - "    Rails.cache.fetch(cache_key(:totals)) do"
     - "    Rails.cache.fetch(report.cache_key(:monthly_totals))"

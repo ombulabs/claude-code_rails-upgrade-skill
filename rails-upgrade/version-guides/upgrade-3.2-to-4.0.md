@@ -860,8 +860,9 @@ cache_timestamp_format
 that takes an argument (`cache_key(:totals)`) is not the Active Record method.
 
 **Fix:**
-To keep the 3.2 keys, set the format explicitly. The setting exists on both versions, so it
-can ship before the bump:
+To keep the 3.2 keys, set the format explicitly. The setting exists from Rails 3.2.13, so on
+3.2.13 or newer it can ship before the bump. On 3.2.0 through 3.2.12 the setter does not exist
+and boot fails with `NoMethodError`, so add `if NextRails.next?` to the line:
 
 ```ruby
 # config/application.rb
