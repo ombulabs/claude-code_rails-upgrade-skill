@@ -127,6 +127,7 @@ DEFAULT_SCOPE_WITHOUT_BLOCK:
     - "  default_scope Proc.new { order(:name) }"
     - "  def self.default_scope"
     - "  # default_scope where(deleted_at: nil)"
+    - "  default_scope # set in the concern"
     - "  # Joining :user applies the default_scope, so filter in SQL"
     - "  self.default_scopes = []"
     - "  Model.unscoped { build_default_scope }"

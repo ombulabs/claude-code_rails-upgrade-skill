@@ -134,7 +134,7 @@ upgrade_findings:
 
     - name: "default_scope without a block"
       kind: breaking
-      pattern: "^[ \\t]*default_scope\\b(?!\\s*\\(?\\s*(?:\\{|->|lambda\\b|proc\\b|Proc\\.|do\\b))[ \\t]*\\(?[ \\t]*\\S"
+      pattern: "^[ \\t]*default_scope\\b(?!\\s*\\(?\\s*(?:\\{|->|lambda\\b|proc\\b|Proc\\.|do\\b))[ \\t]*\\(?[ \\t]*[^\\s#]"
       exclude: ""
       search_paths:
         - "app/models/"
