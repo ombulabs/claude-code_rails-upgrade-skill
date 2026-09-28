@@ -542,6 +542,9 @@ ROUTES_TOP_LEVEL_MODULE_AUTOLOAD:
 VALIDATES_FORMAT_OF_ANCHORS:
   # Flags a format-validator regex literal that starts with ^ or ends with an
   # unescaped $, the same rule Rails 4.0 applies before raising.
+  # A call whose options continue after a trailing comma or an opening `{`
+  # (`format: {` at the end of the line, `with:` on the next) is matched across
+  # lines by scan_patterns.rb; this per-line fixture cannot show it.
   match:
     # leading ^ and trailing $
     - '  validates_format_of :email, with: /^[a-z]+$/'
