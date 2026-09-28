@@ -374,13 +374,26 @@ CACHE_KEY_FORMAT:
     # a record's cache_key stored or compared outside the cache
     - "    update_column(:etag, record.cache_key)"
     - "    stale = stored_key != @account.cache_key"
+    # receiverless inside the model, used as a value
+    - "    update_column(:etag, cache_key)"
+    - "    self.etag = cache_key"
+    - "    Sync.push(key: cache_key)"
   no_match:
-    # the app's own cache_key method taking an argument
+    # the app's own cache_key method taking an argument, or defining one
     - "    Rails.cache.fetch(cache_key(:totals)) do"
     - "    Rails.cache.fetch(report.cache_key(:monthly_totals))"
     - "  def cache_key(name)"
-    # a local variable with the same name
+    - "  def cache_key"
+    # a local variable with the same name, assigned or handed to the cache
     - "    cache_key = \"settings_for_#{id}\""
+    - "    cache_key ||= compute_key"
+    - "    cache_key << record.id.to_s"
+    - "    settings = Rails.cache.fetch(cache_key, expires_in: 12.hours) do"
+    - "  = cache cache_key do"
+    # look-alike names and a symbol
+    - "    return unless account_cache_key.present?"
+    - "    @cache_key = build_key"
+    - "    options = { cache_key: 1 }"
     # model_name.cache_key has no timestamp
     - "    \"#{self.class.model_name.cache_key}/#{id}\""
     - "  def display_name; name; end"

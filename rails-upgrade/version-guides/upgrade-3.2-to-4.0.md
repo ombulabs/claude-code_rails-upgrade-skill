@@ -850,8 +850,9 @@ another service) or compares it to a saved string stops matching.
 
 **Detection Pattern:**
 ```ruby
-# explicit calls on a record, and any existing setting
+# a record key used as a value, and any existing setting
 record.cache_key
+update_column(:etag, cache_key)   # inside the model
 cache_timestamp_format
 ```
 
