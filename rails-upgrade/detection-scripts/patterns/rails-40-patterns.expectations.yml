@@ -497,24 +497,44 @@ ROUTES_TOP_LEVEL_MODULE_AUTOLOAD:
     - "  constraints Constraints::Admin do"
 
 VALIDATES_FORMAT_OF_ANCHORS:
-  # Pattern: "validates_format_of.*with:\\s*/[^/]*[\\^$]"
-  # Flags a leading ^ / trailing $ in a validates_format_of `with:` regex.
+  # Flags a format-validator regex literal that starts with ^ or ends with an
+  # unescaped $, the same rule Rails 4.0 applies before raising.
   match:
-    # leading ^ and trailing $ — the boot-fatal form on Rails 4
+    # leading ^ and trailing $
     - '  validates_format_of :email, with: /^[a-z]+$/'
-    # trailing $ only still flags
+    # trailing $ only, and a leading ^ only with a flag after the regex
     - '  validates_format_of :name, with: /foo$/'
-    # Ruby-1.8 hash-rocket syntax common in 3.2-era code
+    - '  validates_format_of :name, with: /^foo/i'
+    # hash-rocket syntax common in 3.2-era code
     - '  validates_format_of :email, :with => /^[a-z]+$/'
-  no_match:
-    # already rewritten to \A / \z — the correct Rails 4 form
-    - '  validates_format_of :email, with: /\A[a-z]+\z/'
-    # hash-rocket form, already rewritten — must not flag
-    - '  validates_format_of :email, :with => /\Afoo\z/'
-    # block-options form is out of scope for the primary regex
+    # without: is checked the same way
+    - '  validates_format_of :code, without: /^tmp/'
+    # the validates form, with a hash or a bare regex
     - '  validates :email, format: { with: /^x$/ }'
-    # without: is a different option, out of scope
-    - '  validates_format_of :x, without: /^foo$/'
+    - '  validates :zip, presence: true, format: { with: /\d{5}$/, allow_blank: true }'
+    - '  validates :code, format: /^[A-Z]{3}$/'
+    # %r{} literal
+    - '  validates_format_of :path, with: %r{^[a-z/]+$}'
+    # explicit receiver
+    - '  model_class.validates_format_of :slug, with: /^[a-z-]+$/'
+  no_match:
+    # already rewritten to \A / \z
+    - '  validates_format_of :email, with: /\A[a-z]+\z/'
+    - '  validates_format_of :email, :with => /\Afoo\z/'
+    # ^ inside a character class and $ in the middle do not raise
+    - '  validates_format_of :email, with: /\A[^@\s]+@[^@\s]+\z/'
+    - '  validates :email, format: { with: /\A[^@]+\z/ }'
+    - '  validates_format_of :ratio, with: /\Aa$b\z/'
+    # an escaped \$ at the end is a literal dollar sign
+    - '  validates_format_of :price, with: /\A\d+\$/'
+    # multiline: true turns the check off
+    - '  validates_format_of :body, with: /^foo$/, multiline: true'
+    # a constant is out of reach of a line regex
+    - '  validates_format_of :key, with: KEY_FORMAT'
+    # commented out
+    - '  # validates_format_of :name, with: /^foo$/'
+    # validates_with is a different API
+    - '  validates_with SlugValidator, with: /^x/'
 
 VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND:
   # Pattern: "Regexp\\.new\\(.*[\\^$]"
