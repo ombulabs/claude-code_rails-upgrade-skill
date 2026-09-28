@@ -132,6 +132,16 @@ upgrade_findings:
       fix: "Wrap the body in a lambda: `scope :active, -> { where(active: true) }`. Rewrite a hash body as query methods inside the lambda: `scope :recent, -> { order('created_at DESC') }`. The lambda form works on Rails 4.0 too, so the change can land before the version bump with no NextRails.next? branch"
       variable_name: "SCOPE_WITHOUT_LAMBDA"
 
+    - name: "default_scope without a block"
+      kind: breaking
+      pattern: "^[ \\t]*default_scope\\b(?!\\s*\\(?\\s*(?:\\{|->|lambda\\b|proc\\b|Proc\\.|do\\b))[ \\t]*\\(?[ \\t]*\\S"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 raises `ArgumentError: Support for calling #default_scope without a block is removed` when `default_scope` gets a relation or a hash instead of a block or lambda, such as `default_scope where(deleted_at: nil)` or `default_scope order: 'name'`. Rails 4.0 accepted both with a deprecation warning. The raise happens while the class body runs, so the model fails to load. activerecord-deprecated_finders keeps the hash form working with a warning, but not a relation argument"
+      fix: "Pass a block: `default_scope { where(deleted_at: nil) }`, and rewrite a hash as query methods: `default_scope { order(:name) }`. The block form works on Rails 4.0 too, so the change can land before the version bump with no NextRails.next? branch. A `def self.default_scope` class method override is not affected"
+      variable_name: "DEFAULT_SCOPE_WITHOUT_BLOCK"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking

@@ -48,12 +48,12 @@ upgrade_findings:
       variable_name: "SCOPE_WITHOUT_LAMBDA"
 
     - name: "default_scope without block"
-      kind: "breaking"
+      kind: "deprecation"
       pattern: "default_scope\\s+(where|order|:order)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 requires default_scope to use a block"
+      explanation: "Rails 4.0 deprecates calling default_scope without a block: `default_scope where(...)` still works but emits a deprecation warning when the model loads, and Rails 4.1 raises ArgumentError for it"
       fix: "Change default_scope where(...) to default_scope { where(...) }"
       variable_name: "DEFAULT_SCOPE_WITHOUT_BLOCK"
 

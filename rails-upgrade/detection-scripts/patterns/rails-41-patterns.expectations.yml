@@ -97,3 +97,28 @@ SCOPE_WITHOUT_LAMBDA:
     - "  # scope :archived, where(archived: true)"
     - "  default_scope { where(deleted_at: nil) }"
     - "  def self.active; where(active: true); end"
+
+# The scanner matches file content, so `default_scope(` with the lambda on
+# the next line is still skipped there; a fixture line can only show the
+# single-line shapes.
+DEFAULT_SCOPE_WITHOUT_BLOCK:
+  match:
+    - "  default_scope where(deleted_at: nil)"
+    - "  default_scope order('created_at DESC')"
+    - "  default_scope(where(active: true))"
+    - "  default_scope :order => 'name'"
+    - "  default_scope order: 'name'"
+    - "  default_scope includes(:author)"
+  no_match:
+    - "  default_scope { where(deleted_at: nil) }"
+    - "  default_scope do"
+    - "  default_scope -> { order(:name) }"
+    - "  default_scope(-> { order(:name) })"
+    - "  default_scope lambda { order(:name) }"
+    - "  default_scope proc { order(:name) }"
+    - "  default_scope Proc.new { order(:name) }"
+    - "  def self.default_scope"
+    - "  # default_scope where(deleted_at: nil)"
+    - "  # Joining :user applies the default_scope, so filter in SQL"
+    - "  self.default_scopes = []"
+    - "  Model.unscoped { build_default_scope }"
