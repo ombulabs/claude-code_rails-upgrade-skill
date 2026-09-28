@@ -39,7 +39,7 @@ upgrade_findings:
 
     - name: "Scope without lambda"
       kind: "breaking"
-      pattern: "scope\\s+:\\w+\\s*,\\s*where"
+      pattern: "^[ \\t]*scope[ \\t]*\\(?[ \\t]*(?::\\w+|\"\\w+\"|'\\w+')[ \\t]*,\\s*+(?!\\(*\\s*(?:->|lambda\\b|proc\\b|Proc\\.new\\b))"
       exclude: ""
       search_paths:
         - "app/models/"

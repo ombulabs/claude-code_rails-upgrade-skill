@@ -41,18 +41,40 @@ REQUIRE_STRONG_PARAMS:
     - "require 'strong_password'"
 
 SCOPE_WITHOUT_LAMBDA:
-  # Pattern: "scope\\s+:\\w+\\s*,\\s*where"
-  # Rails 4.0 requires every scope to wrap its query in a callable (lambda).
+  # A scope body that is not callable: Rails 4.0 warns when the model loads.
+  # The line must start with `scope` (so comments do not flag), and anything
+  # after the comma other than a lambda or proc flags, including a body that
+  # starts on the next line.
   match:
-    # bare where() right after the scope name — the breaking form
+    # bare where() right after the scope name
     - "  scope :active, where(active: true)"
     # extra whitespace around the name and comma must still flag
     - "  scope :recent , where('created_at > ?', 1.week.ago)"
+    # parenthesized call form
+    - "  scope(:active, where(active: true))"
+    # any relation method, not only where
+    - "  scope :ordered, order(:position)"
+    - "  scope :visible, scoped.where(hidden: false)"
+    - "  scope :popular, with_votes.select('items.*, COUNT(votes.id) AS vote_count')"
+    # a relation wrapped in parentheses is still not callable
+    - "  scope :sorted, (joins(:category).order(:position))"
+    # body on the next line: the scope line itself is flagged
+    - "  scope :with_votes,"
+    # string scope name
+    - "  scope 'active', where(active: true)"
   no_match:
-    # already wrapped in a stabby lambda — the correct Rails 4 form
+    # already wrapped in a stabby lambda, the Rails 4 form
     - "  scope :active, -> { where(active: true) }"
-    # wrapped in an explicit lambda — also correct, must not flag
+    - "  scope :by_month, ->(month) { where(month: month) }"
+    # wrapped in an explicit lambda or proc
     - "  scope :active, lambda { where(active: true) }"
+    - "  scope :by_month, proc { |month| where(month: month) }"
+    - "  scope :by_month, Proc.new { |month| where(month: month) }"
+    # a proc wrapped in parentheses is callable, no warning on 4.0
+    - "  scope :by_month, (proc { |month| where(month: month) })"
+    - "  scope(:active, -> { where(active: true) })"
+    # commented-out scope
+    - "  # scope :active, where(active: true)"
 
 CLASS_SCOPED:
   # Model.scoped, relation.scoped and a receiverless `scoped` inside a model

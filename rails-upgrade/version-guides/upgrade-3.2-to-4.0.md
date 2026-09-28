@@ -119,19 +119,25 @@ ActiveRecord scopes must use a lambda. Additionally, association options like `:
 **Detection Pattern:**
 ```ruby
 scope :active, where(active: true)
+scope(:ordered, order(:position))
+scope :visible, scoped.where(hidden: false)
 default_scope where(deleted_at: nil)
 default_scope :order => 'created_at ASC'
 ```
+
+Any body that is not a lambda or proc counts, whatever relation method it starts with, with or without parentheses around the arguments. A proc in parentheses (`scope :by_month, (proc { |m| where(month: m) })`) is already callable and needs no change.
 
 **Fix:**
 ```ruby
 # BEFORE
 scope :active, where(active: true)
+scope(:ordered, order(:position))
 default_scope where(deleted_at: nil)
 default_scope :order => 'created_at ASC'
 
 # AFTER
 scope :active, -> { where(active: true) }
+scope(:ordered, -> { order(:position) })
 default_scope { where(deleted_at: nil) }
 default_scope { order('created_at ASC') }
 ```
