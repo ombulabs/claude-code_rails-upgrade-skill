@@ -1,7 +1,7 @@
 # JS Compressor vs Sprockets During a Dual-Boot Upgrade
 
 **When to read this:** the `JS_COMPRESSOR_GEM_MISMATCH` detection pattern fired, i.e. the
-Gemfile has `gem "terser"` (or `closure-compiler`) and you are dual-booting across a Rails
+Gemfile has `gem "terser"` and you are dual-booting across a Rails
 version that locks Sprockets to the 2.x line (Rails 4.0 via `sprockets-rails`).
 
 If the app uses plain `uglifier`, you do not need this file. The standard
@@ -11,8 +11,8 @@ If the app uses plain `uglifier`, you do not need this file. The standard
 
 ## The problem in one paragraph
 
-Modern JS-compressor gems (terser, closure-compiler) `require "sprockets/digest_utils"` from
-their railtie. That file exists only in **Sprockets >= 3**. Rails 4.0 pins Sprockets to **2.x**.
+terser's `Terser::Compressor` (`lib/terser/compressor.rb`) does `require "sprockets/digest_utils"`, and
+its railtie references that class at boot. `sprockets/digest_utils` exists only in **Sprockets >= 3**. Rails 4.0 pins Sprockets to **2.x**.
 The next bundle *resolves* fine (so `railsbump` / `next_rails` report nothing), but at **boot**
 Bundler auto-requires the gem, the railtie runs, and you get:
 

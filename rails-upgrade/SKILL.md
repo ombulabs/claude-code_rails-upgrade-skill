@@ -111,7 +111,7 @@ When proposing code fixes that must work with both the current and target Rails 
 - `references/multi-hop-strategy-reference.md` - Multi-version planning
 - `references/testing-checklist-reference.md` - Comprehensive testing
 - `references/gem-compatibility-reference.md` - Gem update order and the "no compatible version" playbook (fork / vendor / replace). Load only when Workflow 06's compatibility check produced blockers.
-- `references/js-compressor-sprockets-mismatch-reference.md` - Keeping terser / closure-compiler working when the target Rails pins Sprockets to the 2.x line. Load only when JS_COMPRESSOR_GEM_MISMATCH fires.
+- `references/js-compressor-sprockets-mismatch-reference.md` - Keeping terser working when the target Rails pins Sprockets to the 2.x line. Load only when JS_COMPRESSOR_GEM_MISMATCH fires.
 
 ### Detection Pattern Resources
 - `detection-scripts/patterns/rails-*.yml` - Version-specific patterns for direct detection

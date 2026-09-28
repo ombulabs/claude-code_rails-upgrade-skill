@@ -187,11 +187,29 @@ SWEEPERS:
     - "class ProductObserver < ActiveRecord::Observer"
 
 ACTION_CACHING:
+  # Pattern: caches_action / expire_action; page caching is PAGE_CACHING.
   match:
     - "  caches_action :index"
-    - "  caches_page :show"
+    - "  caches_action :show, :layout => false, :expires_in => 1.hour"
+    - "    expire_action :controller => 'products', :action => 'index'"
   no_match:
+    - "  caches_page :show"
     - "  fragment_cache_key 'products'"
+    - "    expire_fragment('products/sidebar')"
+    - "  # caches_action :index"
+
+PAGE_CACHING:
+  # Pattern: caches_page / expire_page / page_cache_directory.
+  match:
+    - "  caches_page :show"
+    - "  caches_page :feed, if: Proc.new { |c| !c.request.format.html? }"
+    - "    expire_page :controller => 'products', :action => 'show', :id => product.id"
+    - "  config.action_controller.page_cache_directory = Rails.root.join('public', 'cache').to_s"
+  no_match:
+    - "  caches_action :index"
+    - "  # caches_page :show"
+    # page_cache_extension is still in 4.0 core, as a deprecated alias
+    - "  self.page_cache_extension = '.html'"
 
 ACTIVE_RESOURCE:
   match:
@@ -217,6 +235,92 @@ ASSETS_COMPRESS:
     - "  config.assets.compress = true"
   no_match:
     - "  config.assets.js_compressor = :uglifier"
+
+NON_DIGEST_ASSET_PATHS:
+  # Pattern: "[\"'(]\\s*/assets/"
+  # A literal /assets/ path opened by a quote or a paren.
+  match:
+    # plain CSS url() without quotes
+    - "  background: url(/assets/icons/arrow.png) no-repeat;"
+    # quoted url() in SCSS
+    - "  background-image: url(\"/assets/backgrounds/stripes.png\");"
+    # string literal in plain JavaScript
+    - "    icon.src = '/assets/spinner.gif';"
+    # HAML attribute hash
+    - "%link{ href: '/assets/favicons/apple-touch-icon.png', rel: 'apple-touch-icon' }"
+    # ERB markup
+    - "<img src=\"/assets/logo.png\" alt=\"Logo\">"
+    # a path that already carries a digest still breaks at the bump
+    - "  background: url(/assets/shared/calendar-5f2b9c0d1e3a4b6c7d8e9f0a1b2c3d4e.svg);"
+    # Paperclip-style default in a model or initializer
+    - "  has_attached_file :avatar, default_url: \"/assets/missing.png\""
+    # the leading paren of a helper call does not make the literal path safe
+    - "  background: url(image_path(\"/assets/backgrounds/grid.png\"));"
+  no_match:
+    # asset helpers resolve the digest themselves
+    - "= image_tag \"logo.png\""
+    - "  background-image: image-url(\"backgrounds/stripes.png\");"
+    # a full URL on another host is not served by this app's pipeline
+    - "  background: url(\"https://cdn.example.com/assets/x.svg\");"
+    # the prefix setting itself carries no trailing slash
+    - "  config.assets.prefix = \"/assets\""
+    # a local path with assets further down is not a pipeline path
+    - "  File.join(Rails.root, \"app/assets/images\")"
+    # commented-out references in Ruby, HAML and JavaScript
+    - "  # icon = \"/assets/old_icon.png\""
+    - "  -# %img{ src: '/assets/old_icon.png' }"
+    - "  // icon.src = '/assets/old_icon.png';"
+    # a CSS attribute selector that tests for the prefix is not a reference
+    - "    expect(wrapper.find('img[src^=\"/assets/\"]')).toHaveLength(0)"
+
+CSS_COMPRESSOR_MINIFIED_GUARD:
+  # Pattern: a whole file with at most two newlines and a line of 300+ chars.
+  # Each fixture string stands for a whole file, embedded newlines included.
+  match:
+    # minified on one line, no trailing newline
+    - ".w-btn{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-tab{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-row{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-col{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-nav{display:inline-block;padding:4px 8px;border:1px solid #ccc}"
+    # license banner on line one, minified rules on line two
+    - "/*! widget v2.1.0 | MIT */\n.w-btn{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-tab{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-row{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-col{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-nav{display:inline-block;padding:4px 8px;border:1px solid #ccc}\n"
+  no_match:
+    # three or more newlines: 3.2's guard sent this to Sass too
+    - ".w-btn{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-tab{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-row{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-col{display:inline-block;padding:4px 8px;border:1px solid #ccc}.w-nav{display:inline-block;padding:4px 8px;border:1px solid #ccc}\n.a{color:red}\n.b{color:blue}\n"
+    # an authored stylesheet
+    - ".banner {\n  color: #333;\n}\n"
+    # a short one-line file is not minified vendor CSS
+    - ".hidden{display:none}"
+
+FIELD_HELPERS_SYMBOLS:
+  # Pattern: any reference to field_helpers; lines already normalized are skipped.
+  match:
+    - "  (field_helpers - %w(label fields_for hidden_field)).each do |helper|"
+    - "  helpers = field_helpers +"
+    - "    next unless self.class.field_helpers.include?(\"text_field\")"
+    - "  wrapped = field_helpers.reject { |h| h == \"label\" }"
+  no_match:
+    # already normalized to one element type
+    - "  (field_helpers.map(&:to_s) - %w(label fields_for)).each do |helper|"
+    - "  (field_helpers.map(&:to_sym) - [:label, :fields_for]).each do |helper|"
+    # a longer identifier is not the class attribute
+    - "  custom_field_helpers_list = []"
+    # commented-out reference
+    - "  # field_helpers - %w(label)"
+
+INSTALL_HELPERS_REMOVED:
+  # Pattern: "\\binstall_helpers\\b"; definitions and comments are skipped.
+  match:
+    - "  Rails.application.routes.install_helpers(self)"
+    - "      route_set.install_helpers"
+    - "    routes.install_helpers [ReportMailer, PdfRenderer]"
+  no_match:
+    # the replacement
+    - "  include Rails.application.routes.url_helpers"
+    # a method of the app's own that happens to share the name
+    - "  def install_helpers"
+    - "  def self.install_helpers(target)"
+    # a longer identifier
+    - "  reinstall_helpers_cache!"
+    # commented-out call
+    - "  # Rails.application.routes.install_helpers(self)"
 
 CONFIG_ROUTES_PATH:
   match:
@@ -275,7 +379,7 @@ REQUEST_ENV_MERGE:
     - "request.headers.merge!('HTTP_AUTHORIZATION' => token)"
 
 DUPLICATE_ROOT_ROUTES:
-  # Pattern: "^\\s*root\\s+(to:|=>|['\"])"
+  # Pattern: a root declaration in any hash or string form; `as:` names it.
   # Rails 4 rejects a second `root`; flag every root declaration so a human can
   # count them (a lone hit is noise, 2+ is the breaking case).
   match:
@@ -287,7 +391,17 @@ DUPLICATE_ROOT_ROUTES:
     - "  root \"home#index\""
     # Rails 4 single-quoted string shorthand
     - "  root 'home#index'"
+    # 3.2-era hash rocket on :to
+    - "  root :to => 'pages#home', :constraints => WwwConstraint"
+    # controller / action keys and the paren form
+    - "  root controller: \"pages\", action: \"home\""
+    - "  root(to: \"pages#home\")"
+    # a trailing comment mentioning as: does not name the route
+    - "  root to: \"pages#home\" # TODO add as: :www_root"
   no_match:
+    # a root with its own name does not register :root
+    - "  root to: \"accounts#show\", constraints: SubdomainConstraint, as: :account_root"
+    - "  root :to => 'accounts#show', :as => :account_root"
     # a root_path helper call is not a declaration
     - "    redirect_to root_path"
     # a non-root route must not flag
@@ -412,6 +526,31 @@ VALIDATES_AS_PARANOID:
     # commented-out call is inert
     - '  # validates_as_paranoid'
 
+JS_COMPRESSOR_GEM_MISMATCH:
+  # Pattern: a Gemfile line declaring terser, unless the line before it is `else`
+  # (the 3.2 branch of the fix). Strings with \n stand for two consecutive lines.
+  match:
+    - 'gem "terser"'
+    - "  gem 'terser', '~> 1.2'"
+    # a trailing comment does not count as the fix
+    - '  gem "terser" # needs require: false on the next side'
+    # unfixed, with an unrelated line before it
+    - "group :assets do\n  gem \"terser\""
+  no_match:
+    # the fixed next-side declaration, both hash syntaxes
+    - '    gem "terser", require: false'
+    - "    gem 'terser', :require => false"
+    # uglifier and closure-compiler do not load sprockets/digest_utils
+    - '  gem "uglifier", ">= 1.3.0"'
+    - '  gem "closure-compiler"'
+    # a commented-out declaration
+    - '# gem "terser"'
+    # the fixed Gemfile: next-side line, then the 3.2 line in the else branch
+    - "    gem \"uglifier\", \">= 1.3.0\"\n    gem \"terser\", require: false"
+    - "  else\n    gem \"terser\""
+    - "  gem \"terser\" unless next?"
+    - "  gem 'terser' unless NextRails.next?"
+
 COLLECTION_PROXY_ENUMERABLE_GUARD:
   # Pattern: "(?:is_a\\?|kind_of\\?)\\s*\\(?\\s*Enumerable\\b"
   # is_a?/kind_of? Enumerable guard, with or without parens; \b avoids Enumerable-prefixed names.
@@ -463,12 +602,42 @@ REMOTE_FORM_CSRF_TOKEN:
   # Pattern: form helpers carrying remote: true (either hash syntax).
   # Remote links and plain forms are not affected.
   match:
+    - "= form_for @x, html: { data: { confirm: \"#{t(:sure)}\" } }, remote: true do |f|"
     - '= form_for @user, remote: true do |f|'
     - '  <%= form_tag(search_path, remote: true) do %>'
     - '= form_for @person, :remote => true, html: { class: "opt-in-form" } do |f|'
     - '= simple_form_for @user, remote: true do |f|'
-    - '= form_for [clinic, patient], url: settings_path, remote: true do |f|'
+    - '= form_for [account, member], url: settings_path, remote: true do |f|'
+    # html: { remote: true } is turned into data-remote the same way
+    - '= form_for @note, html: { remote: true, class: "note-form" } do |f|'
+    # an explicit data-remote key in the html options, rocket and quoted-symbol forms
+    - '= form_for [project, task], :builder => TaskFormBuilder, :html => { :"data-remote" => true } do |f|'
+    - '  <%= form_tag search_path, "data-remote": "true" do %>'
+    - '= semantic_form_for @order, remote: true do |f|'
+    # options hash built on an earlier line, then passed to a form helper
+    - '    html_options[:"data-remote"] = true'
+    - '    form_options[:remote] = true'
+    # HAML id shorthand is not a comment
+    - '#search= form_tag search_path, remote: true do'
+    # a remote: true outside the data hash still drops the token
+    - '= form_for @note, remote: true, html: { data: { remote: true } } do |f|'
+    - '= form_for @note, html: { data: { confirm: "Sure?" } }, remote: true do |f|'
   no_match:
+    - "= form_for @x, data: { remote: true, t: \"#{x}\" } do |f|"
+    # data: { remote: true } keeps the hidden token on 4.0, whatever else the hash holds
+    - '= form_for @note, html: { data: { remote: true } } do |f|'
+    - '= form_for @note, html: { data: { remote: true, type: :json } } do |f|'
+    - '= form_tag notes_path, :data => { :type => :json, :remote => true } do'
+    # link options hash literal, not an assignment
+    - "    { \"data-remote\": \"true\", \"data-type\": \"html\" }"
+    # a hand-written form tag gets no token from Rails on either version
+    - "  %form#search{ action: search_path, :\"data-remote\" => true }"
+    # commented-out forms in HAML, ERB and Ruby
+    - '-#= form_for @report, url: reports_path, remote: true do |f|'
+    - '<%#= form_for @report, remote: true do |f| %>'
+    - '  # form_for @report, remote: true'
+    # a longer method name that merely ends in form_for
+    - '= custom_form_for_widget @report, remote: true'
     # remote link_to: UJS builds the form and its token itself
     - '= link_to "Delete", user_path(user), remote: true, method: :delete'
     # button_to renders its own token_tag on POST, regardless of this config

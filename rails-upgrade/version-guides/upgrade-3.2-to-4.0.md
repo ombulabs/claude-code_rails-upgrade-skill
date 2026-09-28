@@ -367,6 +367,42 @@ get '/home' => 'home#index'
 
 ---
 
+#### Duplicate Route Names Raise, Including a Second `root`
+
+**What Changed:**
+Rails 3.2's `RouteSet#add_route` overwrote an existing entry in `named_routes`, so an app
+could declare `root` once per constraints block and boot. Rails 4.0 raises instead:
+
+```
+ArgumentError: Invalid route name, already in use: 'root'
+```
+
+Every `root` without `as:` registers `:root`, so the second one in the same route set stops
+boot. A `root` inside `namespace :admin` registers `admin_root` and does not collide, and an
+engine's routes are a separate route set.
+
+**Detection Pattern:**
+```ruby
+root to: "pages#home", constraints: WwwConstraint
+root to: "accounts#show", constraints: SubdomainConstraint
+```
+
+**Fix:**
+```ruby
+# BEFORE
+root to: "pages#home", constraints: WwwConstraint
+root to: "accounts#show", constraints: SubdomainConstraint
+
+# AFTER: keep the first as :root so root_path / root_url keep working
+root to: "pages#home", constraints: WwwConstraint
+root to: "accounts#show", constraints: SubdomainConstraint, as: :account_root
+```
+
+`as:` on `root` works on 3.2 too, so no `NextRails.next?` branch is needed. Requests to
+`/` still go to the first root whose constraints match.
+
+---
+
 #### Remote Forms Stop Embedding the CSRF Token
 
 **What Changed:**
@@ -399,8 +435,9 @@ the test environment, so no token is rendered in tests either way.
 
 **Detection Pattern:**
 ```bash
-# remote forms whose submit path needs auditing, both hash syntaxes
-grep -rnE "remote:\s*true|:remote\s*=>\s*true" app/views/ app/helpers/
+# remote forms whose submit path needs auditing, both hash syntaxes,
+# plus an explicit "data-remote" key in the form's html options
+grep -rnE "remote:\s*true|:remote\s*=>\s*true|[\"']data-remote[\"']" app/views/ app/helpers/
 
 # confirm the app never pinned the config
 grep -rn "embed_authenticity_token_in_remote_forms" config/
@@ -412,6 +449,12 @@ BUNDLE_GEMFILE=Gemfile.next bundle exec rails runner 'puts ActionView::Helpers::
 
 Remote `link_to` / `button_to` links are safe: UJS builds their form and token itself.
 The grep is a list of forms to audit, not a list of forms to change.
+
+The flip keys on the literal `data-remote` html option. `remote: true`,
+`html: { remote: true }` and `html: { "data-remote" => true }` all drop the token on 4.0,
+including when a helper builds that hash on an earlier line
+(`html_options[:"data-remote"] = true`). `data: { remote: true }` does not: the form
+still renders `data-remote="true"`, but the hidden token stays.
 
 **Fix:**
 ```ruby
@@ -458,6 +501,52 @@ end
 Related: **4.2** masks the token per request (`CSRF_TOKEN_MASKING`), so any client that
 caches a token across requests breaks there. **7.0** replaces UJS with Turbo and the
 submit path changes again.
+
+---
+
+#### terser Fails to Load on Sprockets 2.x
+
+**What Changed:**
+Rails 4.0 runs on `sprockets-rails` 2.0, which pins Sprockets to 2.x. terser's
+`Terser::Compressor` requires `sprockets/digest_utils`, which only exists from Sprockets
+3.0. The bundle resolves, because terser does not declare a sprockets dependency, but
+terser's railtie registers the compressor in a `config.assets.configure` block that
+sprockets-rails 2.0 runs at boot, and the app dies with:
+
+```
+LoadError: cannot load such file -- sprockets/digest_utils
+```
+
+On 3.2, `config.assets.configure` is only an unset option, so the block never runs and
+the current side boots. `uglifier` and `closure-compiler` do not load that file.
+
+**Detection Pattern:**
+```ruby
+# Gemfile
+gem "terser"
+```
+
+**Fix:**
+```ruby
+# BEFORE
+group :assets do
+  gem "terser"
+end
+
+# AFTER
+group :assets do
+  if next?
+    gem "uglifier", ">= 1.3.0"   # only so :uglifier resolves in env configs
+    gem "terser", require: false
+  else
+    gem "terser"
+  end
+end
+```
+
+`require: false` alone stops the boot failure. To keep compiling with terser on the next
+side, register it at compile time with a rake task: the full recipe is in
+`references/js-compressor-sprockets-mismatch-reference.md`.
 
 ---
 
@@ -705,22 +794,36 @@ Note: This is the same gem as "Observers Extracted" — `rails-observers` bundle
 
 ---
 
-#### Action Caching Extracted
+#### Page and Action Caching Extracted
 
 **What Changed:**
-`caches_page` and `caches_action` are no longer included.
+Rails 4.0 removes page caching and action caching from Action Pack and ships them as two
+separate gems. `caches_page`, `expire_page` and `page_cache_directory` move to
+`actionpack-page_caching`; `caches_action` and `expire_action` move to
+`actionpack-action_caching`. Without the matching gem, `caches_page` or `caches_action`
+raises `NoMethodError` when the controller class loads.
 
 **Detection Pattern:**
 ```ruby
 caches_page :public
+expire_page action: "public"
 caches_action :index, :show
+expire_action action: "index"
 ```
 
 **Fix:**
 ```ruby
-# Gemfile
-gem 'actionpack-action_caching'
+# BEFORE: Gemfile, nothing needed on 3.2
+
+# AFTER: add only the gem for the methods the app calls, on the next side,
+# since both gems require actionpack >= 4.0 and cannot bundle on 3.2
+if next?
+  gem "actionpack-page_caching"    # caches_page, expire_page
+  gem "actionpack-action_caching"  # caches_action, expire_action
+end
 ```
+
+Call sites stay as they are.
 
 ---
 
@@ -746,6 +849,175 @@ Rails 4.0 dropped support for `vendor/plugins`.
 - Move plugin code to `lib/` and require it
 - Convert to a gem
 - Find a gem replacement
+
+---
+
+#### Precompile No Longer Writes Non-Digest Asset Copies
+
+**What Changed:**
+On Rails 3.2, `rake assets:precompile` ran a second `assets:precompile:nondigest` pass
+whenever `config.assets.digest` was on, so `public/assets/` held both `logo-<digest>.png`
+and a plain `logo.png`. On 4.0 the task comes from `sprockets-rails` 2.x, whose
+`Sprockets::Manifest#compile` writes the digested file only. Any hardcoded
+`/assets/logo.png` stops resolving in production once the 4.0 bundle is precompiled.
+
+Nothing raises. The page renders, and the test suite stays green because Sprockets serves
+logical paths live wherever `config.assets.compile` is on (the test default). The symptom
+is a broken image, icon or font in production. A literal path that already carries a
+digest breaks too: the digest mixes in the Sprockets version, so it changes at the bump.
+
+**Detection Pattern:**
+```bash
+grep -rnE "[\"'(][[:space:]]*/assets/" app/ lib/ config/ vendor/assets/ public/*.html
+```
+
+**Fix:**
+```scss
+// BEFORE (plain .css, or .css.scss)
+.banner { background: url(/assets/backgrounds/stripes.png); }
+
+// AFTER (rename the file to .css.scss first if it is plain .css)
+.banner { background: image-url("backgrounds/stripes.png"); }
+```
+
+```haml
+-# BEFORE
+%link{ href: '/assets/favicons/apple-touch-icon.png', rel: 'apple-touch-icon' }
+
+-# AFTER
+%link{ href: asset_path('favicons/apple-touch-icon.png'), rel: 'apple-touch-icon' }
+```
+
+The helpers exist on 3.2, so the change ships before the bump. In plain JavaScript,
+render the path from the view (`data-icon="<%= asset_path('spinner.gif') %>"`) instead of
+hardcoding it. A file that something outside the app links to directly (a sent email, a
+static error page in `public/`) belongs in `public/`, outside the pipeline. Do not set
+`config.assets.digest = false` to get the plain names back: that drops cache busting for
+every asset.
+
+---
+
+#### Sass CSS Compressor Now Parses Minified Stylesheets
+
+**What Changed:**
+sass-rails 3.2.6 installed `Sass::Rails::CssCompressor` only when `config.assets.compress`
+was set, and it returned the CSS untouched unless the bundle had more than two newlines:
+
+```ruby
+def compress(css)
+  if css.count("\n") > 2
+    Sass::Engine.new(css, ...).render
+  else
+    css
+  end
+end
+```
+
+sass-rails 4.0.0 replaces that with `config.assets.css_compressor ||= :sass` in every
+environment except development, and `:sass` is `Sprockets::SassCompressor`, which sends
+every bundle through `Sass::Engine` with no guard. A one-line vendored `.min.css` that
+3.2 passed through is now parsed as SCSS, and Ruby Sass rejects some valid CSS:
+
+```
+Sass::SyntaxError: "var(--gap)" is not a number for `max'
+```
+
+That aborts `assets:precompile`. The compressor is now installed in the test environment
+too, so a feature spec whose page loads the stylesheet gets the same error from the asset
+request. The compressor runs per bundle: a minified file pulled into a larger manifest
+with `*= require` was already parsed on 3.2, so the files that change behavior are the
+ones precompiled or linked on their own. An app that sets `config.assets.css_compressor`
+itself is not affected, because sass-rails only fills in an unset value.
+
+**Detection Pattern:**
+```bash
+# .css files with at most two newlines (the same count as the 3.2 guard)
+# and a line of 300+ characters
+ruby -e 'Dir["{app,lib,vendor}/assets/stylesheets/**/*.css"].each { |f| css = File.read(f); puts f if css.count("\n") <= 2 && css.lines.any? { |l| l.chomp.length >= 300 } }'
+```
+
+**Fix:**
+First precompile the 4.0 bundle in a production-like environment to see whether a flagged
+file fails at all. If one does, keep the 3.2 guard by assigning a compressor object, which
+stops sass-rails' `||=` from installing its own:
+
+```ruby
+# BEFORE: nothing set, sass-rails 4.0 installs the unguarded :sass compressor
+
+# AFTER: config/application.rb, valid on 3.2 and 4.0
+config.assets.css_compressor = Class.new do
+  def compress(css)
+    return css unless css.count("\n") > 2
+
+    Sass::Engine.new(css, syntax: :scss, style: :compressed,
+                          cache: false, read_cache: false).render
+  end
+end.new
+```
+
+Other options are bumping the `sass` gem (3.7.4 renders `max(var(--gap), 1px)`, 3.4
+does not) or switching to a CSS-only compressor. Do not assign an object whose `compress`
+returns its input unchanged: precompile goes green, production CSS silently stops being
+minified, and nothing reports it. Compare the size of the precompiled `application-*.css`
+with the 3.2 build.
+
+---
+
+#### `FormBuilder.field_helpers` Holds Symbols, Not Strings
+
+**What Changed:**
+On 3.2, `ActionView::Helpers::FormBuilder.field_helpers` is
+`FormHelper.instance_method_names - %w(form_for convert_to_model)`, a list of strings.
+On 4.0 it is a literal array of symbols. String operations on it silently stop matching:
+`field_helpers - %w(label fields_for)` removes nothing on 4.0. A custom builder that
+decorates every helper except a few ends up redefining the ones it meant to skip, and
+nothing raises or warns.
+
+**Detection Pattern:**
+```ruby
+class LabeledFormBuilder < ActionView::Helpers::FormBuilder
+  (field_helpers - %w(label fields_for hidden_field)).each do |helper|
+```
+
+**Fix:**
+```ruby
+# BEFORE
+(field_helpers - %w(label fields_for hidden_field)).each do |helper|
+
+# AFTER: same list on 3.2 and 4.0
+(field_helpers.map(&:to_s) - %w(label fields_for hidden_field)).each do |helper|
+```
+
+---
+
+#### `RouteSet#install_helpers` Removed
+
+**What Changed:**
+Rails 3.2's `RouteSet#install_helpers(destinations = [ActionController::Base, ActionView::Base])`
+mixed a route set's named-route helpers into other classes. Rails 4.0 removed it, so any
+call raises `NoMethodError: undefined method 'install_helpers'`, often in spec setup that
+builds its own `RouteSet`.
+
+**Detection Pattern:**
+```ruby
+Rails.application.routes.install_helpers(self)
+route_set.install_helpers
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Rails.application.routes.install_helpers(self)
+
+# AFTER: works on 3.2 and 4.0
+include Rails.application.routes.url_helpers
+
+# BEFORE (spec with its own route set)
+route_set.install_helpers
+
+# AFTER
+ActionView::Base.send(:include, route_set.url_helpers)
+```
 
 ---
 
@@ -1106,6 +1378,8 @@ gem 'rails', '~> 4.0.0'
 
 # Add if needed
 gem 'rails-observers'       # If using observers or sweepers
+gem 'actionpack-page_caching'   # If using caches_page
+gem 'actionpack-action_caching' # If using caches_action
 ```
 
 ```bash
@@ -1147,6 +1421,7 @@ Review changes to:
 - Check partials for `undefined local variable` errors from removed magic variables
 - Check JSON serialization — Rails 4 may add `id: nil` to serialized objects
 - Check error message assertions — SQL quoting changed (parentheses → backticks)
+- Precompile the 4.0 bundle and confirm every literal `/assets/` path still resolves to a file under `public/assets/`
 
 ---
 
@@ -1172,10 +1447,14 @@ Error → section lookup for the most common errors encountered during this upgr
 | Scope returns wrong results or errors | "Scopes", under "Scopes and Association Options Require Lambda" — add lambda |
 | `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`", under "Scopes and Association Options Require Lambda" — move to lambda |
 | `No route matches` | "Routes Require HTTP Method" — add HTTP method |
+| `ArgumentError: Invalid route name, already in use: 'root'` | "Duplicate Route Names Raise, Including a Second `root`": add `as:` to the later roots |
 | Remote form POST arrives with no session or current user | "Remote Forms Stop Embedding the CSRF Token" — pin `embed_authenticity_token_in_remote_forms` |
+| `LoadError: cannot load such file -- sprockets/digest_utils` at boot | "terser Fails to Load on Sprockets 2.x": `require: false` on the next side |
 | `ArgumentError: The method .order() must contain arguments.` | "`order` and `reorder` Require Arguments" — name the column, `order(:id)` for `.order.last` |
 | `ArgumentError: Direction should be :asc or :desc` | "`order` and `reorder` Require Arguments" — hash values must be `:asc` / `:desc`; use strings across joins |
 | `NoMethodError: undefined method 'rescue_action'` | "`rescue_action` Removed — Use `rescue_from`" |
+| `NoMethodError: undefined method 'install_helpers'` | "`RouteSet#install_helpers` Removed": include `url_helpers` instead |
+| `NoMethodError: undefined method 'caches_page'` or `'caches_action'` | "Page and Action Caching Extracted": add the matching gem on the next side |
 | `undefined local variable or method` in partial | "Partial Magic Variables Removed" — pass `locals:` |
 | Cache misses after upgrade | "`cache_key` Timestamp Format Changed" — changed to `:nsec` |
 | `invalid date` in fixtures | "Fixture Dates Must Be Cast to Strings" — cast with `.to_s(:db)` |
@@ -1183,6 +1462,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NameError: uninitialized constant ActiveSupport::BufferedLogger` | "`ActiveSupport::BufferedLogger` Renamed" — renamed to `ActiveSupport::Logger` |
 | `ActiveRecord::ImmutableRelation` | "`ActiveRecord::ImmutableRelation` Error" — use `.distinct.count` |
 | Controller specs don't see custom headers | "Test Request Headers API Changed" — use `request.headers.merge!` |
+| Images, icons or fonts 404 in production, fine in tests | "Precompile No Longer Writes Non-Digest Asset Copies": replace literal `/assets/` paths with asset helpers |
+| `Sass::SyntaxError` from `assets:precompile` in a `.min.css` file | "Sass CSS Compressor Now Parses Minified Stylesheets": restore the newline guard |
 
 ---
 

@@ -245,14 +245,14 @@ upgrade_findings:
       fix: "Guard the call with `unless NextRails.next?`: `validates_as_paranoid unless NextRails.next?`. With paranoia's default_scope, uniqueness validators using `Model.where(...)` automatically skip soft-deleted records, so the explicit declaration is redundant on Rails 4+. Same guard applies if the codebase keeps `rails3_acts_as_paranoid` gated `unless next?` without swapping to paranoia — the call site is a no-op on the next side either way"
       variable_name: "VALIDATES_AS_PARANOID"
 
-    - name: "Modern JS-compressor gem requires newer Sprockets than Rails 4 ships"
+    - name: "terser gem requires newer Sprockets than Rails 4.0 ships"
       kind: "breaking"
-      pattern: "gem\\s+['\"](terser|closure-compiler)['\"]"
-      exclude: ""
+      pattern: "(?<!\\belse\\n|\\belse \\n)^\\s*gem\\s+['\"]terser['\"]"
+      exclude: ",\\s*(?:require:|:require\\s*=>)\\s*false\\b|\\bunless\\s+(?:NextRails\\.)?next\\?"
       search_paths:
         - "Gemfile"
-      explanation: "Only fires when terser or closure-compiler is in the Gemfile — apps on plain uglifier never see this entry. Modern JS-compressor gems (terser, closure-compiler) declare a runtime dependency on `sprockets/digest_utils`, which exists only in Sprockets >= 3. Rails 4.0 locks Sprockets to the 2.x line via sprockets-rails. On Rails 4.0's next side the bundle resolves cleanly (gemspec passes railsbump's check) but the gem's railtie loads at boot and raises `LoadError: cannot load such file -- sprockets/digest_utils`. Invisible to railsbump because the failure is at require-time, after the bundle is locked. Apps reach for terser deliberately (modern JS the abandoned uglifier 4.2.0 cannot compile: ES2020 optional chaining `?.`, UTF-8 source), so you cannot simply swap it for uglifier on the next side without losing those assets. For uglifier itself the breaking versions are 4.x+, so a hit on a bare `gem \"uglifier\"` needs a version-pin check"
-      fix: "Keep terser on the next side but stop its railtie from auto-loading on Sprockets 2.x: `gem \"terser\", require: false` (require: false is mandatory or boot dies with the LoadError). Add `gem \"uglifier\", \">= 1.3.0\"` on the next side too, only so the `:uglifier` symbol resolves in environment configs, then register Terser as the real compressor at compile time via a rake task hooked on assets:environment. The current (Rails 3.2) side keeps plain `gem \"terser\"` (its railtie is harmless there). Full recipe with Gemfile, env-config, and rake-task examples: rails-upgrade/references/js-compressor-sprockets-mismatch-reference.md"
+      explanation: "terser's lib/terser/compressor.rb starts with `require 'sprockets/digest_utils'`, a file that exists only in Sprockets 3.0 and later. Rails 4.0 runs on sprockets-rails 2.0, which pins Sprockets to 2.x. The bundle still resolves, because terser's gemspec does not depend on sprockets. At boot Bundler requires terser, its railtie registers `Terser::Compressor` inside `config.assets.configure`, sprockets-rails 2.0 runs that block in after_initialize, the autoload fires, and boot raises `LoadError: cannot load such file -- sprockets/digest_utils`. On 3.2 the same railtie call does nothing, because `config.assets.configure` is only an unset option there, so the current side boots fine. Apps usually add terser on purpose, since uglifier 4.2.0 cannot parse newer syntax such as optional chaining (`a?.b`), so swapping it back to uglifier on the next side can break those assets. uglifier and closure-compiler do not require sprockets/digest_utils and are not affected. The documented fix is excluded: a terser line carrying `require: false`, a terser line in the `else` branch right after `else` (the 3.2 side of an `if next?` block), and `gem \"terser\" unless next?`. The `else` check is a lookbehind on the previous line, so a plain `gem \"terser\"` directly under the `else` of some other condition is skipped too"
+      fix: "Keep terser on the next side with `gem \"terser\", require: false` (without it boot dies with the LoadError). Add `gem \"uglifier\", \">= 1.3.0\"` on the next side too, only so the `:uglifier` symbol resolves in environment configs, then register Terser as the real compressor at compile time via a rake task hooked on assets:environment. The current (Rails 3.2) side keeps plain `gem \"terser\"`. Full recipe with Gemfile, env-config, and rake-task examples: rails-upgrade/references/js-compressor-sprockets-mismatch-reference.md"
       variable_name: "JS_COMPRESSOR_GEM_MISMATCH"
 
     - name: "validates_format_of with multiline anchors (^...$)"
@@ -289,12 +289,12 @@ upgrade_findings:
 
     - name: "Duplicate root route declarations across constraints"
       kind: "breaking"
-      pattern: "^\\s*root\\s+(to:|=>|['\"])"
-      exclude: ""
+      pattern: "^\\s*root\\s*\\(?\\s*(?:to:|:to\\s*=>|controller:|:controller\\s*=>|=>|['\"])"
+      exclude: ",\\s*(?:as:|:as\\s*=>)"
       search_paths:
         - "config/"
-      explanation: "Only actionable when the routes file has 2+ `root` declarations (typically one per constraint block); a single root is fine, so treat a lone hit as noise. Rails 4 raises `ArgumentError: Invalid route name, already in use: 'root'` on the second and later `root` declarations. Rails 3.2 was lenient about duplicate names with different constraints. Matches all three forms: `root to:`, `root =>`, and the Rails 4 string shorthand `root \"home#index\"`"
-      fix: "Keep the FIRST `root` declaration as the default `:root` name; add `as: :<unique_name>` to the SECOND and subsequent declarations. Renaming all of them (giving the first an `as:` too) silently breaks every `root_path` / `root_url` call site because the `:root` name is no longer registered. Real apps have dozens to hundreds of these helper calls. Verification step: `grep -rnE \"\\b(root_path|root_url)\\b\" app/ config/ lib/` and confirm no caller targets a constraint-bound root that was renamed"
+      explanation: "Rails 4.0's RouteSet#add_route raises `ArgumentError: Invalid route name, already in use: 'root'` when a route name is registered twice. Rails 3.2's add_route just overwrote the entry in named_routes, so an app could declare `root` once per constraints block (one per subdomain, say) and boot. Every `root` without `as:` registers the name `:root`, so the second one in the same route set now stops boot. Only a count of two or more matters: a lone root is fine, a root with `as:` has its own name and is excluded, and a root inside `namespace :admin` or `scope as: :admin` registers `admin_root`, which does not collide. Routes drawn by an engine (`Engine.routes.draw`) live in a separate route set. The pattern matches `root to:`, `root :to =>`, `root controller:`, the paren form and the string shorthand `root \"home#index\"`, one line at a time, so read the surrounding block before counting"
+      fix: "Keep the FIRST `root` declaration as the default `:root` name; add `as: :<unique_name>` to the SECOND and subsequent declarations (`as:` on root works on 3.2 too, so no NextRails.next? branch is needed). Renaming all of them (giving the first an `as:` too) silently breaks every `root_path` / `root_url` call site because the `:root` name is no longer registered. Request routing does not change: the first route whose constraints match still serves `/`. Verification step: `grep -rnE \"\\b(root_path|root_url)\\b\" app/ config/ lib/` and confirm no caller targets a constraint-bound root that was renamed"
       variable_name: "DUPLICATE_ROOT_ROUTES"
 
     - name: "Hyphenated or CamelCase controller name in routes to: value"
@@ -319,13 +319,13 @@ upgrade_findings:
 
     - name: "Remote form that relies on an embedded CSRF token"
       kind: "breaking"
-      pattern: "(form_for|form_tag|form_with|simple_form_for)[^\\n]*(remote:\\s*true|:remote\\s*=>\\s*true)"
-      exclude: ""
+      pattern: "\\b(?:form_for|form_tag|form_with|simple_form_for|semantic_form_for|nested_form_for)\\b(?:\\bdata:\\s*\\{(?:[^{}#\\n]|#(?!\\{)|#?\\{[^{}\\n]*\\})*\\}|:data\\s*=>\\s*\\{(?:[^{}#\\n]|#(?!\\{)|#?\\{[^{}\\n]*\\})*\\}|(?!\\bdata:\\s*\\{|:data\\s*=>\\s*\\{)[^\\n])*?(?:\\bremote:\\s*true|:remote\\s*=>\\s*true|[\"']data-remote[\"']:?\\s*(?:=>\\s*)?(?:true|[\"']true[\"']))|\\[\\s*:?[\"']?(?:data-remote|remote)[\"']?\\s*\\]\\s*=\\s*(?:true|[\"']true[\"'])"
+      exclude: "^\\s*(?:#(?:\\s|$)|-#|<%#)"
       search_paths:
         - "app/views/"
         - "app/helpers/"
         - "app/cells/"
-      explanation: "Rails 4.0 flips the default of config.action_view.embed_authenticity_token_in_remote_forms from true to false, so remote forms stop rendering the hidden authenticity_token field. From then on the token reaches the server only as the X-CSRF-Token header that rails-ujs sets from the csrf-token meta tag. Any submit path that does not go through rails-ujs (custom fetch / XHR that posts a FormData built from the form, a jQuery-triggered submit, an iframe upload, a form serialized by a plugin) posts with no CSRF token at all, and bare protect_from_forgery nulls the session instead of raising, so the request silently loses its user rather than erroring. Nothing in the test suite catches it: allow_forgery_protection is false in the test environment, and rack_test drivers never run the JavaScript that does the submitting. The regex flags remote form helpers; remote link_to links are safe (rails-ujs builds their form and token itself), and so is button_to, which renders its own token_tag on POST and never consults this config, so neither is in the regex. The regex also matches one line at a time, so a form helper split across lines with remote: true on a continuation line is missed, so this is a list of forms to audit, not a list of forms to change"
+      explanation: "Rails 4.0 flips the default of config.action_view.embed_authenticity_token_in_remote_forms from true to false, so remote forms stop rendering the hidden authenticity_token field. From then on the token reaches the server only as the X-CSRF-Token header that rails-ujs sets from the csrf-token meta tag. Any submit path that does not go through rails-ujs (custom fetch / XHR that posts a FormData built from the form, a jQuery-triggered submit, an iframe upload, a form serialized by a plugin) posts with no CSRF token at all, and bare protect_from_forgery nulls the session instead of raising, so the request silently loses its user rather than erroring. Nothing in the test suite catches it: allow_forgery_protection is false in the test environment, and rack_test drivers never run the JavaScript that does the submitting. The flip applies to every form whose html options end up with a data-remote key: `remote: true` on the helper, `html: { remote: true }`, and an explicit `:\"data-remote\" => true` in the html options all drop the token on 4.0, while `data: { remote: true }` keeps it, because FormTagHelper#html_options_for_form only checks the literal \"data-remote\" key. The regex steps over a `data: { ... }` / `:data => { ... }` hash (it may hold `#{}` interpolation or one nested hash), so a remote key inside it is not counted and one outside it still is. Comments are skipped (`# `, `-#`, `<%#`), but a HAML id shorthand such as `#search= form_tag ...` is not a comment and is still flagged. The regex flags form helpers carrying any of those keys on the same line, plus `opts[:remote] = true` / `opts[:\"data-remote\"] = true` assignments, which is how helpers and partials build the options hash on an earlier line; an assignment can also be building link options, so check what the hash is passed to. Remote link_to links are safe (rails-ujs builds their form and token itself), and so is button_to, which renders its own token_tag on POST and never consults this config, so neither is in the regex. A hand-written `<form data-remote>` tag gets no token from Rails on either version, so it is not in the regex either. The regex matches one line at a time, so a form helper split across lines with remote: true on a continuation line is missed, so this is a list of forms to audit, not a list of forms to change"
       fix: "Set config.action_view.embed_authenticity_token_in_remote_forms = true in config/application.rb to keep the Rails 3.2 behavior on both sides of a dual boot, then audit the JavaScript that submits each flagged form: anything not driven by rails-ujs needs the X-CSRF-Token header set explicitly. See 'Remote Forms Stop Embedding the CSRF Token' in version-guides/upgrade-3.2-to-4.0.md"
       variable_name: "REMOTE_FORM_CSRF_TOKEN"
 
@@ -373,15 +373,28 @@ upgrade_findings:
       fix: "Add gem 'rails-observers' to Gemfile (includes sweepers)"
       variable_name: "SWEEPERS"
 
-    - name: "Action caching (caches_page/caches_action)"
+    - name: "Action caching (caches_action)"
       kind: "breaking"
-      pattern: "caches_page|caches_action"
-      exclude: ""
+      pattern: "\\b(?:caches_action|expire_action)\\b"
+      exclude: "^\\s*#"
       search_paths:
-        - "app/controllers/"
-      explanation: "Page and action caching were extracted from Rails 4.0 into two separate gems: caches_page moved to actionpack-page_caching, caches_action moved to actionpack-action_caching"
-      fix: "Add gem 'actionpack-page_caching' for caches_page and/or gem 'actionpack-action_caching' for caches_action, matching the methods the app actually uses"
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.0 deletes actionpack's action_controller/caching/actions.rb and moves action caching into the actionpack-action_caching gem. Without the gem, `caches_action` raises NoMethodError when the controller class loads, and `expire_action` (often called from sweepers or models) raises when it runs. Page caching moved to a different gem; see PAGE_CACHING"
+      fix: "Add `gem \"actionpack-action_caching\"` to the next side of the Gemfile only: the gem has required actionpack >= 4.0 since its first release, so it cannot bundle on 3.2, where the methods still come from Rails. Call sites stay as they are"
       variable_name: "ACTION_CACHING"
+
+    - name: "Page caching (caches_page)"
+      kind: "breaking"
+      pattern: "\\b(?:caches_page|expire_page|page_cache_directory)\\b"
+      exclude: "^\\s*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+      explanation: "Rails 4.0 deletes actionpack's action_controller/caching/pages.rb and moves page caching into the actionpack-page_caching gem. Without the gem, `caches_page` raises NoMethodError when the controller class loads, `expire_page` raises when it runs, and a `page_cache_directory` setting has nothing to configure. actionpack-action_caching does not provide any of these; see ACTION_CACHING"
+      fix: "Add `gem \"actionpack-page_caching\"` to the next side of the Gemfile only: the gem has required actionpack >= 4.0 since its first release, so it cannot bundle on 3.2, where the methods still come from Rails. Call sites stay as they are. The gem sets `page_cache_directory` to public/ when the app does not, which matches the 3.2 default"
+      variable_name: "PAGE_CACHING"
 
     - name: "ActiveResource usage"
       kind: "breaking"
@@ -436,6 +449,57 @@ upgrade_findings:
       explanation: "config.assets.compress was removed in Rails 4.0"
       fix: "Replace with config.assets.js_compressor = :uglifier and config.assets.css_compressor = :sass"
       variable_name: "ASSETS_COMPRESS"
+
+    - name: "Hardcoded /assets/ path to a pipeline asset"
+      kind: "breaking"
+      pattern: "[\"'(]\\s*/assets/"
+      exclude: "^\\s*(?://|-#)|^\\s*#\\s|\\[[\\w-]+[\\^$*~|]?=\\s*[\"']/assets/"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+        - "vendor/assets/"
+        - "public/*.html"
+      explanation: "Rails 3.2 wrote every precompiled asset twice. When config.assets.digest is on, the 3.2 `assets:precompile:all` task (actionpack lib/sprockets/assets.rake) runs `assets:precompile:nondigest` after the digest pass, so public/assets/ holds both logo-<digest>.png and a plain logo.png. On 4.0 the precompile task comes from sprockets-rails 2.x, which calls Sprockets::Manifest#compile and writes only the digested file. Every literal `/assets/name.ext` reference then 404s once the 4.0 bundle is deployed with precompiled assets. The app boots, the page renders and the test suite stays green (with config.assets.compile on, the test-environment default, Sprockets serves logical paths live), so the first sign is a missing image or font in production. A literal path that already carries a digest (`/assets/logo-0a1b2c...png`) breaks too: the digest mixes in the Sprockets version, so it changes at the bump even when the file does not. The pattern flags a quote or `(` followed by `/assets/`, so `url(/assets/x.png)`, `\"/assets/x.png\"` and `'/assets/x.png'` all match, while a full URL on another host (`https://cdn.example.com/assets/x.png`) does not. It skips spec/ and test/ on purpose: a request spec that GETs `/assets/...` is served live by Sprockets and still passes on 4.0"
+      fix: "Replace each literal with the asset helper for its file type, all of which work on 3.2 and 4.0, so the change lands before the bump: `image_tag(\"logo.png\")` or `asset_path(\"logo.png\")` in ERB / HAML, `image-url(\"logo.png\")` or `asset-url(...)` in SCSS (a plain .css file must be renamed to .css.scss first, and any `config.assets.precompile` entry naming it updated), and for plain JavaScript render the path from the view with `asset_path` into a data- attribute instead of hardcoding it. Paperclip-style `default_url: \"/assets/missing.png\"` options need `ActionController::Base.helpers.asset_path(\"missing.png\")`. For a URL that something outside the app already holds (a sent email, a partner integration, a static error page in public/), move the file out of app/assets into public/ so the plain path keeps working. Do not set `config.assets.digest = false` to get the plain names back: it drops cache busting for every asset. After precompiling the 4.0 bundle, check that each remaining literal path resolves to a file under public/"
+      variable_name: "NON_DIGEST_ASSET_PATHS"
+
+    - name: "Minified stylesheet now parsed by the Sass CSS compressor"
+      kind: "breaking"
+      pattern: "\\A(?=(?:[^\\n]*\\n){0,2}[^\\n]*\\z)(?=(?:[^\\n]*\\n){0,2}[^\\n]{300})"
+      exclude: ""
+      search_paths:
+        - "app/assets/stylesheets/**/*.css"
+        - "lib/assets/stylesheets/**/*.css"
+        - "vendor/assets/stylesheets/**/*.css"
+      explanation: "sass-rails changes its CSS compressor between the 3.2 and 4.0 lines. sass-rails 3.2.6 installs `Sass::Rails::CssCompressor` only when `config.assets.compress` is set, and its `compress` returns the CSS untouched unless it has more than two newlines, so a one- or two-line minified file skipped Sass entirely. sass-rails 4.0.0 sets `config.assets.css_compressor ||= :sass` in every environment except development, and `:sass` is `Sprockets::SassCompressor`, which hands every bundle to `Sass::Engine` with no guard. A minified file that Ruby Sass cannot parse now fails: with the sass 3.4 gem, `max(var(--gap), 1px)` raises `Sass::SyntaxError: \"var(--gap)\" is not a number for 'max'`. That aborts `assets:precompile`, and because the compressor is now also installed in the test environment, a feature spec whose page loads that stylesheet gets the same error back from the asset request. The pattern flags a .css file with at most two newlines and a line of 300 or more characters, the shape 3.2's guard let through. The compressor runs per bundle, so a file only pulled into a larger manifest with `*= require` was already parsed by Sass on 3.2 and is not a regression; the hits that matter are files precompiled or linked on their own. Nothing changes for an app that already sets `config.assets.css_compressor` to something else, because sass-rails only fills it in when it is unset"
+      fix: "First precompile the 4.0 bundle in a production-like environment to find out whether any flagged file actually fails. If one does, keep 3.2's behavior by giving sass-rails a compressor object so its `||=` leaves it alone: in config/application.rb, `config.assets.css_compressor = Class.new { def compress(css); return css unless css.count(\"\\n\") > 2; Sass::Engine.new(css, syntax: :scss, style: :compressed, cache: false, read_cache: false).render; end }.new`. It works on 3.2 and 4.0 alike, so it needs no NextRails.next? branch. Other options: bump the sass gem (3.7.4 renders `max(var(--gap), 1px)` that 3.4 rejects) or switch to a CSS-only compressor. Do not assign an object whose `compress` returns its input unchanged: precompile goes green, but production CSS stops being minified and nothing reports it. Then compare the size of the precompiled application-*.css with the 3.2 build"
+      variable_name: "CSS_COMPRESSOR_MINIFIED_GUARD"
+
+    - name: "FormBuilder.field_helpers compared against strings"
+      kind: "breaking"
+      pattern: "\\bfield_helpers\\b"
+      exclude: "^\\s*#|^[^#]*\\bfield_helpers\\.(?:map|collect)\\(&:to_s(?:ym)?\\)"
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "ActionView::Helpers::FormBuilder.field_helpers changes element type at 4.0. On 3.2 it is built as `FormHelper.instance_method_names - %w(form_for convert_to_model)`, and instance_method_names returns strings, so the list holds \"text_field\", \"label\" and so on. On 4.0 it is a literal array of symbols (`[:fields_for, :label, :text_field, ...]`). Custom form builders that do string work on it silently stop matching: `field_helpers - %w(label fields_for)` removes nothing, `field_helpers.include?(\"text_field\")` is false, `helper == \"label\"` never hits. The usual victim is a builder that decorates every helper except a few, so on 4.0 it also redefines label, hidden_field or fields_for and changes what those fields render. Nothing raises or warns at the bump. The pattern flags every reference to field_helpers in app/ and lib/ so each one can be checked; a line that already normalizes with `.map(&:to_s)` or `.map(&:to_sym)` is excluded"
+      fix: "Normalize the element type before comparing: `field_helpers.map(&:to_s) - %w(label fields_for)` when the other side is strings, or `field_helpers.map(&:to_sym) - [:label, :fields_for]` when it is symbols. Both give the same list on 3.2 and 4.0, so the change ships before the bump without a NextRails.next? branch. Add a spec that builds a form with the custom builder and asserts the helpers meant to be skipped render as plain Rails output"
+      variable_name: "FIELD_HELPERS_SYMBOLS"
+
+    - name: "RouteSet#install_helpers removed"
+      kind: "breaking"
+      pattern: "\\binstall_helpers\\b"
+      exclude: "^\\s*#|\\bdef\\s+(?:self\\.)?install_helpers\\b"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 3.2's ActionDispatch::Routing::RouteSet#install_helpers(destinations = [ActionController::Base, ActionView::Base]) mixed a route set's named-route helpers into the given classes. Rails 4.0 removed the method, so `Rails.application.routes.install_helpers(SomeClass)` or `route_set.install_helpers` raises NoMethodError wherever it runs: at class load in app code, or in the setup of a spec that builds its own RouteSet. The pattern flags every call; a method definition named install_helpers is excluded"
+      fix: "Include the route set's url_helpers module instead, which exists on 3.2 and 4.0, so the change ships before the bump: `include Rails.application.routes.url_helpers` inside the class, or `SomeClass.send(:include, route_set.url_helpers)` from outside it (`include` is private on Ruby versions before 2.1). For a spec that called `route_set.install_helpers` with no argument, include the module into the classes it used to target, usually ActionView::Base or the view object under test"
+      variable_name: "INSTALL_HELPERS_REMOVED"
 
     - name: "config.paths[\"config/routes\"] (without .rb)"
       kind: "breaking"
@@ -618,13 +682,13 @@ dependencies:
   actionpack_action_caching:
     check: false
     gem_name: "actionpack-action_caching"
-    message: "Required if using caches_action — extracted from Rails core at 4.0"
+    message: "Required if using caches_action or expire_action (ACTION_CACHING), extracted from Rails core at 4.0. Requires actionpack >= 4.0, so add it on the next side only"
     url: "https://github.com/rails/actionpack-action_caching"
 
   actionpack_page_caching:
     check: false
     gem_name: "actionpack-page_caching"
-    message: "Required if using caches_page — extracted from Rails core at 4.0 (separate gem from actionpack-action_caching)"
+    message: "Required if using caches_page, expire_page or page_cache_directory (PAGE_CACHING), extracted from Rails core at 4.0. Separate gem from actionpack-action_caching. Requires actionpack >= 4.0, so add it on the next side only"
     url: "https://github.com/rails/actionpack-page_caching"
 
   activeresource:
