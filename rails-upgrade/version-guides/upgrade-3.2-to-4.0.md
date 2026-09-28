@@ -748,30 +748,44 @@ Results need manual review — only partials rendered without `collection:`, `ob
 #### `cache_key` Timestamp Format Changed
 
 **What Changed:**
-The `cache_timestamp_format` changed from `:number` to `:nsec`, producing longer, more precise cache keys. This can break code that compares or stores cache keys as strings.
+The default `ActiveRecord::Base.cache_timestamp_format` changed from `:number` to `:nsec`,
+so the key of any record with `updated_at` gains nine digits of fractional seconds:
 
-```yaml
-Rails 3.2: self.cache_timestamp_format = :number
-  "orders/33-2024030519440"
-
-Rails 4.0: self.cache_timestamp_format = :nsec
-  "orders/34-20240305194606468282921"
+```ruby
+account.cache_key
+# Rails 3.2 => "accounts/1-20140102030405"
+# Rails 4.0 => "accounts/1-20140102030405678901000"
 ```
+
+Nothing raises. Every cache entry keyed on a record misses once after the deploy and is
+rebuilt, which can be a load spike on a large app. Code that stores a record's
+`cache_key` outside the cache (a database column, an ETag a client kept, a key handed to
+another service) or compares it to a saved string stops matching.
 
 **Detection Pattern:**
 ```ruby
-# Code that stores or compares cache_key strings
-cache_key
+# explicit calls on a record, and any existing setting
+record.cache_key
 cache_timestamp_format
 ```
 
+`model_name.cache_key` has no timestamp and is not affected. A method of the app's own
+that takes an argument (`cache_key(:totals)`) is not the Active Record method.
+
 **Fix:**
-If your code stores cache keys externally (e.g., in Redis, a database, or a background job), those stored keys will no longer match after the upgrade. Either:
-1. Invalidate/regenerate stored cache keys after upgrading
-2. Or set `self.cache_timestamp_format = :number` on affected models to preserve the old format
+To keep the 3.2 keys, set the format explicitly. The setting exists on both versions, so it
+can ship before the bump:
 
-**Skill behavior:** When this change is detected, ask the user which approach they prefer — the right choice depends on whether external systems rely on the cache key format.
+```ruby
+# config/application.rb
+config.active_record.cache_timestamp_format = :number
+```
 
+Remove it later, when a one-time cache flush is acceptable. If nothing stores the keys and
+a cold cache after the deploy is fine, no change is needed.
+
+**Skill behavior:** When this change is detected, ask the user which approach they prefer.
+The right choice depends on whether anything outside the cache relies on the key format.
 ---
 
 #### Observers Extracted

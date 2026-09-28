@@ -349,9 +349,20 @@ ACTIVE_RESOURCE:
 
 CACHE_KEY_FORMAT:
   match:
-    - "self.cache_timestamp_format = :number"
-    - "  def cache_key; \"#{id}-#{updated_at}\"; end"
+    - "  self.cache_timestamp_format = :number"
+    - "    config.active_record.cache_timestamp_format = :number"
+    # a record's cache_key stored or compared outside the cache
+    - "    update_column(:etag, record.cache_key)"
+    - "    stale = stored_key != @account.cache_key"
   no_match:
+    # the app's own cache_key method taking an argument
+    - "    Rails.cache.fetch(cache_key(:totals)) do"
+    - "    Rails.cache.fetch(report.cache_key(:monthly_totals))"
+    - "  def cache_key(name)"
+    # a local variable with the same name
+    - "    cache_key = \"settings_for_#{id}\""
+    # model_name.cache_key has no timestamp
+    - "    \"#{self.class.model_name.cache_key}/#{id}\""
     - "  def display_name; name; end"
 
 BUFFERED_LOGGER:
