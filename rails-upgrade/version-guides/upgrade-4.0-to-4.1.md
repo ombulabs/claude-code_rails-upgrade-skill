@@ -426,6 +426,39 @@ The block form works on Rails 4.0 too, so this can land before the version bump 
 
 ---
 
+#### Scope Names That Collide with Active Record Class Methods Raise
+
+**What Changed:**
+Rails 4.1 checks each scope name against the class methods Active Record already defines and raises while the class body runs:
+
+```
+ArgumentError: You tried to define a scope named "none" on the model "Post", but Active Record already defined a class method with the same name.
+```
+
+Rails 4.0 let the scope replace the method with no warning. The model now fails to load, so with eager loading the app does not boot. One case to look for: a hand-written `none` scope from before `Model.none` was added in Rails 4.0.
+
+**Detection Pattern:**
+```ruby
+scope :none, -> { where('1 = 0') }
+scope :all, -> { where(archived: false) }
+scope :count, -> { select('COUNT(*)') }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+scope :none, -> { where('1 = 0') }
+scope :all, -> { where(archived: false) }
+
+# AFTER
+# delete the `none` scope: Post.none is built in and runs no query
+scope :unarchived, -> { where(archived: false) }
+```
+
+Rename every caller along with the scope. A scope defined in a concern raises in every model that includes it, so fix it once in the concern. The rename works on Rails 4.0 too, so it needs no `NextRails.next?` branch.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -898,6 +931,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 
 15. Wrap every non-callable `scope` body in a lambda (`scope :active, -> { where(active: true) }`).
 15. Pass a block to every `default_scope` that takes a relation or a hash (`default_scope { where(deleted_at: nil) }`).
+15. Rename any scope whose name matches an Active Record class method (`none`, `all`, `count`, ...), or delete it if the built-in does the same job.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -934,6 +968,7 @@ Error → section lookup for the most common errors encountered during this upgr
 
 | `NoMethodError: undefined method 'call'` when a scope runs | "Scopes With a Non-Callable Body Removed": wrap the body in `-> { ... }` |
 | `ArgumentError: Support for calling #default_scope without a block is removed` when a model loads | "`default_scope` Without a Block Raises": wrap the argument in a block |
+| `ArgumentError: You tried to define a scope named ... but Active Record already defined a class method with the same name` | "Scope Names That Collide with Active Record Class Methods Raise": rename or delete the scope |
 
 ---
 

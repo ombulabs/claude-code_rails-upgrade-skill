@@ -122,3 +122,22 @@ DEFAULT_SCOPE_WITHOUT_BLOCK:
     - "  # Joining :user applies the default_scope, so filter in SQL"
     - "  self.default_scopes = []"
     - "  Model.unscoped { build_default_scope }"
+
+SCOPE_NAME_COLLISION:
+  match:
+    - "  scope :none, -> { where('1 = 0') }"
+    - "  scope :all, -> { where(archived: false) }"
+    - "  scope :first, -> { order(:id).limit(1) }"
+    - "  scope :count, -> { select('COUNT(*)') }"
+    - "  scope :new, -> { where(state: 'new') }"
+    - "  scope :distinct, -> { select('DISTINCT name') }"
+    - "    scope :where, lambda { |*args| super(*args) }"
+  no_match:
+    - "  scope :none_assigned, -> { where(assignee_id: nil) }"
+    - "  scope :allowed, -> { where(allowed: true) }"
+    - "  scope :newest, -> { order(created_at: :desc) }"
+    - "  scope :active, -> { where(active: true) }"
+    - "  scope :recent_first, -> { order(created_at: :desc) }"
+    - "  Post.none"
+    - "  # scope :none, -> { where('1 = 0') }"
+    - "  def self.none; where('1 = 0'); end"
