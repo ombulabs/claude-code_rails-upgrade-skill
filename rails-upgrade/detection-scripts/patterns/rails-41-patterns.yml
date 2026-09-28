@@ -124,7 +124,7 @@ upgrade_findings:
 
     - name: "scope with a non-callable body"
       kind: breaking
-      pattern: "^[ \\t]*scope\\s+:\\w+\\s*,(?!\\s*\\(?\\s*(?:->|lambda\\b|Proc\\.|proc\\b|['\"]))"
+      pattern: "^[ \\t]*scope(?:\\s+|\\s*\\(\\s*):\\w+\\s*,(?!\\s*\\(?\\s*(?:->|lambda\\b|Proc\\.|proc\\b|method\\s*\\(|[A-Z]\\w*(?:::[A-Z]\\w*)*[ \\t]*(?:$(?!\\s*\\.)|[)#])|['\"]))"
       exclude: ""
       search_paths:
         - "app/models/"

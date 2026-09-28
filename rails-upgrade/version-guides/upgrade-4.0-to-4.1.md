@@ -376,6 +376,7 @@ The error appears when the scope runs, not when the model loads, so the app boot
 scope :active, where(active: true)
 scope :recent, order('created_at DESC')
 scope :published, :conditions => { published: true }
+scope(:visible, where(hidden: false))
 ```
 
 **Fix:**
