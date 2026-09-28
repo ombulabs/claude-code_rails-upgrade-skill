@@ -64,7 +64,7 @@ upgrade_findings:
       search_paths:
         - "app/models/"
       explanation: "Rails 4.0 moved :conditions out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1. A proc-valued :conditions has a receiver subtlety covered separately by ASSOCIATION_CONDITIONS_PROC"
-      fix: "Move conditions into a scope lambda: has_many :items, -> { where(active: true) }. Works on Rails 3.2 and 4.0+"
+      fix: "Move conditions into a scope lambda: has_many :items, -> { where(active: true) }. Rails 3.2 rejects a lambda as the second argument of an association macro (`ArgumentError: wrong number of arguments (given 3, expected 1..2)`), so branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_CONDITIONS"
 
     - name: "Association :order option"
@@ -74,7 +74,7 @@ upgrade_findings:
       search_paths:
         - "app/models/"
       explanation: "Rails 4.0 moved :order out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1"
-      fix: "Move order into a scope lambda: has_many :items, -> { order('position ASC') }. Works on Rails 3.2 and 4.0+"
+      fix: "Move order into a scope lambda: has_many :items, -> { order('position ASC') }. Rails 3.2 rejects a lambda as the second argument of an association macro (`ArgumentError: wrong number of arguments (given 3, expected 1..2)`), so branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_ORDER"
 
     - name: "belongs_to / has_one :extend option"
@@ -94,7 +94,7 @@ upgrade_findings:
       search_paths:
         - "app/models/"
       explanation: "Rails 4.0 moved :uniq out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda with distinct before dropping the gem or moving to 4.1"
-      fix: "Move uniq into a scope lambda: has_many :items, -> { distinct }, through: :joins. Works on Rails 3.2 and 4.0+"
+      fix: "Move uniq into a scope lambda: has_many :items, -> { distinct }, through: :joins. Rails 3.2 rejects a lambda as the second argument of an association macro (`ArgumentError: wrong number of arguments (given 3, expected 1..2)`), so branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_UNIQ"
 
     - name: "Association :finder_sql option"
@@ -125,7 +125,7 @@ upgrade_findings:
       search_paths:
         - "app/models/"
       explanation: "Rails 4.0 moved :readonly out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Move it to a scope lambda before dropping the gem or moving to 4.1"
-      fix: "Move readonly into a scope lambda: has_many :items, -> { readonly }, through: :joins. Works on Rails 3.2 and 4.0+"
+      fix: "Move readonly into a scope lambda: has_many :items, -> { readonly }, through: :joins. Rails 3.2 rejects a lambda as the second argument of an association macro (`ArgumentError: wrong number of arguments (given 3, expected 1..2)`), so branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_READONLY"
 
     - name: "Ruby 1.8 version requirement"
@@ -490,7 +490,7 @@ upgrade_findings:
       search_paths:
         - "app/models/"
       explanation: "At the 3.2 → 4.0 hop this keeps working, with a deprecation warning, because activerecord-deprecated_finders is a default dependency of Rails 4.0 (removed in 4.1). That gem restores the `:conditions` option and instance_evals a proc value against the owner, so the Rails 3.2 receiver semantics are preserved on 4.0. The hazard is the eventual rewrite, not the bump: the native Rails 4 replacement is a scope lambda that is instance_exec'd against the relation (`klass.unscoped`) with the owner passed as the lambda argument, so `self` is the relation, not the owner. A careless rewrite to a bare `-> { where(x: x) }` resolves `x` against the relation instead of the owner — a silent shift"
-      fix: "Two options. (1) Defer: rely on the bundled activerecord-deprecated_finders through the 4.0 window; the proc keeps working and only warns. (2) Rewrite for forward compatibility (required before dropping the gem or moving to 4.1): convert to a scope lambda whose parameter is the owner. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` becomes `belongs_to :foo, ->(owner) { where(clinic_id: owner.clinic_id) }`. Bare attribute references and `self.x` that targeted the owner become `owner.x`; local variables and constants stay as-is. The lambda form works on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
+      fix: "Two options. (1) Defer: rely on the bundled activerecord-deprecated_finders through the 4.0 window; the proc keeps working and only warns. (2) Rewrite for forward compatibility (required before dropping the gem or moving to 4.1): convert to a scope lambda whose parameter is the owner. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` becomes `belongs_to :foo, ->(owner) { where(clinic_id: owner.clinic_id) }`. Bare attribute references and `self.x` that targeted the owner become `owner.x`; local variables and constants stay as-is. The lambda argument raises `ArgumentError: wrong number of arguments (given 3, expected 1..2)` on Rails 3.2, so the rewrite is not backwards-compatible: branch the declaration with `NextRails.next?` or rewrite after the bump"
       variable_name: "ASSOCIATION_CONDITIONS_PROC"
 
     - name: "order / reorder hash whose value is not :asc or :desc"

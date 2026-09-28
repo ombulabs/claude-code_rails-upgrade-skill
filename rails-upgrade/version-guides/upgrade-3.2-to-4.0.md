@@ -169,6 +169,11 @@ has_one :spouse, -> { where(relationship: 'Spouse') }, class_name: 'Contact'
 has_many :items, -> { where('access_type != "public"') }
 ```
 
+The AFTER forms do not run on Rails 3.2: its association macros take only `(name, options)`, so a lambda
+second argument raises `ArgumentError: wrong number of arguments (given 3, expected 1..2)` at class load.
+During dual boot, put the lambda form behind `NextRails.next?` and keep the 3.2 form on the other branch,
+or apply the rewrite after the bump. This holds for every association lambda in this section.
+
 ##### Association `:conditions` with proc → lambda with owner parameter
 
 When conditions reference the owning object (common in multi-key associations), the proc must become a lambda that receives the owner as a parameter.
