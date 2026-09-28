@@ -63,7 +63,7 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 moved :conditions out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1. A proc-valued :conditions has a receiver subtlety covered separately by ASSOCIATION_CONDITIONS_PROC"
+      explanation: "Rails 4.0 moved :conditions out of core. activerecord-deprecated_finders, a dependency of Rails 4.0 only, restores it with a deprecation warning, so on Ruby 2.2 or older it keeps working at the 4.0 hop. On Ruby 2.3 or newer the association raises ArgumentError as soon as it loads: see ASSOCIATION_OPTIONS_RUBY_23. Rails 4.1 no longer depends on the gem, so rewrite before the 4.1 hop or add the gem to the Gemfile there as a bridge. As that bridge on Ruby 2.3 or newer, the gem drops a Hash-valued :conditions without an error and the association returns every row, so rewrite Hash conditions rather than bridging them. A proc-valued :conditions has a receiver subtlety covered separately by ASSOCIATION_CONDITIONS_PROC"
       fix: "Move conditions into a scope lambda: has_many :items, -> { where(active: true) }. Rails 3.2 rejects a lambda as the second argument of an association macro (`ArgumentError: wrong number of arguments (given 3, expected 1..2)`), so branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_CONDITIONS"
 
@@ -73,7 +73,7 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 moved :order out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1"
+      explanation: "Rails 4.0 moved :order out of core. activerecord-deprecated_finders, a dependency of Rails 4.0 only, restores it with a deprecation warning, so on Ruby 2.2 or older it keeps working at the 4.0 hop. On Ruby 2.3 or newer the association raises ArgumentError as soon as it loads: see ASSOCIATION_OPTIONS_RUBY_23. Rails 4.1 no longer depends on the gem, so rewrite before the 4.1 hop or add the gem to the Gemfile there as a bridge"
       fix: "Move order into a scope lambda: has_many :items, -> { order('position ASC') }. Rails 3.2 rejects a lambda as the second argument of an association macro (`ArgumentError: wrong number of arguments (given 3, expected 1..2)`), so branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_ORDER"
 
@@ -93,7 +93,7 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 moved :uniq out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda with distinct before dropping the gem or moving to 4.1"
+      explanation: "Rails 4.0 moved :uniq out of core. activerecord-deprecated_finders, a dependency of Rails 4.0 only, restores it with a deprecation warning, so on Ruby 2.2 or older it keeps working at the 4.0 hop. On Ruby 2.3 or newer the association raises ArgumentError as soon as it loads: see ASSOCIATION_OPTIONS_RUBY_23. Rails 4.1 no longer depends on the gem, so rewrite before the 4.1 hop or add the gem to the Gemfile there as a bridge"
       fix: "Move uniq into a scope lambda: has_many :items, -> { distinct }, through: :joins. Rails 3.2 rejects a lambda as the second argument of an association macro (`ArgumentError: wrong number of arguments (given 3, expected 1..2)`), so branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_UNIQ"
 
@@ -124,7 +124,7 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 moved :readonly out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Move it to a scope lambda before dropping the gem or moving to 4.1"
+      explanation: "Rails 4.0 moved :readonly out of core. activerecord-deprecated_finders, a dependency of Rails 4.0 only, restores it with a deprecation warning, so on Ruby 2.2 or older it keeps working at the 4.0 hop. On Ruby 2.3 or newer the association raises ArgumentError as soon as it loads: see ASSOCIATION_OPTIONS_RUBY_23. Rails 4.1 no longer depends on the gem, so rewrite before the 4.1 hop or add the gem to the Gemfile there as a bridge"
       fix: "Move readonly into a scope lambda: has_many :items, -> { readonly }, through: :joins. Rails 3.2 rejects a lambda as the second argument of an association macro (`ArgumentError: wrong number of arguments (given 3, expected 1..2)`), so branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_READONLY"
 
@@ -489,8 +489,8 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "At the 3.2 → 4.0 hop this keeps working, with a deprecation warning, because activerecord-deprecated_finders is a default dependency of Rails 4.0 (removed in 4.1). That gem restores the `:conditions` option and instance_evals a proc value against the owner, so the Rails 3.2 receiver semantics are preserved on 4.0. The hazard is the eventual rewrite, not the bump: the native Rails 4 replacement is a scope lambda that is instance_exec'd against the relation (`klass.unscoped`) with the owner passed as the lambda argument, so `self` is the relation, not the owner. A careless rewrite to a bare `-> { where(x: x) }` resolves `x` against the relation instead of the owner — a silent shift"
-      fix: "Two options. (1) Defer: rely on the bundled activerecord-deprecated_finders through the 4.0 window; the proc keeps working and only warns. (2) Rewrite for forward compatibility (required before dropping the gem or moving to 4.1): convert to a scope lambda whose parameter is the owner. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` becomes `belongs_to :foo, ->(owner) { where(clinic_id: owner.clinic_id) }`. Bare attribute references and `self.x` that targeted the owner become `owner.x`; local variables and constants stay as-is. The lambda argument raises `ArgumentError: wrong number of arguments (given 3, expected 1..2)` on Rails 3.2, so the rewrite is not backwards-compatible: branch the declaration with `NextRails.next?` or rewrite after the bump"
+      explanation: "At the 3.2 → 4.0 hop on Ruby 2.2 or older this keeps working, with a deprecation warning, because activerecord-deprecated_finders is a dependency of Rails 4.0 (not of 4.1). On Ruby 2.3 or newer it raises ArgumentError when the association loads: see ASSOCIATION_OPTIONS_RUBY_23. That gem restores the `:conditions` option and instance_evals a proc value against the owner, so the Rails 3.2 receiver semantics are preserved on 4.0. The hazard is the eventual rewrite, not the bump: the native Rails 4 replacement is a scope lambda that is instance_exec'd against the relation (`klass.unscoped`) with the owner passed as the lambda argument, so `self` is the relation, not the owner. A careless rewrite to a bare `-> { where(x: x) }` resolves `x` against the relation instead of the owner — a silent shift"
+      fix: "Two options. (1) Defer: rely on the bundled activerecord-deprecated_finders through the 4.0 window; on Ruby 2.2 or older the proc keeps working and only warns, and on Ruby 2.3 or newer it needs the initializer described in ASSOCIATION_OPTIONS_RUBY_23. (2) Rewrite (required before the 4.1 hop unless the gem is added there as a bridge): convert to a scope lambda whose parameter is the owner. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` becomes `belongs_to :foo, ->(owner) { where(clinic_id: owner.clinic_id) }`. Bare attribute references and `self.x` that targeted the owner become `owner.x`; local variables and constants stay as-is. The lambda argument raises `ArgumentError: wrong number of arguments (given 3, expected 1..2)` on Rails 3.2, so the rewrite is not backwards-compatible: branch the declaration with `NextRails.next?` or rewrite after the bump"
       variable_name: "ASSOCIATION_CONDITIONS_PROC"
 
     - name: "order / reorder hash whose value is not :asc or :desc"
@@ -644,7 +644,7 @@ dependencies:
   activerecord_deprecated_finders:
     check: false
     gem_name: "activerecord-deprecated_finders"
-    message: "Default dependency of Rails 4.0 (removed in 4.1), so these keep working with a deprecation warning on 4.0. Restores dynamic finders (find_all_by_* etc.) and old-style association options (:conditions including a proc, :order, :include, :uniq, :readonly — not :extend). Temporary bridge: migrate off then drop the gem before 4.1"
+    message: "Dependency of Rails 4.0 only. Restores, with a deprecation warning, dynamic finders (find_all_by_* etc.), find(:all, ...) option hashes and the old association options :conditions (including a proc), :order, :include, :uniq and :readonly; it does not restore :extend on belongs_to / has_one. Rails 4.1 no longer depends on it, and an app still using these APIs there adds it to the Gemfile with `require: 'active_record/deprecated_finders'`; the gem declares support for Active Record below 5. On Ruby 2.3 or newer the association options need care: on 4.0 they raise ArgumentError when the association loads (see ASSOCIATION_OPTIONS_RUBY_23), and on 4.1 a Hash-valued :conditions is dropped without an error. Rewrite the association options rather than relying on the gem for them"
     url: "https://github.com/rails/activerecord-deprecated_finders"
 
   actionpack_action_caching:
