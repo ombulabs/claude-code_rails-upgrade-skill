@@ -32,7 +32,9 @@ Rails 7.2 requires Ruby 3.1.0 or newer: the `rails` 7.2 gemspec sets `required_r
 ```ruby
 # Gemfile
 ruby "3.0.6"
-ruby "~> 3.0"     # read by its lowest version
+ruby "~> 3.0.6"   # below 3.1
+ruby "~> 2.7"     # below 3.0
+# not flagged: "~> 3.0" and ">= 2.7.0" still allow 3.1+
 
 # .ruby-version
 3.0.6

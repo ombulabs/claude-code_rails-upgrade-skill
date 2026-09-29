@@ -282,7 +282,7 @@ Dir.glob(File.join(SKILLS.fetch("rails-upgrade"), "version-guides", "upgrade-*-t
   patterns_file = File.join(PATTERNS_DIR, "rails-#{to}-patterns.yml")
   known = File.file?(patterns_file) ? pattern_names(patterns_file) : []
 
-  entries = [] # [heading, line_no, marker_value_or_nil]
+  entries = [] # [heading, heading_line, marker_value_or_nil, marker_line]
   section = nil
   pending = nil
   in_fence = false
@@ -298,6 +298,7 @@ Dir.glob(File.join(SKILLS.fetch("rails-upgrade"), "version-guides", "upgrade-*-t
       entries << pending
     elsif pending && !line.strip.empty?
       pending[2] = line[MARKER, 1]
+      pending[3] = i + 1
       pending = nil
     end
   end
@@ -306,26 +307,26 @@ Dir.glob(File.join(SKILLS.fetch("rails-upgrade"), "version-guides", "upgrade-*-t
   next if marked.empty?
 
   owner = {}
-  marked.each do |heading, ln, value|
+  marked.each do |heading, _, value, ln|
     next if value =~ /\Anone\b/
 
     names = value.scan(/`([A-Z0-9_]+)`/).flatten
     if names.empty?
-      err(guide, "line #{ln + 2}: \"#{heading}\" marker lists no `VARIABLE_NAME`; hint: write **Pattern:** `NAME`, or **Pattern:** none (why)")
+      err(guide, "line #{ln}: \"#{heading}\" marker lists no `VARIABLE_NAME`; hint: write **Pattern:** `NAME`, or **Pattern:** none (why)")
     end
     names.each do |name|
       unless known.include?(name)
-        err(guide, "line #{ln + 2}: \"#{heading}\" names #{name}, which is not in #{File.basename(patterns_file)}; " \
+        err(guide, "line #{ln}: \"#{heading}\" names #{name}, which is not in #{File.basename(patterns_file)}; " \
                    "hint: fix the spelling, or add the pattern first")
       end
       if owner[name]
-        err(guide, "line #{ln + 2}: #{name} is already named by \"#{owner[name]}\"; hint: keep it on the entry whose fix it follows")
+        err(guide, "line #{ln}: #{name} is already named by \"#{owner[name]}\"; hint: keep it on the entry whose fix it follows")
       end
       owner[name] ||= heading
     end
   end
 
-  entries.reject { |_, _, m| m }.each do |heading, ln, _|
+  entries.reject { |_, _, m| m }.each do |heading, ln, _, _|
     err(guide, "line #{ln}: \"#{heading}\" has no **Pattern:** line; hint: add one under the heading, or **Pattern:** none (why)")
   end
   (known - owner.keys).each do |name|

@@ -16,7 +16,9 @@ RUBY_VERSION:
   # .ruby-version and .tool-versions.
   match:
     - "ruby \"3.0.6\""
-    - "ruby '~> 3.0'"
+    - "ruby \"~> 3.0.6\""
+    - "ruby '~> 2.7'"
+    - "ruby \"= 3.0.6\""
     - "ruby \"2.7.8\""
     - "3.0.6"
     - "ruby-3.0.6"
@@ -26,6 +28,10 @@ RUBY_VERSION:
     - "3.3.6"
     - "ruby 3.3.0"
     - "ruby \">= 3.1\""
+    # requirements that still allow 3.1+: Bundler checks the running Ruby
+    - "ruby \"~> 3.0\""
+    - "ruby \">= 2.7.0\""
+    - "ruby \"~> 3.1.4\""
     - "3.10.0"
     - "ruby file: \".ruby-version\""
     - "gem \"rack\", \"3.0.8\""

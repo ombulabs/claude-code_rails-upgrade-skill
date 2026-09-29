@@ -74,13 +74,13 @@ upgrade_findings:
 
     - name: "Ruby version"
       kind: "breaking"
-      pattern: "^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:[~>=]+\\s*)?|ruby-|ruby\\s+)?(?:2\\.\\d+|3\\.0)(?:\\.\\d+)*(?![\\d.])"
+      pattern: "^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:=\\s*|~>\\s*(?=\\d+\\.\\d+\\.\\d))?|ruby-|ruby\\s+)?(?:2\\.\\d+|3\\.0)(?:\\.\\d+)*(?![\\d.])|^\\s*ruby\\s*\\(?\\s*[\"']~>\\s*2\\.\\d+(?![\\d.])"
       exclude: ""
       search_paths:
         - "Gemfile"
         - ".ruby-version"
         - ".tool-versions"
-      explanation: "Rails 7.2 requires Ruby 3.1.0 or newer (required_ruby_version >= 3.1.0 in the rails 7.2 gemspec; 7.1 accepts >= 2.7.0), so Bundler refuses to install 7.2 on Ruby 3.0 or older. Flags a Ruby below 3.1 in the Gemfile `ruby` line (a requirement such as `~> 3.0` is read by its lowest version), .ruby-version or .tool-versions"
+      explanation: "Rails 7.2 requires Ruby 3.1.0 or newer (required_ruby_version >= 3.1.0 in the rails 7.2 gemspec; 7.1 accepts >= 2.7.0), so Bundler refuses to install 7.2 on Ruby 3.0 or older. Flags a Ruby below 3.1 in .ruby-version or .tool-versions, and a Gemfile `ruby` line that rules out 3.1: an exact version (`3.0.6`), `~> 3.0.6` (below 3.1) or `~> 2.7` (below 3.0). A requirement that still allows 3.1, such as `~> 3.0` or `>= 2.7.0`, is not flagged: Bundler checks it against the Ruby that runs"
       fix: "Upgrade Ruby to 3.1 or newer while the app is still on Rails 7.1, as its own step before the Rails bump. See the \"Ruby Version Requirement\" entry in the 7.1 to 7.2 guide"
       variable_name: "RUBY_VERSION"
 
