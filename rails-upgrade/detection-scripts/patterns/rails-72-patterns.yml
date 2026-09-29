@@ -72,6 +72,18 @@ upgrade_findings:
       fix: "Replace ActiveRecord::Migration.check_pending! with ActiveRecord::Migration.check_all_pending!"
       variable_name: "MIGRATION_CHECK_PENDING_REMOVED"
 
+    - name: "Ruby version"
+      kind: "breaking"
+      pattern: "^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:[~>=]+\\s*)?|ruby-|ruby\\s+)?(?:2\\.\\d+|3\\.0)(?:\\.\\d+)*(?![\\d.])"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+        - ".ruby-version"
+        - ".tool-versions"
+      explanation: "Rails 7.2 requires Ruby 3.1.0 or newer (required_ruby_version >= 3.1.0 in the rails 7.2 gemspec; 7.1 accepts >= 2.7.0), so Bundler refuses to install 7.2 on Ruby 3.0 or older. Flags a Ruby below 3.1 in the Gemfile `ruby` line (a requirement such as `~> 3.0` is read by its lowest version), .ruby-version or .tool-versions"
+      fix: "Upgrade Ruby to 3.1 or newer while the app is still on Rails 7.1, as its own step before the Rails bump. See the \"Ruby Version Requirement\" entry in the 7.1 to 7.2 guide"
+      variable_name: "RUBY_VERSION"
+
   medium_priority:
     - name: "serialize syntax change"
       kind: "breaking"
@@ -131,16 +143,6 @@ upgrade_findings:
       fix: "Change %w() to %w[] for consistency"
       variable_name: "AUTOLOAD_LIB_SYNTAX"
 
-    - name: "Ruby version"
-      kind: "breaking"
-      pattern: "ruby.*['\"]3\\.[0-1]"
-      exclude: ""
-      search_paths:
-        - "Gemfile"
-        - ".ruby-version"
-      explanation: "Rails 7.2 works best with Ruby 3.1+"
-      fix: "Consider upgrading to Ruby 3.2+ for best performance"
-      variable_name: "RUBY_VERSION"
 
 dependencies:
   ruby:
