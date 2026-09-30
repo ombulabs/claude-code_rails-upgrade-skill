@@ -151,6 +151,25 @@ The new name works on 5.1 too.
 
 ---
 
+#### ActiveSupport.halt_callback_chains_on_return_false Removed
+
+**Pattern:** `HALT_CALLBACK_CHAINS_ON_RETURN_FALSE`
+
+**What Changed:**
+In 5.1 the getter and setter only emitted a deprecation warning and changed nothing. Rails 5.2 removes both, so the line the 5.0 generator wrote into `config/initializers/new_framework_defaults.rb` raises `NoMethodError` at boot. The `config.active_support.` form is skipped silently, but is dead code.
+
+**Fix:**
+```ruby
+# BEFORE
+ActiveSupport.halt_callback_chains_on_return_false = false
+
+# AFTER
+# (line removed; halt callbacks with throw :abort)
+```
+Removing the line works on 5.1 too.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Encrypted Secrets → Credentials
@@ -408,6 +427,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `Using a dynamic :controller segment in a route is deprecated` (or `:action`) | "Dynamic :controller and :action Route Segments" — declare each route explicitly |
 | `` ArgumentError: A class was passed to `:class_name` but we are expecting a string. `` | "Association class_name Must Be a String" — quote the class name |
 | ``NoMethodError: undefined method `error_on_ignored_order_or_limit='`` at boot | "error_on_ignored_order_or_limit Removed" — rename to `error_on_ignored_order` |
+| ``NoMethodError: undefined method `halt_callback_chains_on_return_false='`` at boot | "ActiveSupport.halt_callback_chains_on_return_false Removed" — delete the line |
 
 ---
 

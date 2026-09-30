@@ -36,6 +36,16 @@ upgrade_findings:
       fix: "Rename the config key: config.active_record.error_on_ignored_order_or_limit = X → config.active_record.error_on_ignored_order = X"
       variable_name: "ERROR_ON_IGNORED_ORDER_OR_LIMIT"
 
+    - name: "halt_callback_chains_on_return_false config (removed)"
+      kind: "breaking"
+      pattern: "halt_callback_chains_on_return_false"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 5.2 removes ActiveSupport.halt_callback_chains_on_return_false and its setter. In 5.1 both only emitted a deprecation warning and changed nothing. The line usually sits in config/initializers/new_framework_defaults.rb, which the 5.0 generator wrote; `ActiveSupport.halt_callback_chains_on_return_false = false` there raises NoMethodError at boot. A config.active_support.halt_callback_chains_on_return_false line is skipped silently (the railtie checks respond_to?), but is dead and should go too"
+      fix: "Remove the line entirely. Code that relied on `return false` to halt callbacks should already be using `throw :abort` after the 4.2 → 5.0 hop"
+      variable_name: "HALT_CALLBACK_CHAINS_ON_RETURN_FALSE"
+
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
       kind: "deprecation"
@@ -46,16 +56,6 @@ upgrade_findings:
       explanation: "A route whose path has a :controller or :action segment (the old catch-all :controller(/:action(/:id)) shape) emits a deprecation warning when routes load, saying it will be removed in Rails 6.0. The warning exists since 5.0 and is unchanged in 5.1 and 5.2. Matches the segment inside a quoted path; the hash keys controller: / :action => are not segments and are skipped"
       fix: "Replace dynamic segments with explicit routes: get '/admin/:controller/:action' → declare each controller/action pair explicitly with `get '/admin/users', to: 'users#index'` etc."
       variable_name: "DYNAMIC_ROUTE_SEGMENTS"
-
-    - name: "halt_callback_chains_on_return_false config (deprecated)"
-      kind: "breaking"
-      pattern: "halt_callback_chains_on_return_false"
-      exclude: ""
-      search_paths:
-        - "config/"
-      explanation: "Rails 5.2 removes ActiveSupport.halt_callback_chains_on_return_false entirely. The `return false` halt mechanism was removed in Rails 5.0; the config has been a no-op deprecated shim since 5.1 and is now gone. Assigning the config in config/application.rb or an initializer raises NoMethodError at boot"
-      fix: "Remove the line entirely. Code that relied on `return false` to halt callbacks should already be using `throw :abort` after the 4.2 → 5.0 hop"
-      variable_name: "HALT_CALLBACK_CHAINS_ON_RETURN_FALSE"
 
     - name: "String if:/unless: conditions on model callbacks"
       kind: "deprecation"

@@ -39,3 +39,10 @@ ERROR_ON_IGNORED_ORDER_OR_LIMIT:
     - "  config.active_record.error_on_ignored_order_or_limit = true"
   no_match:
     - "  config.active_record.error_on_ignored_order = true"
+
+HALT_CALLBACK_CHAINS_ON_RETURN_FALSE:
+  match:
+    - "ActiveSupport.halt_callback_chains_on_return_false = false"
+    - "  config.active_support.halt_callback_chains_on_return_false = false"
+  no_match:
+    - "  throw :abort"
