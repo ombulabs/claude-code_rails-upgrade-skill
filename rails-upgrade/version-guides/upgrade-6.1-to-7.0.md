@@ -24,7 +24,7 @@ Rails 7.0 is a major release focused on frontend modernization:
 **Pattern:** `RUBY_VERSION`
 
 **What Changed:**
-Rails 7.0 requires Ruby 2.7.0 or newer: the `rails` 7.0 gemspec sets `required_ruby_version >= 2.7.0`, while 6.1 accepts `>= 2.5.0`. Bundler refuses to install 7.0 on an older Ruby, so upgrade Ruby first, while the app is still on Rails 6.1, as its own deploy. The gemspec sets no upper bound; a Ruby released after a Rails version may need that version's latest patch release.
+Rails 7.0 requires Ruby 2.7.0 or newer: the `rails` 7.0 gemspec sets `required_ruby_version >= 2.7.0`, while 6.1 accepts `>= 2.5.0`. Bundler refuses to install 7.0 on an older Ruby, so upgrade Ruby first, while the app is still on Rails 6.1, as its own deploy. Rails 7.0.0 itself needs Ruby below 3.1 ([FastRuby.io compatibility table](https://www.fastruby.io/blog/ruby/rails/versions/compatibility-table.html)); on Ruby 3.1 or newer, use 7.0.1 or a later 7.0 patch. The gemspec sets no upper bound; a Ruby released after a Rails version may need that version's latest patch release.
 
 **Detection Pattern:**
 ```ruby
