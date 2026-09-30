@@ -198,6 +198,29 @@ Symbols and lambdas work on 5.1 too.
 
 ---
 
+#### evented_redis Action Cable Adapter Removed
+
+**Pattern:** `EVENTED_REDIS_ADAPTER`
+
+**What Changed:**
+Rails 5.1 deprecated the `evented_redis` adapter. Rails 5.2 deletes it, so `adapter: evented_redis` raises `LoadError` ("Could not load the 'evented_redis' Action Cable pubsub adapter") on the first connection or broadcast. Boot and a test suite on the `async` or `test` adapter still pass, so the error shows up first in the environment that uses it.
+
+**Fix:**
+```yaml
+# BEFORE (config/cable.yml)
+production:
+  adapter: evented_redis
+  url: <%= ENV["REDIS_URL"] %>
+
+# AFTER
+production:
+  adapter: redis
+  url: <%= ENV["REDIS_URL"] %>
+```
+The `redis` adapter works on 5.1 too. It needs only the `redis` gem, so `em-hiredis` can go.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Encrypted Secrets → Credentials

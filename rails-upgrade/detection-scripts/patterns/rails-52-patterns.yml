@@ -58,6 +58,17 @@ upgrade_findings:
       fix: "Replace the string with a symbol: `if: :record_active?` instead of `if: 'record_active?'`. For inline expressions, use a lambda: `if: -> { record_active? && ... }`"
       variable_name: "CALLBACK_STRING_CONDITIONS"
 
+    - name: "evented_redis Action Cable adapter (removed)"
+      kind: "breaking"
+      pattern: "\\bevented_redis\\b|\\bSubscriptionAdapter::EventedRedis\\b"
+      exclude: ""
+      search_paths:
+        - "config/"
+        - "lib/"
+      explanation: "Rails 5.1 deprecated the evented_redis Action Cable adapter (a warning when the adapter is built). Rails 5.2 deletes action_cable/subscription_adapter/evented_redis.rb, so `adapter: evented_redis` in config/cable.yml raises LoadError ('Could not load the 'evented_redis' Action Cable pubsub adapter') the first time the server builds its pubsub, on the first connection or broadcast. It does not fail at boot, and a test env on the async or test adapter passes, so the error first shows in the environment that uses evented_redis. Also flags code that customizes ActionCable::SubscriptionAdapter::EventedRedis"
+      fix: "In config/cable.yml replace `adapter: evented_redis` with `adapter: redis`; the url and channel_prefix keys stay the same. The redis adapter needs only the redis gem (em-hiredis can go). Move any EventedRedis.redis_connector override to ActionCable::SubscriptionAdapter::Redis.redis_connector. The redis adapter exists in 5.1 too"
+      variable_name: "EVENTED_REDIS_ADAPTER"
+
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
       kind: "deprecation"
@@ -91,17 +102,6 @@ upgrade_findings:
       explanation: "Rails 5.2 ships with bootsnap as a new default for boot-time speedup. This is a presence check: a HIT means bootsnap is already configured; ABSENCE is the signal to add it. Grep cannot detect absence, so review the Gemfile manually when this pattern does not match"
       fix: "If no match: add `gem 'bootsnap', require: false` under the top-level Gemfile, then add `require 'bootsnap/setup'` near the top of config/boot.rb. Optional but recommended"
       variable_name: "BOOTSNAP_PRESENCE"
-
-    - name: "event_redis ActionCable adapter"
-      kind: "deprecation"
-      pattern: "event_redis"
-      exclude: ""
-      search_paths:
-        - "config/cable.yml"
-        - "config/"
-      explanation: "Rails 5.2 deprecates the :event_redis ActionCable adapter. Apps using it should switch to :redis"
-      fix: "Edit config/cable.yml and replace `adapter: event_redis` with `adapter: redis`. Adjust the URL/channel_prefix entries to match the redis adapter's expected shape"
-      variable_name: "EVENT_REDIS_ADAPTER"
 
     - name: "Erubis template handler references"
       kind: "breaking"

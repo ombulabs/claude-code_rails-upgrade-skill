@@ -65,3 +65,11 @@ CALLBACK_STRING_CONDITIONS:
     - "  validates :email, presence: { message: 'is required' }, if: :active?"
     - "  after_save :sync, if: :sync? # was if: 'sync?'"
     - "  # before_save :normalize, if: 'name_changed?'"
+
+EVENTED_REDIS_ADAPTER:
+  match:
+    - "  adapter: evented_redis"
+    - "ActionCable::SubscriptionAdapter::EventedRedis.em_redis_connector = ->(config) { EM::Hiredis.connect(config[:url]) }"
+  no_match:
+    - "  adapter: redis"
+    - "  channel_prefix: evented_redis_app"
