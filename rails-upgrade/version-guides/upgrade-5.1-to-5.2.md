@@ -314,7 +314,7 @@ Rails.application.config.action_dispatch.use_authenticated_cookie_encryption = f
 **Pattern:** none (the minimum Ruby does not change at this hop)
 
 **What Changed:**
-Nothing. The `rails` 5.2 gemspec requires Ruby `>= 2.2.2`, the same as 5.1, so the Ruby that bundles 5.1 also bundles 5.2. The gemspec sets no upper bound; a Ruby released after 5.2 may need its latest patch release.
+The floor does not change: the `rails` 5.2 gemspec requires Ruby `>= 2.2.2`, the same as 5.1, so the Ruby that bundles 5.1 also bundles 5.2. The ceiling rises: the [FastRuby.io compatibility table](https://www.fastruby.io/blog/ruby/rails/versions/compatibility-table.html) lists 5.1 as needing Ruby below 2.6 and 5.2 below 2.7, so 5.2 is the first release that runs on Ruby 2.6. The gemspec sets no upper bound; a Ruby released after 5.2 may need its latest patch release.
 
 **Fix:**
 None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
