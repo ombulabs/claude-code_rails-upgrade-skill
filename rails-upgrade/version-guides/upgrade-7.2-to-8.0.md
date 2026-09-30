@@ -218,6 +218,31 @@ This is **behavior-preserving and version-agnostic**: when `foreign_key:` is giv
 
 ---
 
+#### `enum` Keyword-Arguments Form Removed
+
+**Pattern:** `ENUM_KWARGS`
+
+**What Changed:**
+Rails 7.2 accepted `enum status: { ... }, _prefix: true` with a deprecation warning. Rails 8.0 makes the enum name a required positional argument (`def enum(name, values = nil, **options)`), so the keyword form raises `ArgumentError: wrong number of arguments (given 0, expected 1..2)` when the model loads.
+
+**Detection Pattern:**
+```ruby
+# app/models/*.rb
+enum status: { active: 0, archived: 1 }, _prefix: true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+enum status: { active: 0, archived: 1 }, _prefix: true
+
+# AFTER
+enum :status, { active: 0, archived: 1 }, prefix: true
+```
+The AFTER works on 7.2 too. Drop the leading underscore from the options (`_prefix`, `_suffix`, `_scopes`, `_default`): the positional form raises `ArgumentError: invalid option(s)` on both versions if it is kept.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Solid Cache (Optional)
@@ -553,6 +578,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Solid Queue jobs stuck in pending | "Solid Queue (Optional)" — start the supervisor, `bin/jobs` |
 | `` DEPRECATION WARNING: `to_time` will always preserve the full timezone `` (or `receiver timezone`) at boot | "to_time Preserves the Full Timezone": set `to_time_preserves_timezone = :zone`; `load_defaults 8.0` later |
 | `DEPRECATION WARNING: 'config.read_encrypted_secrets=' is deprecated` on the 7.2 side | "read_encrypted_secrets Removed": delete the line |
+| `ArgumentError: wrong number of arguments (given 0, expected 1..2)` from an `enum` line | "`enum` Keyword-Arguments Form Removed": `enum :status, { ... }, prefix: true` |
 
 ---
 
