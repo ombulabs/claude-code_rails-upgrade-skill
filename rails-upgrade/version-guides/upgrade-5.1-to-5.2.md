@@ -22,25 +22,6 @@ Rails 5.2 introduces:
 
 ### 🔴 HIGH PRIORITY
 
-#### Cookie Expiry Format Changed
-
-**Pattern:** none (a default turned on by `load_defaults 5.2`, not a code shape)
-
-**What Changed:**
-With `config.action_dispatch.use_authenticated_cookie_encryption = true` (set by `load_defaults 5.2`; the framework default is still `false`), encrypted cookies switch from AES-256-CBC to AES-256-GCM, and signed and encrypted cookies carry their expiry inside the value.
-
-**Impact:**
-Rails 5.2 still reads the old CBC cookies and rewrites them, so the upgrade itself does not log users out. A server without the flag (5.1, or 5.2 before the flag) cannot read the new cookies, so a rollback or a mixed 5.1/5.2 deploy logs out users whose cookie was rewritten.
-
-**Fix:**
-Keep the flag off until no 5.1 server is left, then turn it on:
-```ruby
-# config/initializers/new_framework_defaults_5_2.rb
-Rails.application.config.action_dispatch.use_authenticated_cookie_encryption = false
-```
-
----
-
 #### Active Record attribute_changed? Behavior
 
 **Pattern:** `DIRTY_TRACKING_AFTER_SAVE`
@@ -323,6 +304,25 @@ get 'reports/daily',  to: 'reports#daily'
 get 'reports/weekly', to: 'reports#weekly'
 ```
 The explicit routes work on 5.1 too.
+
+---
+
+#### Cookie Expiry Format Changed
+
+**Pattern:** none (a default turned on by `load_defaults 5.2`, not a code shape)
+
+**What Changed:**
+With `config.action_dispatch.use_authenticated_cookie_encryption = true` (set by `load_defaults 5.2`; the framework default is still `false`), encrypted cookies switch from AES-256-CBC to AES-256-GCM, and signed and encrypted cookies carry their expiry inside the value.
+
+**Impact:**
+Rails 5.2 still reads the old CBC cookies and rewrites them, so the upgrade itself does not log users out. A server without the flag (5.1, or 5.2 before the flag) cannot read the new cookies, so a rollback or a mixed 5.1/5.2 deploy logs out users whose cookie was rewritten.
+
+**Fix:**
+Keep the flag off until no 5.1 server is left, then turn it on:
+```ruby
+# config/initializers/new_framework_defaults_5_2.rb
+Rails.application.config.action_dispatch.use_authenticated_cookie_encryption = false
+```
 
 ---
 
