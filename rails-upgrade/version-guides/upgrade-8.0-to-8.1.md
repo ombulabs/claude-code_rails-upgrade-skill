@@ -262,6 +262,30 @@ azure:
 
 ---
 
+#### Benchmark.ms Removed
+
+**Pattern:** `BENCHMARK_MS_REMOVED`
+
+**What Changed:**
+Rails 8.0 defined `Benchmark.ms` as a deprecated core extension. Rails 8.1 removes it and drops Active Support's dependency on the `benchmark` gem. The gem defines `Benchmark.ms` itself only from 0.5.0 (0.4.x, the Ruby 3.4 default, does not), so on 8.1 a call raises `NoMethodError: undefined method 'ms' for module Benchmark` unless the app bundles benchmark 0.5.0 or later.
+
+**Detection Pattern:**
+```ruby
+elapsed = Benchmark.ms { run_report }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+elapsed = Benchmark.ms { run_report }
+
+# AFTER
+elapsed = ActiveSupport::Benchmark.realtime(:float_millisecond) { run_report }
+```
+The AFTER works on 8.0 too (`ActiveSupport::Benchmark` exists from 8.0.0). To keep the call as it is, add `gem "benchmark", ">= 0.5.0"` to the Gemfile instead.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### schema.rb Column Sorting Change
@@ -401,6 +425,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Deprecation warning for `pool:` in `database.yml`, or `Ambiguous configuration: 'pool' ... and 'max_connections'` | "pool: → max_connections:" — `max_connections: 5`, drop `pool:` |
 | SSL redirect not working in production | "SSL Configuration Commented Out" — uncomment `force_ssl` and `assume_ssl` in `production.rb` |
 | `ArgumentError: Wrong number of arguments (expect 1, got 2)` while drawing routes at boot | "Route With Multiple Paths Raises" — one route call per path |
+| `NoMethodError: undefined method 'ms' for module Benchmark` | "Benchmark.ms Removed" — `ActiveSupport::Benchmark.realtime(:float_millisecond)` |
 | Sidekiq jobs not processing | "Sidekiq Adapter Removed" — `gem 'sidekiq', '>= 7.3.3'` |
 | A request parameter after a `;` in the URL or form body is missing, or the value keeps `;rest=...` | "Semicolon Query Separator Removed" — use `&` |
 | Deprecation warning for `strict_query_string_separator` | "Semicolon Query Separator Removed" — delete the setting |

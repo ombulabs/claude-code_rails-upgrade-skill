@@ -69,3 +69,14 @@ ROUTES_MULTIPLE_PATHS_REMOVED:
     - "  resources :photos, :comments"
     # commented out
     - "  # get '/a', '/b'"
+
+BENCHMARK_MS_REMOVED:
+  match:
+    - "    elapsed = Benchmark.ms { run_report }"
+    - "    Benchmark.ms do"
+    - "    ::Benchmark.ms { run }"
+  no_match:
+    # the replacement, and other Benchmark methods
+    - "    ActiveSupport::Benchmark.realtime(:float_millisecond) { run }"
+    - "    Benchmark.realtime { run }"
+    - "    Benchmark.msg"

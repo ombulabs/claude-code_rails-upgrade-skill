@@ -100,8 +100,8 @@ upgrade_findings:
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 8.1 removes the `Benchmark.ms` core extension. activesupport/CHANGELOG.md: 'Remove deprecated `Benchmark.ms` method. It is now defined in the `benchmark` gem.' Calls raise NoMethodError unless the `benchmark` gem is required. Was deprecated at 8.0 (see rails-80-patterns.yml BENCHMARK_MS)"
-      fix: "Add `gem 'benchmark'` to the Gemfile (will be bundled with Ruby 3.5; explicit until then) and `require 'benchmark'` wherever `Benchmark.ms` is used. Or replace with `Process.clock_gettime(Process::CLOCK_MONOTONIC)` deltas for hot paths"
+      explanation: "Rails 8.1 removes the `Benchmark.ms` core extension. activesupport/CHANGELOG.md: 'Remove deprecated `Benchmark.ms` method. It is now defined in the `benchmark` gem.' activesupport 8.1 also drops its `benchmark` gem dependency. The `benchmark` gem defines `Benchmark.ms` only from 0.5.0 (0.4.x, the Ruby 3.4 default, does not), so calls raise NoMethodError unless the app bundles benchmark 0.5.0 or later. Was deprecated at 8.0 (see rails-80-patterns.yml BENCHMARK_MS)"
+      fix: "Replace `Benchmark.ms { ... }` with `ActiveSupport::Benchmark.realtime(:float_millisecond) { ... }`, which exists from Rails 8.0.0 and returns the same Float of milliseconds. Or add `gem 'benchmark', '>= 0.5.0'` to the Gemfile. Both work on 8.0 too"
       variable_name: "BENCHMARK_MS_REMOVED"
 
     - name: "ActiveSupport::Configurable"
