@@ -373,7 +373,7 @@ rescue_from PARAMS_PARSE_ERROR, with: :bad_request
 **Pattern:** none (the minimum Ruby does not change at this hop)
 
 **What Changed:**
-Nothing. The `rails` 5.1 gemspec requires Ruby `>= 2.2.2`, the same as 5.0, so the Ruby that bundles 5.0 also bundles 5.1. The gemspec sets no upper bound; a Ruby released after 5.1 may need its latest patch release.
+The floor does not change: the `rails` 5.1 gemspec requires Ruby `>= 2.2.2`, the same as 5.0, so the Ruby that bundles 5.0 also bundles 5.1. The ceiling rises: the [FastRuby.io compatibility table](https://www.fastruby.io/blog/ruby/rails/versions/compatibility-table.html) lists 5.0 as needing Ruby below 2.5 and 5.1 below 2.6, so 5.1 is the first release that runs on Ruby 2.5. The gemspec sets no upper bound; a Ruby released after 5.1 may need its latest patch release.
 
 **Fix:**
 None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
