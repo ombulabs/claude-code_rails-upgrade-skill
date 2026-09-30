@@ -115,15 +115,15 @@ upgrade_findings:
       fix: "Replace ActionView::Template::Handlers::Erubis and ActionView::Template::Handlers::ERB::Erubis with ActionView::Template::Handlers::ERB::Erubi, which exists in 5.1 too. A subclass that relied on Erubis-only methods needs porting to Erubi's API. For a gem that references Erubis, update the gem"
       variable_name: "ERUBIS_HANDLER"
 
-    - name: "Defining quoted_id method"
+    - name: "Defining or calling quoted_id"
       kind: "breaking"
-      pattern: "def\\s+quoted_id\\b"
+      pattern: "\\bdef\\s+quoted_id\\b|\\.quoted_id\\b"
       exclude: ""
       search_paths:
-        - "app/models/"
+        - "app/"
         - "lib/"
-      explanation: "Rails 5.2 removes the respond_to?(:quoted_id) hook in AR's quoting pipeline (deprecated in 5.1). Defining `def quoted_id` on a model no longer raises and no longer warns -- Rails simply ignores it during query construction, so the custom logic becomes silently dead code with production impact. Custom implementations were used by some legacy gems to coerce non-AR objects into queries; this is now handled via Type::Value#serialize and ActiveModel::Type"
-      fix: "Migrate the logic to a custom ActiveModel::Type (define #serialize / #cast) or accept the model's default quoting behavior"
+      explanation: "Rails 5.1's connection quote calls #quoted_id on any object that defines it, with a warning ('Defining #quoted_id is deprecated and will be ignored in Rails 5.2.'), and type_cast uses #id for such objects. Rails 5.2 drops both checks. An Active Record model is quoted by its primary key, so a custom quoted_id on a model is skipped with no error. Any other object that relied on quoted_id now raises TypeError ('can't quote Foo') when it is quoted, for example as the bind in where('owner_id = ?', owner). Calling record.quoted_id also fails: 5.1 deprecated ActiveRecord::Base#quoted_id and 5.2 removes it (NoMethodError)"
+      fix: "Pass a primitive at the call site (where('owner_id = ?', owner.id) instead of where('owner_id = ?', owner)), which works on 5.1 too, then delete quoted_id. Replace record.quoted_id with Model.connection.quote(record.id). For a model, delete the override or move the logic into a custom ActiveModel::Type"
       variable_name: "QUOTED_ID_METHOD"
 
     - name: "ConnectionPool#verify with arguments"

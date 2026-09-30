@@ -367,6 +367,33 @@ class MyHandler < ActionView::Template::Handlers::ERB::Erubi
 
 ---
 
+#### quoted_id Is Ignored and Removed
+
+**Pattern:** `QUOTED_ID_METHOD`
+
+**What Changed:**
+Rails 5.1 quoted any object that defined `quoted_id` by calling it, with a warning ("Defining #quoted_id is deprecated and will be ignored in Rails 5.2."). Rails 5.2 never calls it: a model is quoted by its primary key, so an override is skipped silently, and any other object raises `TypeError` ("can't quote Foo") when used as a bind. `ActiveRecord::Base#quoted_id` itself is removed, so calling it raises `NoMethodError`.
+
+**Detection Pattern:**
+```ruby
+def quoted_id
+"owner_id = #{owner.quoted_id}"
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Invoice.where("owner_id = ?", owner)            # owner defines quoted_id
+"owner_id = #{owner.quoted_id}"
+
+# AFTER
+Invoice.where("owner_id = ?", owner.id)
+"owner_id = #{Invoice.connection.quote(owner.id)}"
+```
+The AFTER works on 5.1 too; then delete `quoted_id`.
+
+---
+
 ## New Features
 
 ### Active Storage

@@ -82,3 +82,11 @@ ERUBIS_HANDLER:
   no_match:
     - "class CustomHandler < ActionView::Template::Handlers::ERB::Erubi"
     - "Erubis::Eruby.new(template).result(binding)"
+
+QUOTED_ID_METHOD:
+  match:
+    - "  def quoted_id"
+    - "  sql = \"owner_id = #{owner.quoted_id}\""
+  no_match:
+    - "  def quoted_identifier"
+    - "  where(owner_id: owner.id)"
