@@ -27,7 +27,7 @@ The breaking changes are smaller than 3.2 → 4.0 but several silently change be
 #### Dynamic Finders Removed
 
 **What Changed:**
-`activerecord-deprecated_finders` was removed as a Rails dependency. `find_all_by_*`, `find_last_by_*`, `scoped_by_*`, `find_or_initialize_by_*`, and `find_or_create_by_*` no longer work out of the box.
+`activerecord-deprecated_finders` was removed as a Rails dependency. `find_all_by_*`, `find_last_by_*`, `scoped_by_*`, `find_or_initialize_by_*`, and `find_or_create_by_*` no longer work out of the box. `find_by_*` and `find_by_*!` are unaffected: Rails 4.1 core still defines them.
 
 **Detection Pattern:**
 ```ruby
@@ -55,11 +55,15 @@ User.find_or_initialize_by(email: email, name: name)
 User.find_or_create_by(email: email)
 ```
 
-If you cannot migrate callers now, restore the bridge gem:
+If you cannot migrate callers now, restore the bridge gem, and name its entry file:
 ```ruby
 # Gemfile
-gem 'activerecord-deprecated_finders'
+gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders'
 ```
+
+The `require:` is not optional. On 4.0, `active_record.rb` requires the gem itself, so it loads whether or not the Gemfile mentions it. On 4.1 nothing does, and the gem's only entry file is `active_record/deprecated_finders.rb`: `Bundler.require` tries `activerecord-deprecated_finders` and then `activerecord/deprecated_finders`, finds neither, and moves on without an error. A bare `gem 'activerecord-deprecated_finders'` (or one with `require: false`) puts the gem in the bundle but never loads it, so every call it was meant to bridge still fails, unless the app requires `active_record/deprecated_finders` itself (for example in `config/application.rb`). Check for such a require before changing the Gemfile line. The line with `require:` is harmless on 4.0, so it works on both sides of a dual boot.
+
+The gem covers more than dynamic finders: `find(:all / :first / :last)`, finder options on `find` / `first` / `last` and on calculations, `update_all` with a conditions argument, `Model.scoped`, and the association `:conditions` / `:order` / `:include` / `:uniq` / `:readonly` options. `find_by_*` and `find_by_*!` are still in Rails 4.1 core and do not need it. Remove the gem once the call sites are migrated.
 
 ---
 
@@ -204,6 +208,120 @@ Then confirm nothing first-party reaches the gem's API, because core's is not ca
 Core's ERB dependency tracker also detects **more** dependencies than the gem's (it parses `layout:` keys and method chains), so fragment digests can move. That is a cold fragment cache on the first deploy, not an error. An app with no `cache` call in any view has nothing to verify here.
 
 Delete the gem outright once the current Rails is 4.1.
+
+---
+
+#### `update_all` With a Conditions Argument Removed
+
+**What Changed:**
+Rails 4.0 core defines `Relation#update_all(updates)` with a single argument. The `update_all(updates, conditions)` and `update_all(updates, conditions, limit: n, order: x)` forms kept working on 4.0 only because `activerecord-deprecated_finders` wraps `update_all` and warns `Relation#update_all with conditions is deprecated`. Rails 4.1 drops that dependency, so the call raises:
+
+```
+ArgumentError: wrong number of arguments (2 for 1)
+```
+
+**Detection Pattern:**
+```ruby
+Item.update_all({ price: 0 }, { color: "red" })
+Item.update_all("price = 0", ["color = ?", color])
+Item.update_all(updates, id: ids)
+Item.update_all({ price: 0 }, nil, order: :id, limit: 5)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Item.update_all({ price: 0 }, { color: "red" })
+Item.update_all("price = 0", ["color = ?", color])
+Item.update_all({ price: 0 }, nil, order: :id, limit: 5)
+
+# AFTER
+Item.where(color: "red").update_all(price: 0)
+Item.where("color = ?", color).update_all("price = 0")
+Item.order(:id).limit(5).update_all(price: 0)
+```
+
+The chained form works on 3.2, 4.0 and 4.1, so it can ship before the bump. Calls split across several lines are the ones a hand review tends to miss. The detection pattern matches them only when run by the whole-file pattern scanner; a line-based search such as `grep` sees single-line calls only.
+
+---
+
+#### Calculations Silently Ignore Finder Options
+
+**What Changed:**
+On 4.0, `count`, `sum`, `average`, `minimum`, `maximum` and `calculate` accept finder options (`:conditions`, `:joins`, `:group`, `:select`, `:order`, `:include`, ...) only because `activerecord-deprecated_finders` overrides `Relation#calculate`, applies the options as a scope, and warns `Relation#calculate with finder options is deprecated`. Rails 4.1 drops that dependency. Core 4.1 still accepts the options hash but never reads it, so **nothing raises**: the options are dropped and the query runs without them. With four items, two of them red:
+
+```ruby
+Item.count(conditions: { color: "red" })
+# 4.0: 2 (plus the deprecation warning)
+# 4.1: 4, every row
+
+Item.maximum(:price, group: :color)
+# 4.0: {"blue"=>30, "red"=>20}
+# 4.1: 30, a scalar
+```
+
+A test that asserts on the number will catch it; code that only renders the number will not.
+
+**Detection Pattern:**
+```ruby
+Item.count(conditions: { color: "red" })
+Item.count(:id, :conditions => ["color = ?", color])
+Item.maximum(:price, group: :color)
+owner.items.sum(:price, joins: :orders, conditions: { paid: true })
+Item.count(select: "DISTINCT items.owner_id")
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Item.count(conditions: { color: "red" })
+Item.maximum(:price, group: :color)
+owner.items.sum(:price, joins: :orders, conditions: { paid: true })
+Item.count(select: "DISTINCT items.owner_id")
+
+# AFTER
+Item.where(color: "red").count
+Item.group(:color).maximum(:price)   # still a Hash keyed by group
+owner.items.joins(:orders).where(paid: true).sum(:price)
+Item.select("DISTINCT items.owner_id").count
+```
+
+The chained form works on 3.2, 4.0 and 4.1. A call that also passes `distinct: true` loses that option at 4.1 as well, with or without the gem. Move it to `.distinct` in the same edit: `Item.count(:owner_id, conditions: c, distinct: true)` becomes `Item.where(c).distinct.count(:owner_id)`.
+
+---
+
+#### `count(distinct: true)` Silently Ignored
+
+**What Changed:**
+Rails 4.0 deprecates the `:distinct` option on `count` / `calculate` but still honors it. Rails 4.1 removes the handling: the options hash is accepted and never read, so the call runs a plain `COUNT` and **nothing raises**. With four items owned by two owners:
+
+```ruby
+Item.count(:owner_id, distinct: true)
+# 4.0: 2 (plus the deprecation warning)
+# 4.1: 4, the row count
+```
+
+`activerecord-deprecated_finders` does not bring it back: its `calculate` override hands `:distinct` to core, which ignores it.
+
+**Detection Pattern:**
+```ruby
+Item.count(:owner_id, distinct: true)
+Item.count(:owner_id, :distinct => true)
+Item.calculate(:count, :owner_id, distinct: true)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Item.count(:owner_id, distinct: true)
+Item.count(:owner_id, conditions: { color: "red" }, distinct: true)
+
+# AFTER
+Item.distinct.count(:owner_id)
+Item.where(color: "red").distinct.count(:owner_id)
+```
+
+Keep the column symbol so Rails still qualifies it with the table name. `Relation#distinct` exists on 4.0, so the rewrite works on both sides of a dual boot; prefer it over `uniq`, which Rails 5.0 deprecates. `count("DISTINCT items.owner_id")` is a different form that still works on 4.1.
 
 ---
 
@@ -632,8 +750,8 @@ gem 'rails', '~> 4.1.16'  # pin to the last 4.1 patch
 # Only if you rely on it directly
 # gem 'multi_json'
 
-# Only if you cannot migrate dynamic finders now
-# gem 'activerecord-deprecated_finders'
+# Only if you cannot migrate dynamic finders now; without require: it never loads on 4.1
+# gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders'
 
 # Only if you depend on removed JSON encoder features
 # gem 'activesupport-json_encoder'
@@ -672,6 +790,9 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
+15. Move `update_all(updates, conditions)` conditions into a `where` chain.
+16. Move finder options on `count` / `sum` / `maximum` / ... (`conditions:`, `joins:`, `group:`) onto chained scopes.
+17. Replace `count(:col, distinct: true)` with `distinct.count(:col)`.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -691,6 +812,10 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
 | `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
+| `NoMethodError` on `find_all_by_*` (or another bridged call) with `activerecord-deprecated_finders` in the Gemfile | "Dynamic Finders Removed": add `require: 'active_record/deprecated_finders'` to the gem line |
+| `ArgumentError: wrong number of arguments (2 for 1)` from `update_all` | "`update_all` With a Conditions Argument Removed": move the conditions into `where(...)` |
+| `count(conditions: ...)` returns the total row count; `maximum(:col, group: ...)` returns a scalar instead of a Hash | "Calculations Silently Ignore Finder Options": chain `where` / `joins` / `group` before the calculation |
+| `count(:col, distinct: true)` returns the row count instead of the distinct count | "`count(distinct: true)` Silently Ignored": use `distinct.count(:col)` |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |

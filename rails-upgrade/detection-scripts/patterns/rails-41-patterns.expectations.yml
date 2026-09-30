@@ -11,6 +11,19 @@
 # Run with:
 #   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-41-patterns.yml
 
+DYNAMIC_FINDERS:
+  match:
+    - "User.find_all_by_email(email)"
+    - "User.find_last_by_email(email)"
+    - "User.scoped_by_status(\"active\")"
+    - "  owner.items.find_all_by_color_and_size(color, size)"
+  no_match:
+    - "User.find_by_email(email)"
+    - "User.find_by_email!(email)"
+    - "User.find_by(email: email)"
+    - "User.find_by_sql(sql)"
+    - "User.where(email: email).last"
+
 CACHE_DIGESTS_BACKPORT:
   match:
     - "gem 'cache_digests'"
@@ -24,3 +37,90 @@ CACHE_DIGESTS_BACKPORT:
     - "  ActionView::Digestor.digest(name: name, finder: lookup_context)"
     - "  config.action_view.cache_template_loading = true"
     - "  <% cache [@post, 'v3'] do %>"
+
+DEPRECATED_FINDERS_AUTOREQUIRE:
+  match:
+    - "gem 'activerecord-deprecated_finders'"
+    - "gem \"activerecord-deprecated_finders\", \"~> 1.0.4\""
+    - "  gem 'activerecord-deprecated_finders', require: false"
+    - "  gem 'activerecord-deprecated_finders', :require => false"
+    - "gem 'activerecord-deprecated_finders', require: 'activerecord-deprecated_finders'"
+    - "gem 'activerecord-deprecated_finders', \"1.0.4\" # require: 'active_record/deprecated_finders' later"
+  no_match:
+    - "gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders'"
+    - "gem \"activerecord-deprecated_finders\", \"~> 1.0.4\", require: \"active_record/deprecated_finders\""
+    - "gem 'activerecord-deprecated_finders', :require => 'active_record/deprecated_finders'"
+    - "# gem 'activerecord-deprecated_finders'"
+    - "gem 'activerecord'"
+
+UPDATE_ALL_WITH_CONDITIONS:
+  # The multi-line shape (`update_all({\n a: 1\n}, {\n id: ids\n})`) matches only
+  # in the whole-file scanner (detection-scripts/scan_patterns.rb); a line-based
+  # search sees single-line calls only. Fixtures are single lines.
+  match:
+    - "Item.update_all({ price: 0 }, { color: \"red\" })"
+    - "Item.update_all(\"price = 0\", [\"color = ?\", color])"
+    - "Item.update_all('price = 0', 'color = \"red\"')"
+    - "Item.update_all([\"price = ?\", price], id: ids)"
+    - "Item.update_all(updates, id: ids)"
+    - "  scope.update_all(attributes, key_column => key)"
+    - "Item.update_all(self.class.reset_values, { id: ids }, limit: 10)"
+    - "Item.update_all({ price: 0 }, nil, order: :id, limit: 5)"
+  no_match:
+    - "Item.where(color: \"red\").update_all(price: 0)"
+    - "Item.update_all(price: 0, color: \"blue\")"
+    - "Item.update_all(:price => 0, :color => \"blue\")"
+    - "Item.update_all(\"price = 0, color = 'blue'\")"
+    - "Item.update_all([\"price = ?, color = ?\", 0, \"blue\"])"
+    - "Item.update_all(tags: [\"a\", \"b\"].to_yaml)"
+    - "Item.update_all(updates.join(\",\"))"
+    - "Item.update_all(price:0, color: \"blue\")"
+    - "Item.where(id: ids).update_all(updates)"
+
+CALCULATE_FINDER_OPTIONS:
+  # A call split across lines (`count(:id,\n  conditions: c)`) matches only in
+  # the whole-file scanner (detection-scripts/scan_patterns.rb); a line-based
+  # search sees single-line calls only. Fixtures are single lines.
+  match:
+    - "Item.count(conditions: { color: \"red\" })"
+    - "Item.count(:id, :conditions => [\"color = ?\", color])"
+    - "Item.maximum(:price, group: :color)"
+    - "owner.items.sum(:price, joins: :orders, conditions: { paid: true })"
+    - "Item.minimum(\"items.price\", joins: \"LEFT JOIN orders ON orders.item_id = items.id\")"
+    - "Item.count(select: \"DISTINCT items.owner_id\")"
+    - "Item.average(:price, :include => :owner)"
+    - "Item.calculate(:sum, :price, having: \"SUM(price) > 10\")"
+    - "Item.count(:all, group: :color)"
+    - "Item.sum(\"price\", :limit => 5)"
+  no_match:
+    - "Item.where(color: \"red\").count"
+    - "Item.group(:color).maximum(:price)"
+    - "Item.count(:owner_id, distinct: true)"
+    - "Item.count(\"DISTINCT items.owner_id\")"
+    - "Item.sum(:order_total)"
+    - "Item.count(:group_id)"
+    - "Item.maximum(:price, sub_group: :color)"
+    - "[1, 2, 3].sum"
+    # Service objects that take keyword arguments with the same names.
+    - "TaxCalculator.calculate(order: order)"
+    - "Shipping.calculate(from: origin, to: dest)"
+    - "Stats.count(limit: 10)"
+
+DISTINCT_COUNT_OPTION:
+  # A call split across lines (`count(:owner_id,\n  distinct: true)`) matches
+  # only in the whole-file scanner (detection-scripts/scan_patterns.rb); a
+  # line-based search sees single-line calls only. Fixtures are single lines.
+  match:
+    - "Item.count(:owner_id, distinct: true)"
+    - "Item.count(:owner_id, :distinct => true)"
+    - "  unique_owners: scope.count(:owner_id, distinct: true),"
+    - "Item.calculate(:count, :owner_id, distinct: true)"
+    - "Item.count(:owner_id, conditions: { color: \"red\" }, distinct: true)"
+  no_match:
+    - "Item.distinct.count(:owner_id)"
+    - "Item.uniq.count(:owner_id)"
+    - "Item.count(\"DISTINCT items.owner_id\")"
+    - "Item.count(select: \"distinct items.owner_id\")"
+    - "Item.count(:owner_id, distinct: false)"
+    - "Item.count(:owner_id, not_distinct: true)"
+    - "Item.where(distinct: true).count"
