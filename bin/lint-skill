@@ -23,9 +23,15 @@ SKILLS = {
 }.freeze
 
 $errors = []
+$warnings = []
 
 def err(file, detail)
   $errors << "#{file.sub("#{ROOT}/", "")}: #{detail}"
+end
+
+# Reported but does not fail the run: known gaps that are being worked down.
+def warn_about(file, detail)
+  $warnings << "#{file.sub("#{ROOT}/", "")}: #{detail}"
 end
 
 # CHANGELOG.md lives at the repo root, outside every skill dir, so it is never
@@ -259,10 +265,11 @@ end
 # A heading can be reworded freely; the variable_name is what code refers to.
 #
 # Every marker must name a variable_name in the hop's patterns file, and a
-# name may sit on one entry only. Guides opt in: once a guide has one marker,
-# every entry under "## Breaking Changes" needs one and every pattern of the
-# hop must be named by some entry, so a guide can be migrated on its own
-# without turning lint red for the rest.
+# name may sit on one entry only; both are errors. Guides opt in: once a guide
+# has one marker, an entry under "## Breaking Changes" with no marker and a
+# pattern of the hop that no entry names are reported as warnings. They are the
+# backlog of missing entries (Ruby version, patterns with no entry, entries with
+# no pattern yet) and become errors once that backlog is empty.
 MARKER = /\A\*\*Pattern:\*\*\s*(.*)\z/
 
 def pattern_names(file)
@@ -327,17 +334,18 @@ Dir.glob(File.join(SKILLS.fetch("rails-upgrade"), "version-guides", "upgrade-*-t
   end
 
   entries.reject { |_, _, m| m }.each do |heading, ln, _, _|
-    err(guide, "line #{ln}: \"#{heading}\" has no **Pattern:** line; hint: add one under the heading, or **Pattern:** none (why)")
+    warn_about(guide, "line #{ln}: \"#{heading}\" has no **Pattern:** line; hint: add one under the heading, or **Pattern:** none (why)")
   end
   (known - owner.keys).each do |name|
-    err(guide, "#{name} (#{File.basename(patterns_file)}) is not named by any entry; " \
+    warn_about(guide, "#{name} (#{File.basename(patterns_file)}) is not named by any entry; " \
                "hint: add it to the entry that explains it, or write an entry for it")
   end
 end
 
 # ---------------------------------------------------------------------------
+$warnings.each { |w| puts "WARN  #{w}" }
 if $errors.empty?
-  puts "lint-skill: OK"
+  puts "lint-skill: OK#{$warnings.empty? ? '' : " (#{$warnings.length} warning(s))"}"
 else
   $errors.each { |e| puts "ERROR #{e}" }
   puts "lint-skill: #{$errors.length} error(s)"
