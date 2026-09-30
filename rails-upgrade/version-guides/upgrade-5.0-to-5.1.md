@@ -180,6 +180,33 @@ Remove the configuration line. This is now the default behavior.
 
 ---
 
+#### config.serve_static_files and config.static_cache_control Removed
+
+**Pattern:** `SERVE_STATIC_FILES_RENAME`, `STATIC_CACHE_CONTROL_RENAME`
+
+**What Changed:**
+Rails 5.0 kept both settings as deprecated aliases that wrote to `config.public_file_server`. Rails 5.1 removes them. Assigning either one no longer raises: the value is stored as an unknown config option and ignored. So `config.serve_static_files = false` stops turning off Rails' static file server (it defaults to on), and `config.static_cache_control` stops adding the `Cache-Control` header to files under `public/`. Reading `config.serve_static_files` without assigning it first raises `NoMethodError`.
+
+**Detection Pattern:**
+```ruby
+config.serve_static_files = ENV['RAILS_SERVE_STATIC_FILES'].present?
+config.static_cache_control = 'public, max-age=3600'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+config.serve_static_files = ENV['RAILS_SERVE_STATIC_FILES'].present?
+config.static_cache_control = 'public, max-age=3600'
+
+# AFTER
+config.public_file_server.enabled = ENV['RAILS_SERVE_STATIC_FILES'].present?
+config.public_file_server.headers = { 'Cache-Control' => 'public, max-age=3600' }
+```
+The AFTER works on Rails 5.0 too, so make the change before the bump.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Ruby Version Requirement
@@ -302,6 +329,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ActionView::Template::Error: Unknown keyword: text` | "render :text Removed" — `render plain:` |
 | `redirect_to :back` raises | "redirect_to :back Removed" — `redirect_back(fallback_location: ...)` |
 | `ArgumentError: missing keyword: :fallback_location` | "redirect_to :back Removed" — `redirect_back` requires `fallback_location:` |
+| Files under `public/` lose their `Cache-Control` header, or Rails serves them although `serve_static_files = false` | "config.serve_static_files and config.static_cache_control Removed" — move to `config.public_file_server` |
 
 ---
 
