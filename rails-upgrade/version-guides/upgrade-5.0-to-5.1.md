@@ -134,6 +134,37 @@ redirect_back(fallback_location: root_path, notice: 'Done!')
 
 ---
 
+#### Returning false No Longer Halts Callbacks
+
+**Pattern:** `HALT_CALLBACK_CHAINS_DEPRECATION`
+
+**What Changed:**
+In Rails 5.0 a `before_*` callback on an Active Record or Active Model object that returns `false` still halts the chain, with a deprecation warning, while `ActiveSupport.halt_callback_chains_on_return_false` is `true`. That is the default, and `rails app:update` writes the line as `true`. Rails 5.1 removes the halt: the save or validation goes on and nothing warns. The setter stays until 5.2 but only logs a deprecation warning.
+
+**Detection Pattern:**
+```ruby
+# config/initializers/new_framework_defaults.rb
+ActiveSupport.halt_callback_chains_on_return_false = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+before_save :check_something
+
+def check_something
+  return false if invalid_condition
+end
+
+# AFTER
+def check_something
+  throw :abort if invalid_condition
+end
+```
+The AFTER works on Rails 5.0 too. The pattern finds only the config line, and an app without the line had the same default: run the suite on 5.0, fix every callback behind the warning `will not implicitly halt a callback chain in Rails 5.1`, then delete the line.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Positional Arguments in Process Methods
@@ -357,6 +388,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ArgumentError: missing keyword: :fallback_location` | "redirect_to :back Removed" — `redirect_back` requires `fallback_location:` |
 | Files under `public/` lose their `Cache-Control` header, or Rails serves them although `serve_static_files = false` | "config.serve_static_files and config.static_cache_control Removed" — move to `config.public_file_server` |
 | `ActionController::UnfilteredParameters: unable to convert unpermitted parameters to hash` | "raise_on_unfiltered_parameters Deprecated" — `permit(...)` before `to_h` |
+| A record saves although a `before_*` callback returned `false` | "Returning false No Longer Halts Callbacks" — `throw :abort` |
 
 ---
 

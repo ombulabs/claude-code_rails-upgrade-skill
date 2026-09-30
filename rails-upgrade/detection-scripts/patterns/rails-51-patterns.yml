@@ -89,6 +89,16 @@ upgrade_findings:
       fix: "Wrap params/session/flash in keyword args: `get :show, params: { id: 1 }, session: { user_id: 1 }, flash: { notice: 'hi' }`"
       variable_name: "CONTROLLER_TEST_POSITIONAL"
 
+    - name: "halt_callback_chains_on_return_false"
+      kind: "deprecation"
+      pattern: "halt_callback_chains_on_return_false"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 5.1 removes the `return false` halt: a before_* callback on an Active Record or Active Model object that returns false no longer stops the chain, and nothing warns. In Rails 5.0 it still halted, with a deprecation warning, while ActiveSupport.halt_callback_chains_on_return_false was true (the default; `rails app:update` wrote it as true). The 5.1 setter only logs a deprecation warning and changes nothing; Rails 5.2 removes it (see rails-52-patterns.yml HALT_CALLBACK_CHAINS_ON_RETURN_FALSE). A line set to true means the app may still rely on `return false`; an app with no line had the same default"
+      fix: "Before the bump, run the test suite on Rails 5.0 and replace every callback behind the deprecation warning `will not implicitly halt a callback chain in Rails 5.1` with `throw :abort`, then remove the assignment. throw :abort works on 5.0 too"
+      variable_name: "HALT_CALLBACK_CHAINS_DEPRECATION"
+
   medium_priority:
     - name: "raise_in_transactional_callbacks config (dead setting)"
       kind: "breaking"
@@ -188,16 +198,6 @@ upgrade_findings:
       explanation: "Rails 5.1 deprecates config.action_controller.raise_on_unfiltered_parameters and ignores it: ActionController::Parameters#to_h and #to_hash always raise ActionController::UnfilteredParameters on unpermitted params. Setting it to true logs a deprecation warning at boot; setting it to false does nothing, so an app that ran with false (the Rails 5.0 default when the line is absent) starts raising where it calls to_h on unpermitted params"
       fix: "Remove the line from config/application.rb, config/initializers/new_framework_defaults.rb or environment configs. If it was false, call permit(...) before to_h, or to_unsafe_h where the unfiltered hash is intended"
       variable_name: "RAISE_ON_UNFILTERED_PARAMS"
-
-    - name: "halt_callback_chains_on_return_false"
-      kind: "deprecation"
-      pattern: "halt_callback_chains_on_return_false"
-      exclude: ""
-      search_paths:
-        - "config/"
-      explanation: "Rails 5.1 deprecates ActiveSupport.halt_callback_chains_on_return_false. The underlying `return false` halt mechanism was already removed at 5.0; the 5.1 config setter is a no-op deprecated shim. Removed entirely at 5.2 (see rails-52-patterns.yml HALT_CALLBACK_CHAINS_ON_RETURN_FALSE for the breaking entry)"
-      fix: "Remove the assignment from config/application.rb / initializers. Code that relied on `return false` to halt callbacks should already be using `throw :abort` after the 4.2 → 5.0 hop"
-      variable_name: "HALT_CALLBACK_CHAINS_DEPRECATION"
 
     - name: "Defining quoted_id"
       kind: "deprecation"
