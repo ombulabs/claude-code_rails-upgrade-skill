@@ -55,6 +55,36 @@ upgrade_findings:
       fix: "Pass the composite key as an Array to `foreign_key:` instead: `belongs_to :activity, foreign_key: [:activity_id, :school_id]`. AR maps an Array `foreign_key` to query_constraints internally on both 7.2 and 8.0, so the change is behavior-preserving and needs no dual-boot branch."
       variable_name: "QUERY_CONSTRAINTS_OPTION"
 
+    - name: "warn_on_records_fetched_greater_than config"
+      kind: "breaking"
+      pattern: "warn_on_records_fetched_greater_than"
+      exclude: "^\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.0 removes config.active_record.warn_on_records_fetched_greater_than. 7.2 still logs large result sets and warns that the setting is deprecated. On 8.0 the Active Record railtie calls ActiveRecord::Base.warn_on_records_fetched_greater_than= when ActiveRecord::Base loads, which raises `NoMethodError: undefined method 'warn_on_records_fetched_greater_than=' for class ActiveRecord::Base` (at boot with eager loading, otherwise on the first model access)"
+      fix: "Delete the line (safe on 7.2 and 8.0). To keep the check, subscribe to `sql.active_record` notifications and read `payload[:row_count]`, which both versions provide"
+      variable_name: "WARN_ON_RECORDS_FETCHED"
+
+    - name: "allow_deprecated_singular_associations_name config"
+      kind: "breaking"
+      pattern: "allow_deprecated_singular_associations_name"
+      exclude: "^\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.0 removes config.active_record.allow_deprecated_singular_associations_name. On 7.2 the setter already does nothing but warn (the singular-name lookup in where was removed in 7.2). On 8.0 the Active Record railtie calls ActiveRecord::Base.allow_deprecated_singular_associations_name= when ActiveRecord::Base loads, which raises NoMethodError (at boot with eager loading, otherwise on the first model access)"
+      fix: "Delete the line. It has no effect on 7.2 either, so this is safe on both sides of a dual boot"
+      variable_name: "ALLOW_DEPRECATED_SINGULAR_ASSOCIATIONS_NAME"
+
+    - name: "commit_transaction_on_non_local_return config"
+      kind: "breaking"
+      pattern: "commit_transaction_on_non_local_return"
+      exclude: "^\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.0 removes config.active_record.commit_transaction_on_non_local_return. On 7.2 the setter already does nothing but warn: a return, break or throw out of a transaction block always commits. On 8.0 the Active Record railtie calls ActiveRecord::Base.commit_transaction_on_non_local_return= when ActiveRecord::Base loads, which raises NoMethodError (at boot with eager loading, otherwise on the first model access)"
+      fix: "Delete the line. It has no effect on 7.2 either: a non-local return commits on both 7.2 and 8.0, so this is safe on both sides of a dual boot"
+      variable_name: "COMMIT_TRANSACTION_ON_NON_LOCAL_RETURN"
+
   medium_priority:
     - name: "Redis cache store"
       kind: "optional"
@@ -193,36 +223,6 @@ upgrade_findings:
       explanation: "Rails 8.0 removes config.read_encrypted_secrets. railties/CHANGELOG.md: 'Remove deprecated `config.read_encrypted_secrets`.' The setting drove the legacy encrypted-secrets feature (config/secrets.yml.enc), already dead since 7.2 removed `Rails.application.secrets`. The setter does not raise at 8.0: the assignment falls through to Railtie::Configuration#method_missing and is stored with no effect and no warning. Only the 7.2 side of a dual boot warns (`'config.read_encrypted_secrets=' is deprecated and will be removed in Rails 8.0`), which clutters boot and assets:precompile logs. 7.1 and earlier do not warn. Reading `config.read_encrypted_secrets` without assigning it first raises NoMethodError at 8.0"
       fix: "Delete the `config.read_encrypted_secrets = true` line and its comment block (usually in config/environments/production.rb). Safe on both 7.2 and 8.0, no dual-boot branch needed. If the app still keeps secrets in config/secrets.yml.enc, move them to credentials (`bin/rails credentials:edit`) first"
       variable_name: "READ_ENCRYPTED_SECRETS"
-
-    - name: "warn_on_records_fetched_greater_than config"
-      kind: "breaking"
-      pattern: "warn_on_records_fetched_greater_than"
-      exclude: ""
-      search_paths:
-        - "config/"
-      explanation: "Rails 8.0 removes config.active_record.warn_on_records_fetched_greater_than. activerecord/CHANGELOG.md: 'Remove deprecated `config.active_record.warn_on_records_fetched_greater_than`.' Existing config lines raise NoMethodError at boot"
-      fix: "Remove the line entirely. For per-query large-result-set warnings, use `find_each` / `in_batches` and standard application-level instrumentation"
-      variable_name: "WARN_ON_RECORDS_FETCHED"
-
-    - name: "allow_deprecated_singular_associations_name config"
-      kind: "breaking"
-      pattern: "allow_deprecated_singular_associations_name"
-      exclude: ""
-      search_paths:
-        - "config/"
-      explanation: "Rails 8.0 removes config.active_record.allow_deprecated_singular_associations_name. activerecord/CHANGELOG.md: 'Remove deprecated `config.active_record.allow_deprecated_singular_associations_name`.' Existing config lines raise NoMethodError at boot"
-      fix: "Remove the line entirely and audit any associations that relied on the deprecated singular name resolution"
-      variable_name: "ALLOW_DEPRECATED_SINGULAR_ASSOCIATIONS_NAME"
-
-    - name: "commit_transaction_on_non_local_return config"
-      kind: "breaking"
-      pattern: "commit_transaction_on_non_local_return"
-      exclude: ""
-      search_paths:
-        - "config/"
-      explanation: "Rails 8.0 removes config.active_record.commit_transaction_on_non_local_return. activerecord/CHANGELOG.md: 'Remove deprecated `config.active_record.commit_transaction_on_non_local_return`.' Existing config lines raise NoMethodError at boot"
-      fix: "Remove the line entirely; the post-deprecation behavior (rollback on non-local return) is now the only behavior"
-      variable_name: "COMMIT_TRANSACTION_ON_NON_LOCAL_RETURN"
 
     - name: "unsigned_float / unsigned_decimal in migrations"
       kind: "deprecation"

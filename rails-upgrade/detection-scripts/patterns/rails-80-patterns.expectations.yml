@@ -114,3 +114,33 @@ ROUTES_MULTIPLE_PATHS:
     - "  get [\"/old1\", \"/old2\"], to: \"foo#bar\""
     - "  target \"/a\", \"/b\""
     - "  # get \"/a\", \"/b\""
+
+WARN_ON_RECORDS_FETCHED:
+  match:
+    - "    config.active_record.warn_on_records_fetched_greater_than = 1000"
+    - "Rails.application.config.active_record.warn_on_records_fetched_greater_than = 1000"
+    - "ActiveRecord.warn_on_records_fetched_greater_than = 1000"
+  no_match:
+    # commented line, as in the 7.1 new_framework_defaults initializer
+    - "# Rails.application.config.active_record.warn_on_records_fetched_greater_than = 1000"
+    - "    # config.active_record.warn_on_records_fetched_greater_than = 1000"
+
+ALLOW_DEPRECATED_SINGULAR_ASSOCIATIONS_NAME:
+  match:
+    - "    config.active_record.allow_deprecated_singular_associations_name = false"
+    - "Rails.application.config.active_record.allow_deprecated_singular_associations_name = false"
+    - "ActiveRecord.allow_deprecated_singular_associations_name = false"
+  no_match:
+    # commented line, as in the 7.1 new_framework_defaults initializer
+    - "# Rails.application.config.active_record.allow_deprecated_singular_associations_name = false"
+    - "    # config.active_record.allow_deprecated_singular_associations_name = false"
+
+COMMIT_TRANSACTION_ON_NON_LOCAL_RETURN:
+  match:
+    - "    config.active_record.commit_transaction_on_non_local_return = true"
+    - "Rails.application.config.active_record.commit_transaction_on_non_local_return = true"
+    - "ActiveRecord.commit_transaction_on_non_local_return = true"
+  no_match:
+    # commented line, as in the 7.1 new_framework_defaults initializer
+    - "# Rails.application.config.active_record.commit_transaction_on_non_local_return = true"
+    - "    # config.active_record.commit_transaction_on_non_local_return = true"

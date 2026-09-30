@@ -208,6 +208,35 @@ The AFTER works on 7.2 too. Drop the leading underscore from the options (`_pref
 
 ---
 
+#### Removed Active Record Config Keys Raise NoMethodError
+
+**Pattern:** `WARN_ON_RECORDS_FETCHED`, `ALLOW_DEPRECATED_SINGULAR_ASSOCIATIONS_NAME`, `COMMIT_TRANSACTION_ON_NON_LOCAL_RETURN`
+
+**What Changed:**
+Rails 8.0 removes three Active Record settings that 7.2 still accepted with a deprecation warning. The railtie copies each `config.active_record.*` value onto `ActiveRecord::Base` when it loads, so a leftover line raises `NoMethodError: undefined method '<key>=' for class ActiveRecord::Base` at boot with eager loading, otherwise on the first model access. On 7.2, `allow_deprecated_singular_associations_name` and `commit_transaction_on_non_local_return` already do nothing (a `return`, `break` or `throw` out of a transaction block commits); `warn_on_records_fetched_greater_than` still logs large result sets.
+
+**Detection Pattern:**
+```ruby
+# config/application.rb, config/environments/*.rb, config/initializers/*.rb
+config.active_record.warn_on_records_fetched_greater_than = 1000
+config.active_record.allow_deprecated_singular_associations_name = false
+config.active_record.commit_transaction_on_non_local_return = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+config.active_record.warn_on_records_fetched_greater_than = 1000
+
+# AFTER (line deleted; to keep the check, watch the row count)
+ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+  Rails.logger.warn("Large result: #{payload[:sql]}") if payload[:row_count].to_i > 1000
+end
+```
+Deleting the lines works on 7.2 too, and so does the subscriber: both versions put `row_count` in the `sql.active_record` payload.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Multi-Database Configuration for Solid Gems
@@ -658,6 +687,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ArgumentError: wrong number of arguments (given 0, expected 1..2)` from an `enum` line | "`enum` Keyword-Arguments Form Removed": `enum :status, { ... }, prefix: true` |
 | `` DEPRECATION WARNING: Setting `ENV["SCHEMA_CACHE"]` is deprecated `` on the 7.2 side | "`SCHEMA_CACHE` Environment Variable No Longer Read": set `schema_cache_path:` in `database.yml` |
 | `DEPRECATION WARNING: Mapping a route with multiple paths is deprecated` at boot | "Routes Drawn With Multiple Paths Deprecated": one route call per path |
+| `NoMethodError: undefined method 'warn_on_records_fetched_greater_than='` (or `allow_deprecated_singular_associations_name=`, `commit_transaction_on_non_local_return=`) for class ActiveRecord::Base | "Removed Active Record Config Keys Raise NoMethodError": delete the line |
 
 ---
 
