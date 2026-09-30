@@ -194,6 +194,32 @@ config.action_controller.per_form_csrf_tokens = false
 
 ---
 
+#### Dynamic :controller and :action Route Segments
+
+**Pattern:** `DYNAMIC_ROUTE_SEGMENTS`
+
+**What Changed:**
+Nothing new at this hop. A route whose path has a `:controller` or `:action` segment has emitted a deprecation warning since 5.0 ("Using a dynamic :controller segment in a route is deprecated and will be removed in Rails 6.0."), and 5.2 still warns the same way when routes load. Fix it now so the 6.0 hop does not carry it.
+
+**Detection Pattern:**
+```ruby
+get ':controller(/:action(/:id))'
+get 'reports/:action', controller: 'reports'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+get 'reports/:action', controller: 'reports'
+
+# AFTER
+get 'reports/daily',  to: 'reports#daily'
+get 'reports/weekly', to: 'reports#weekly'
+```
+The explicit routes work on 5.1 too.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Ruby Version Requirement
@@ -335,6 +361,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `attribute_changed?` returns `false` after save | "Active Record attribute_changed? Behavior" — `saved_change_to_attribute?` |
 | `ActionController::InvalidAuthenticityToken` on forms that worked on 5.1 | "per_form_csrf_tokens Default Changed" — fresh token per form, or disable the feature |
 | Users logged out once after deploy | "Cookie Expiry Format Changed" — expected, one re-authentication |
+| `Using a dynamic :controller segment in a route is deprecated` (or `:action`) | "Dynamic :controller and :action Route Segments" — declare each route explicitly |
 
 ---
 

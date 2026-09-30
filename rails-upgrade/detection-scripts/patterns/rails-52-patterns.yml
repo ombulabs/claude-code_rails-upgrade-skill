@@ -18,11 +18,11 @@ upgrade_findings:
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
       kind: "deprecation"
-      pattern: "\\b(:controller|:action)\\b"
-      exclude: "controller:|action:|:controller\\s*=>|:action\\s*=>|action_dispatch|action_view|action_mailer|action_cable|action_pack|action_controller"
+      pattern: "(?<=['\"/(]):(?:controller|action)(?!\\w)"
+      exclude: ""
       search_paths:
         - "config/routes.rb"
-      explanation: "Rails 5.2 deprecates the dynamic :controller(/:action(/:id)) route shape. Routing on user-controllable URL segments to arbitrary controllers/actions has been a long-standing security smell"
+      explanation: "A route whose path has a :controller or :action segment (the old catch-all :controller(/:action(/:id)) shape) emits a deprecation warning when routes load, saying it will be removed in Rails 6.0. The warning exists since 5.0 and is unchanged in 5.1 and 5.2. Matches the segment inside a quoted path; the hash keys controller: / :action => are not segments and are skipped"
       fix: "Replace dynamic segments with explicit routes: get '/admin/:controller/:action' → declare each controller/action pair explicitly with `get '/admin/users', to: 'users#index'` etc."
       variable_name: "DYNAMIC_ROUTE_SEGMENTS"
 
