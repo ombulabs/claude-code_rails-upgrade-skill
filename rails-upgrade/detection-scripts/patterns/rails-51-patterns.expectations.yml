@@ -35,3 +35,27 @@ FILTER_METHODS:
     - "  config.filter_parameters += [:password]"
     - "  add_filter { |line| line }"
     - "  before_filters = []"
+
+FILTER_STRING_CONDITIONS:
+  match:
+    - "  before_action :require_guest, if: 'guest?'"
+    - "  before_action :require_guest, unless: \"admin?\""
+    # Hash-rocket form: a leading \b before `:if` never matched here.
+    - "  before_filter :require_guest, :if => 'guest?'"
+    - "  skip_before_action :authenticate, :unless => \"api?\""
+  no_match:
+    - "  before_action :require_guest, if: :guest?"
+    - "  before_action :require_guest, if: -> { guest? }"
+    - "  before_action :require_guest, :if => :guest?"
+    - "  before_action :x, notify: 'y'"
+
+SET_CALLBACK_STRING_CONDITIONS:
+  match:
+    - "  set_callback :save, :before, :x, if: 'y?'"
+    # Hash-rocket form: a leading \b before `:if` never matched here.
+    - "  set_callback :save, :before, :x, :if => 'y?'"
+    - "  skip_callback :validate, :before, :check, unless: \"new_record?\""
+  no_match:
+    - "  set_callback :save, :before, :x, if: :y?"
+    - "  set_callback :save, :before, :x, :if => -> { y? }"
+    - "  run_callbacks :save"

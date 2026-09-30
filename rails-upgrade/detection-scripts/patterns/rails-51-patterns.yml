@@ -45,16 +45,6 @@ upgrade_findings:
       fix: "Rename: before_filter to before_action, skip_before_filter to skip_before_action, and so on; behavior is identical and the *_action names exist in 5.0. Replace skip_filter with the skip_before_action / skip_after_action / skip_around_action that matches the callback"
       variable_name: "FILTER_METHODS"
 
-    - name: "String conditions in controller filters"
-      kind: "breaking"
-      pattern: "(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_(action|filter)\\b[^\\n]*\\b(if|unless):\\s*['\"]"
-      exclude: ""
-      search_paths:
-        - "app/controllers/"
-      explanation: "Rails 5.1 no longer accepts string values for `if:` / `unless:` conditions on filters. They must be symbols (method names) or lambdas"
-      fix: "Replace the string with a symbol: `if: :has_project_guest_id` instead of `if: 'has_project_guest_id'`. For inline expressions, use a lambda: `if: -> { ... }`"
-      variable_name: "FILTER_STRING_CONDITIONS"
-
     - name: "ActiveRecord::Relation#uniq removed"
       kind: "breaking"
       pattern: "\\.uniq(\\b|\\()"
@@ -169,7 +159,7 @@ upgrade_findings:
 
     - name: "set_callback / skip_callback string :if / :unless"
       kind: "deprecation"
-      pattern: "(set_callback|skip_callback)\\b[^\\n]*\\b(?:(?:if|unless):|:(?:if|unless)\\s*=>)\\s*['\"]"
+      pattern: "(set_callback|skip_callback)\\b[^\\n]*(?:\\b(?:if|unless):|:(?:if|unless)\\s*=>)\\s*['\"]"
       exclude: ""
       search_paths:
         - "app/"
@@ -188,6 +178,16 @@ upgrade_findings:
       explanation: "Rails 5.1 deprecates calling #lock! on an ActiveRecord record with unsaved changes. activerecord/lib/active_record/locking/pessimistic.rb at 5.1 emits ActiveSupport::Deprecation.warn 'Locking a record with unpersisted changes is deprecated and will raise an exception in Rails 5.2'. NOISY REGEX: matches every .lock! call site; most are correct usage on persisted records with no in-memory edits. Audit each match. The 5.2 hop turns this into a RuntimeError (see rails-52-patterns.yml LOCK_BANG_UNPERSISTED)"
       fix: "Save (or reload) before locking: record.save; record.lock!. If you intended to lock and then mutate, the correct order is record.lock! followed by the assignment + save"
       variable_name: "LOCK_BANG_DEPRECATION"
+
+    - name: "String conditions in controller filters"
+      kind: "deprecation"
+      pattern: "(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_(action|filter)\\b[^\\n]*(?:\\b(?:if|unless):|:(?:if|unless)\\s*=>)\\s*['\"]"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+      explanation: "Rails 5.1 deprecates a string `if:` / `unless:` condition on controller filters: before_action and the rest call set_callback, which logs a deprecation warning and still evaluates the string. Rails 5.2 raises ArgumentError. The warning fires only when the option is a single string, not when only: / except: is also given (Rails wraps the conditions in an array), so trust the pattern over the logs"
+      fix: "Replace the string with a symbol: `if: :has_project_guest_id` instead of `if: 'has_project_guest_id'`. For inline expressions, use a lambda: `if: -> { ... }`"
+      variable_name: "FILTER_STRING_CONDITIONS"
 
   low_priority:
     - name: "raise_on_unfiltered_parameters config"

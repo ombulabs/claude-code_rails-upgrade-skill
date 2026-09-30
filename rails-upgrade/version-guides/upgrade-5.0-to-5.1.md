@@ -293,6 +293,33 @@ The AFTER works on Rails 5.0 too, so make the change before the bump.
 
 ---
 
+#### String if: / unless: Conditions on Callbacks Deprecated
+
+**Pattern:** `FILTER_STRING_CONDITIONS`, `SET_CALLBACK_STRING_CONDITIONS`
+
+**What Changed:**
+Rails 5.0 evaluates a string passed to `if:` or `unless:` with no warning. Rails 5.1 still evaluates it but `set_callback` and `skip_callback` log a deprecation warning, and controller filters such as `before_action` go through `set_callback`. Rails 5.2 raises `ArgumentError`. The warning only fires when the option is a single string: with `only:` or `except:` also given, Rails wraps the conditions in an array and 5.1 stays silent, so trust the scan over the logs. Model callbacks like `before_save :x, if: 'y?'` warn too, and no 5.1 pattern flags them.
+
+**Detection Pattern:**
+```ruby
+before_action :require_guest, if: 'guest?'
+set_callback :save, :before, :normalize, :unless => 'imported?'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+before_action :require_guest, if: 'guest?'
+before_action :audit, unless: 'current_user.admin?'
+
+# AFTER
+before_action :require_guest, if: :guest?
+before_action :audit, unless: -> { current_user.admin? }
+```
+The AFTER works on Rails 5.0 too.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Ruby Version Requirement
