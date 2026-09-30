@@ -1,6 +1,6 @@
 # Rails 7.0 → 7.1 Upgrade Guide
 
-**Ruby Requirement:** 2.7.0+ (3.0+ recommended)
+**Ruby Requirement:** 2.7.3+ (3.0+ recommended)
 
 **Based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)**
 
@@ -20,6 +20,38 @@ Rails 7.1 introduces:
 ## Breaking Changes
 
 ### 🔴 HIGH PRIORITY
+
+#### Ruby Version Requirement
+
+**Pattern:** `RUBY_VERSION`
+
+**What Changed:**
+Rails 7.1 needs Ruby 2.7.3 or newer. The `rails` 7.1 gemspec still says `required_ruby_version >= 2.7.0`, the same as 7.0, but activerecord 7.1 defines `def method_missing(name, ...)` in `attribute_methods.rb`. A leading argument before `...` is a syntax error before Ruby 2.7.3 (checked on the `ruby:2.7.2` and `ruby:2.7.3` images), so on Ruby 2.7.0 to 2.7.2 the app fails as soon as Active Record loads. The [FastRuby.io compatibility table](https://www.fastruby.io/blog/ruby/rails/versions/compatibility-table.html) lists the same floor.
+
+**Detection Pattern:**
+```ruby
+# Gemfile
+ruby "2.7.2"
+
+# .ruby-version
+2.7.2
+
+# .tool-versions
+ruby 2.7.2
+```
+
+**Fix:**
+```ruby
+# BEFORE
+ruby "2.7.2"
+
+# AFTER
+ruby "3.2.6"
+```
+
+Upgrade Ruby while the app is still on Rails 7.0, as its own deploy: 7.0 runs on 2.7.3 and newer, so both sides of the dual boot use the new Ruby.
+
+---
 
 #### cache_classes → enable_reloading
 
@@ -333,18 +365,6 @@ ActiveRecord::Migration.check_all_pending!
 ---
 
 ### 🟢 LOW PRIORITY
-
-#### Ruby Version Requirement
-
-**Pattern:** none (the minimum Ruby does not change at this hop)
-
-**What Changed:**
-Nothing. The `rails` 7.1 gemspec requires Ruby `>= 2.7.0`, the same as 7.0, so the Ruby that bundles 7.0 also bundles 7.1. The gemspec sets no upper bound; a Ruby released after 7.1 may need its latest patch release.
-
-**Fix:**
-None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
-
----
 
 #### Content Security Policy Middleware Constants Removed
 

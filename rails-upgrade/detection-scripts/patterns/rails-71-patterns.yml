@@ -53,6 +53,18 @@ upgrade_findings:
       fix: "Replace manual autoload_paths/eager_load_paths with config.autoload_lib(ignore: %w[assets tasks])"
       variable_name: "LIB_AUTOLOAD"
 
+    - name: "Ruby below 2.7.3"
+      kind: "breaking"
+      pattern: "^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:=\\s*|~>\\s*(?=\\d+\\.\\d+\\.\\d))?|ruby-|ruby\\s+)?(?:1\\.\\d+|2\\.[0-6])(?:\\.\\d+)*(?![\\d.])|^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:=\\s*)?|ruby-|ruby\\s+)?2\\.7\\.[0-2](?![\\d.])|^\\s*ruby\\s*\\(?\\s*[\"']~>\\s*1\\.\\d+(?![\\d.])"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+        - ".ruby-version"
+        - ".tool-versions"
+      explanation: "Rails 7.1 needs Ruby 2.7.3 or newer, although the rails 7.1 gemspec (like 7.0) says >= 2.7.0. activerecord 7.1 defines `def method_missing(name, ...)` (attribute_methods.rb), and a leading argument before `...` is a syntax error before Ruby 2.7.3, so the app fails as soon as Active Record loads on 2.7.0 to 2.7.2. Flags a Ruby below 2.7.3 in .ruby-version or .tool-versions, and a Gemfile `ruby` line that rules it out (an exact version, or a `~>` whose upper bound is below 2.7.3); a requirement that still allows 2.7.3, such as `~> 2.7.1` or `>= 2.7.0`, is not flagged"
+      fix: "Upgrade Ruby to 2.7.3 or newer (3.x recommended) while the app is still on Rails 7.0, as its own deploy. Rails 7.0 runs on it. See the \"Ruby Version Requirement\" entry in the 7.0 to 7.1 guide"
+      variable_name: "RUBY_VERSION"
+
   medium_priority:
     - name: "ActiveRecord::Migration.check_pending! deprecated"
       kind: "deprecation"
@@ -137,6 +149,6 @@ upgrade_findings:
 
 dependencies:
   ruby:
-    minimum: "2.7.0"
+    minimum: "2.7.3"
     recommended: "3.2.0"
-    message: "Rails 7.1 requires Ruby 2.7+ (3.2 recommended)"
+    message: "Rails 7.1 requires Ruby 2.7.3+ (3.2 recommended): the gemspec says >= 2.7.0, but activerecord uses leading-argument forwarding"

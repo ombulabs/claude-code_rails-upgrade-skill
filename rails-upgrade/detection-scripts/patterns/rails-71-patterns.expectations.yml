@@ -57,3 +57,24 @@ SECRETS_YML_ENC:
     # the replacement API and secret_key_base itself are fine
     - "    Rails.application.credentials.stripe_key"
     - "    Rails.application.secret_key_base"
+
+RUBY_VERSION:
+  # Rails 7.1 needs Ruby >= 2.7.3 (activerecord uses leading-argument
+  # forwarding). Lines come from the Gemfile, .ruby-version and .tool-versions.
+  match:
+    - "ruby \"2.7.2\""
+    - "ruby \"2.7.0\""
+    - "2.7.1"
+    - "ruby-2.7.2"
+    - "ruby 2.6.10"
+    - "ruby \"~> 2.6.3\""
+    - "ruby '~> 1.9'"
+  no_match:
+    - "ruby \"2.7.3\""
+    - "ruby \"2.7.8\""
+    - "ruby \"~> 2.7.1\""
+    - "ruby \"~> 2.6\""
+    - "ruby \">= 2.7.0\""
+    - "2.7.10"
+    - "3.0.6"
+    - "gem \"rack\", \"2.7.1\""
