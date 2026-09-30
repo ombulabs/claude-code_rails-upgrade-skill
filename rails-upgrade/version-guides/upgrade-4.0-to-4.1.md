@@ -61,6 +61,29 @@ If you cannot migrate callers now, restore the bridge gem:
 gem 'activerecord-deprecated_finders'
 ```
 
+**Gems that still call the removed finder forms:** the bridge also carried `find(:first, :conditions => ...)`, `find(:all, ...)` and the two-argument `update_all(updates, conditions)`. Old gem versions that call these break at runtime on 4.1 even though they install and load fine. The known case is `acts_as_list` below 0.3.0. On 0.1.x, adding an item and `move_higher` / `move_lower` go through `find(:first, :conditions => ...)`, and `move_to_top`, `insert_at`, `remove_from_list` and `destroy` go through the two-argument `update_all`, which raises `ArgumentError: wrong number of arguments`. On 0.2.0 only `higher_item` and `lower_item` still call `find(:first, ...)`, so `move_higher`, `move_lower` and those two methods raise, while adding and removing items work. The `find(:first, ...)` calls raise:
+
+```
+ActiveRecord::RecordNotFound: Couldn't find all Items with 'id': (first, {:conditions=>"\"items\".\"list_id\" = 1", :order=>"position DESC"})
+```
+
+Detect it on the resolved version in the lockfile, since a bare `gem 'acts_as_list'` carries none:
+```
+# Gemfile.lock
+    acts_as_list (0.1.6)
+```
+
+Fix it with one constraint that resolves on both 4.0 and 4.1:
+```ruby
+# BEFORE
+gem 'acts_as_list'           # resolves to 0.1.6
+
+# AFTER
+gem 'acts_as_list', '~> 0.7.7'
+```
+
+Several releases separate 0.1.x from 0.7.x, so read the gem's changelog and run the specs that cover list ordering. Keeping `activerecord-deprecated_finders` in the 4.1 bundle also keeps the old version working, with deprecation warnings.
+
 ---
 
 #### `return` Inside Inline Callback Blocks
@@ -204,6 +227,84 @@ Then confirm nothing first-party reaches the gem's API, because core's is not ca
 Core's ERB dependency tracker also detects **more** dependencies than the gem's (it parses `layout:` keys and method chains), so fragment digests can move. That is a cold fragment cache on the first deploy, not an error. An app with no `cache` call in any view has nothing to verify here.
 
 Delete the gem outright once the current Rails is 4.1.
+
+---
+
+#### `:confirm` Option on Link and Button Helpers Removed
+
+**What Changed:**
+Rails 4.0 deprecated `:confirm` on `link_to`, `button_to`, `submit_tag`, `image_submit_tag` and `f.submit`, and still converted it to a `data-confirm` attribute. Rails 4.1 removed that conversion. The option now passes through as an ordinary HTML attribute:
+
+```erb
+<%= link_to "Delete", post_path(@post), method: :delete, confirm: "Are you sure?" %>
+<%# Rails 4.0: <a data-confirm="Are you sure?" data-method="delete" ...> %>
+<%# Rails 4.1: <a confirm="Are you sure?" data-method="delete" ...>      %>
+```
+
+The UJS driver only looks at `data-confirm`, so the dialog stops appearing and the link or button acts on the first click. Nothing raises and nothing is logged, so tests that do not drive a real browser stay green while delete links lose their guard.
+
+**Detection Pattern:**
+```ruby
+# views, helpers and presenters under app/ and lib/
+link_to "Delete", path, confirm: "Are you sure?"
+button_to "Destroy", record, :confirm => "Really?"
+submit_tag "Save", confirm: "Save changes?"
+f.submit "Publish", confirm: "Publish now?"
+
+# also on a continuation line of a multi-line call
+link_to(t("posts.delete"),
+        post_path(post),
+        confirm: t("posts.confirm_delete"),
+        method: :delete)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+link_to "Delete", post_path(@post), method: :delete, confirm: "Are you sure?"
+button_to "Destroy", @post, :confirm => "Really?"
+
+# AFTER
+link_to "Delete", post_path(@post), method: :delete, data: { confirm: "Are you sure?" }
+button_to "Destroy", @post, :data => { :confirm => "Really?" }
+```
+
+The `data:` form renders the same `data-confirm` attribute on 4.0 and 4.1, so the rewrite needs no `NextRails.next?` branch and can ship before the bump. If the call already passes a `data:` hash, add `confirm:` to it.
+
+---
+
+#### `AbstractController::Layouts` Moved to `ActionView::Layouts`
+
+**What Changed:**
+Rails 4.1 extracted Action View from Action Pack into the new `actionview` gem, and the layouts module moved with it: `AbstractController::Layouts` became `ActionView::Layouts`. No alias was left behind, so any class that still includes the old constant raises when it loads:
+
+```
+NameError: uninitialized constant AbstractController::Layouts
+```
+
+With eager loading on, that stops the app from booting. `ActionController::Base` and `ActionMailer::Base` include the new module themselves; the break hits custom renderers built on `AbstractController::Base` (PDF, report, or export renderers) that include the module by hand.
+
+**Detection Pattern:**
+```ruby
+class ReportRenderer < AbstractController::Base
+  include AbstractController::Rendering
+  include AbstractController::Layouts
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+include AbstractController::Layouts
+
+# AFTER, while both versions boot (ActionView::Layouts does not exist on 4.0)
+include(NextRails.next? ? ActionView::Layouts : AbstractController::Layouts)
+
+# AFTER, once 4.1 is the current version
+include ActionView::Layouts
+```
+
+The `layout` DSL is the same in both modules, so nothing else in the class changes.
 
 ---
 
@@ -672,6 +773,9 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
+15. Move `:confirm` on `link_to` / `button_to` / `submit_tag` / `f.submit` under `data: { confirm: ... }`.
+16. Switch `include AbstractController::Layouts` to `ActionView::Layouts` (branch on `NextRails.next?` while both versions boot).
+17. Upgrade `acts_as_list` below 0.3.0 (check the lockfile) to `~> 0.7.7`.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -691,6 +795,7 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
 | `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
+| `ActiveRecord::RecordNotFound: Couldn't find all ... with 'id': (first, {:conditions=>...})` from inside a gem, or `ArgumentError: wrong number of arguments` from a gem's `update_all` call | "Dynamic Finders Removed": upgrade the gem (e.g. `acts_as_list` to 0.3+) |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |
@@ -698,6 +803,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | `I18n::InvalidLocale` on a request that worked on 4.0 | "I18n Enforces Available Locales" — add the locale to `config.i18n.available_locales` |
 | `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
+| Delete link or submit button no longer asks for confirmation; the HTML has `confirm="..."` instead of `data-confirm` | "`:confirm` Option on Link and Button Helpers Removed": move it to `data: { confirm: ... }` |
+| `NameError: uninitialized constant AbstractController::Layouts` | "`AbstractController::Layouts` Moved to `ActionView::Layouts`": include `ActionView::Layouts` instead |
 
 ---
 

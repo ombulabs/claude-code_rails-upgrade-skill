@@ -24,3 +24,70 @@ CACHE_DIGESTS_BACKPORT:
     - "  ActionView::Digestor.digest(name: name, finder: lookup_context)"
     - "  config.action_view.cache_template_loading = true"
     - "  <% cache [@post, 'v3'] do %>"
+
+# The pattern also spans up to four lines (a helper call whose confirm: sits on
+# a continuation line after a trailing comma, never past %>). Fixtures are per line, so that multi-line shape is
+# covered by the scanner, not by these fixtures. A bare `confirm:` line on its
+# own is a no_match here for the same reason.
+CONFIRM_OPTION:
+  match:
+    - "<%= link_to \"Delete\", post_path(@post), method: :delete, confirm: \"Are you sure?\" %>"
+    - "= link_to 'Remove', item_path(item), :confirm => 'Really remove?', :method => :delete"
+    - "<%= button_to \"Destroy\", @post, method: :delete, confirm: t(\"posts.confirm_destroy\") %>"
+    - "<%= submit_tag \"Save\", confirm: \"Save changes?\" %>"
+    - "<%= f.submit \"Publish\", :confirm => \"Publish now?\" %>"
+    - "<%= image_submit_tag \"go.png\", confirm: \"Continue?\" %>"
+    - "<%= link_to \"Archive\", archive_path(@post), data: { method: :post }, confirm: \"Archive it?\" %>"
+    - "= link_to \"Archive\", archive_path(@post), :data => { :confirm => \"Old\" }, :confirm => \"Archive it?\""
+    - "<%= link_to \"Archive\", archive_path(@post), data: { a: { b: 1 } }, confirm: \"Archive it?\" %>"
+    - "<%= link_to \"Archive\", archive_path(@post), 'data' => { method: :post }, confirm: \"Archive it?\" %>"
+  no_match:
+    - "<%= link_to \"Delete\", post_path(@post), method: :delete, data: { confirm: \"Are you sure?\" } %>"
+    - "= link_to 'Remove', item_path(item), :data => { :confirm => 'Really remove?' }, :method => :delete"
+    - "<%= button_to \"Destroy\", @post, \"data-confirm\" => \"Sure?\" %>"
+    - "<%= link_to \"Confirm email\", confirm_email_path(token: @token) %>"
+    - "<%= f.submit \"Save\", data: { disable_with: \"Saving...\", confirm: \"Save?\" } %>"
+    - "<%= link_to \"Delete\", item, data: { title: \"#{item.name}\", confirm: \"Sure?\" } %>"
+    - "<%= link_to \"Delete\", item, 'data' => { confirm: \"Sure?\" } %>"
+    - "<%= link_to \"Delete\", item, :\"data\" => { :confirm => \"Sure?\" } %>"
+    - "<%= link_to \"Delete\", item, data: { params: { id: 1 }, confirm: \"Sure?\" } %>"
+    - "      confirm: \"Are you sure?\","
+    - "<%= f.password_field :password_confirmation %>"
+    - "<%= link_to \"Home\", root_path %> <%= render \"form\", options: { confirm: true } %>"
+
+ABSTRACT_CONTROLLER_LAYOUTS:
+  match:
+    - "  include AbstractController::Layouts"
+    - "  include ::AbstractController::Layouts"
+    - "    include AbstractController::Layouts # needed for layout \"pdf\""
+    - "  include AbstractController::Rendering, AbstractController::Layouts"
+    - "  include(AbstractController::Layouts)"
+  no_match:
+    - "  include ActionView::Layouts"
+    - "  include(NextRails.next? ? ActionView::Layouts : AbstractController::Layouts)"
+    - "  include AbstractController::Rendering"
+    - "  include AbstractController::LayoutsHelper"
+
+ACTS_AS_LIST_PRE_0_3:
+  match:
+    - "    acts_as_list (0.1.6)"
+    - "    acts_as_list (0.2.0)"
+    - "gem 'acts_as_list', '0.1.6'"
+    - "gem \"acts_as_list\", \"~> 0.2.0\""
+    - "gem 'acts_as_list', '~> 0.1.6'"
+    - "gem 'acts_as_list', '< 0.3'"
+    - "gem 'acts_as_list', '>= 0.1', '< 0.3'"
+    - "      acts_as_list (~> 0.2.0)"
+  no_match:
+    - "    acts_as_list (0.3.0)"
+    - "    acts_as_list (0.7.7)"
+    - "    acts_as_list (0.9.19)"
+    - "    acts_as_list (1.0.4)"
+    - "gem 'acts_as_list'"
+    - "gem 'acts_as_list', '~> 0.7.7'"
+    - "    active_admin-acts_as_list (0.0.8)"
+    - "    acts_as_list_mongoid (0.2.5)"
+    - "gem 'acts_as_list', '~> 0.1'"
+    - "gem 'acts_as_list', '>= 0.2'"
+    - "gem 'acts_as_list', '< 0.3.1'"
+    - "      acts_as_list (>= 0.1)"

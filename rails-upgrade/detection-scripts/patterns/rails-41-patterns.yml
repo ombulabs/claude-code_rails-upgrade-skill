@@ -82,6 +82,40 @@ upgrade_findings:
       fix: "Gate the gem out of the 4.1 bundle rather than delete it while the current bundle is still 4.0 and depends on it: `gem 'cache_digests' unless NextRails.next?`. Then confirm no first-party code calls the gem API, because core's is not call-compatible: CacheDigests::TemplateDigestor.digest(name, format, finder, options) (positional) became ActionView::Digestor.digest(name:, finder:, dependencies:, partial:) (single options hash); cache_prefix and the swappable cache accessor are gone; the ['v3', 'key'] explicitly-versioned cache-key form is gone, leaving only skip_digest: true; view_cache_dependency survives unchanged in ActionView::Helpers::CacheHelper. Core's ERB dependency tracker also detects more dependencies than the gem's (it parses layout: keys and method chains), so fragment digests can shift — that is a cold fragment cache on first deploy, not an error. A hit in Gemfile.lock with nothing in the Gemfile means another gem pulls cache_digests in transitively — run `bundle why cache_digests` and gate or upgrade that parent gem instead. Delete cache_digests outright once the current Rails is 4.1"
       variable_name: "CACHE_DIGESTS_BACKPORT"
 
+    - name: ":confirm option on link_to / button_to / submit helpers"
+      kind: breaking
+      pattern: "(link_to|button_to|submit_tag|\\.submit)(?:(?:\\bdata:|:data\\s*=>|:?[\"']data[\"']\\s*=>)\\s*\\{(?:[^{}#]|#(?!\\{)|#?\\{[^{}]*\\})*\\}|(?!%>|(?:\\bdata:|:data\\s*=>|:?[\"']data[\"']\\s*=>)\\s*\\{)[^\\n])*?(?:(?<=[,({])[ \\t]*\\n(?:(?:\\bdata:|:data\\s*=>|:?[\"']data[\"']\\s*=>)\\s*\\{(?:[^{}#]|#(?!\\{)|#?\\{[^{}]*\\})*\\}|(?!%>|(?:\\bdata:|:data\\s*=>|:?[\"']data[\"']\\s*=>)\\s*\\{)[^\\n])*?){0,4}?(:confirm\\s*=>|\\bconfirm:)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.0 deprecated the :confirm option on link_to, button_to, submit_tag, image_submit_tag and the form builder's submit, and turned it into a data-confirm attribute. Rails 4.1 removed that handling, so the option is no longer special: the helper renders it as a plain confirm=\"...\" HTML attribute. The UJS driver only reads data-confirm, so the confirmation dialog stops appearing and the link or button acts on the first click. Nothing raises and nothing is logged, and a destructive action loses its guard. Matches both the :confirm => and the confirm: spellings. The pattern also finds a confirm: on a continuation line of a multi-line helper call, up to four lines below it: it only moves to the next line when the current one ends in a comma or an open ( or {, and it never crosses an ERB %> tag, so a confirm: key in a later statement is not flagged. An options hash spread wider than four lines is missed, so skim views for a bare confirm: as well. A confirm key inside a data hash is skipped, whether the key is spelled data:, :data =>, 'data' => or :\"data\" =>, and the hash may hold #{} interpolation or one level of nested hash; a top-level confirm: next to such a hash is still flagged. A data hash nested two levels deep stops the match, so a top-level confirm: written after it is missed. data-confirm attributes do not match"
+      fix: "Move the option under data: `confirm: \"Are you sure?\"` becomes `data: { confirm: \"Are you sure?\" }` (hash rocket form: `:data => { :confirm => \"Are you sure?\" }`). The data: form renders the same data-confirm attribute on 4.0 and 4.1, so the rewrite needs no NextRails.next? branch and can land before the bump. Keep the message argument as written, including an I18n.t(...) call. If the helper already has a data: hash, add confirm: to it rather than passing a second data: key"
+      variable_name: "CONFIRM_OPTION"
+
+    - name: "include AbstractController::Layouts (moved to ActionView::Layouts)"
+      kind: breaking
+      pattern: "include[\\s(]+(?:(?:::)?[\\w:]+\\s*,\\s*)*(?:::)?AbstractController::Layouts\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 extracted Action View into its own actionview gem and moved the layouts module with it: AbstractController::Layouts (actionpack/lib/abstract_controller/layouts.rb on 4.0) became ActionView::Layouts (actionview/lib/action_view/layouts.rb), and no alias was left behind. A class that includes the old constant raises `NameError: uninitialized constant AbstractController::Layouts` when it loads, so eager loading fails at boot in production and the first request or test that touches the class fails in development. The usual users are custom renderers built on AbstractController::Base (PDF, report, or export renderers) that need layouts outside a controller. ActionController::Base and ActionMailer::Base switch modules on their own and are not affected"
+      fix: "ActionView::Layouts does not exist on 4.0, so while both versions boot pick the module at load time: `include(NextRails.next? ? ActionView::Layouts : AbstractController::Layouts)`. Once 4.1 is the current version, replace it with `include ActionView::Layouts`. The layout DSL (`layout \"report\"`, `_layout`, `action_has_layout?`) is the same in both modules"
+      variable_name: "ABSTRACT_CONTROLLER_LAYOUTS"
+
+    - name: "acts_as_list below 0.3 (calls finder APIs removed in 4.1)"
+      kind: breaking
+      pattern: "(?<![\\w-])acts_as_list(?![\\w-])[^\\n]*?[('\",]\\s*(?:=?\\s*0\\.[0-2](?:\\.\\d+)*|~>\\s*0\\.[0-2]\\.\\d+(?:\\.\\d+)*|<=\\s*0\\.[0-2](?:\\.\\d+)*|<\\s*0\\.(?:[0-2](?:\\.\\d+)*|3(?:\\.0)*))\\s*[)'\",]"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+        - "Gemfile.lock"
+        - "Gemfile.next.lock"
+      explanation: "acts_as_list 0.1.x and 0.2.0 call `find(:first, :conditions => ..., :order => ...)` inside the gem, and 0.1.x also calls the two-argument `update_all(updates, conditions)`. On Rails 4.0 both forms work with a deprecation warning because activerecord-deprecated_finders is a default dependency. Rails 4.1 drops that dependency, so the gem installs and loads fine but fails at runtime: on 0.1.x, adding an item and move_higher / move_lower go through find(:first, ...) and raise `ActiveRecord::RecordNotFound: Couldn't find all <Model>s with 'id': (first, {:conditions=>...})`, and move_to_top, insert_at, remove_from_list and destroy go through the two-argument update_all and raise `ArgumentError: wrong number of arguments`. On 0.2.0 only higher_item and lower_item still call find(:first, ...), so move_higher, move_lower and those two methods raise the same RecordNotFound while adding and removing items work. acts_as_list 0.3.0 and later use where/order/first and the one-argument update_all, and run on 4.1. The pattern flags a resolved `acts_as_list (0.x.y)` line in a lockfile with x of 0, 1, or 2, and a Gemfile or lockfile constraint that caps the gem below 0.3: an exact 0.0 to 0.2 version, `~> 0.1.6` or `~> 0.2.0` (three segments), `<= 0.2.x`, or `< 0.3`. Constraints that still allow 0.3, such as `>= 0.2` or `~> 0.1` (which allows anything below 1.0), are not flagged, since the resolved lockfile line shows what Bundler picked. A bare `gem 'acts_as_list'` carries no version, so the lockfile line is the one that matters. A hit on a dependency line nested under another gem in the lockfile means that gem caps acts_as_list below 0.3; upgrade or replace that parent gem too"
+      fix: "Upgrade the gem with one constraint for both bundles: `gem 'acts_as_list', '~> 0.7.7'` (0.7.x declares activerecord >= 3.0 and runs on 4.0 and 4.1), then `bundle update acts_as_list`. No NextRails.next? branch is needed. Several releases separate 0.1.x from 0.7.x, so read the gem's changelog and run the specs that cover list ordering. As a short-term bridge, keeping `gem 'activerecord-deprecated_finders'` in the 4.1 bundle restores the removed finder forms and the old gem keeps working with deprecation warnings"
+      variable_name: "ACTS_AS_LIST_PRE_0_3"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking
@@ -264,7 +298,7 @@ dependencies:
   activerecord-deprecated_finders:
     check: false
     gem_name: "activerecord-deprecated_finders"
-    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1"
+    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1, plus the find(:first, :conditions => ...) and two-argument update_all forms that old gem versions such as acts_as_list below 0.3.0 still call"
     url: "https://github.com/rails/activerecord-deprecated_finders"
 
   spring:
