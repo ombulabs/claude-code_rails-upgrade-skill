@@ -26,6 +26,16 @@ upgrade_findings:
       fix: "Quote the class name: belongs_to :owner, class_name: User → belongs_to :owner, class_name: 'User'. Same applies to has_one, has_many, and has_and_belongs_to_many"
       variable_name: "CLASS_NAME_CONSTANT"
 
+    - name: "error_on_ignored_order_or_limit config (renamed)"
+      kind: "breaking"
+      pattern: "error_on_ignored_order_or_limit"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 5.2 removes config.active_record.error_on_ignored_order_or_limit. The setting was renamed to config.active_record.error_on_ignored_order in 5.1 with a deprecated wrapper; the wrapper is gone in 5.2. Existing config lines using the old name raise NoMethodError at boot"
+      fix: "Rename the config key: config.active_record.error_on_ignored_order_or_limit = X → config.active_record.error_on_ignored_order = X"
+      variable_name: "ERROR_ON_IGNORED_ORDER_OR_LIMIT"
+
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
       kind: "deprecation"
@@ -36,16 +46,6 @@ upgrade_findings:
       explanation: "A route whose path has a :controller or :action segment (the old catch-all :controller(/:action(/:id)) shape) emits a deprecation warning when routes load, saying it will be removed in Rails 6.0. The warning exists since 5.0 and is unchanged in 5.1 and 5.2. Matches the segment inside a quoted path; the hash keys controller: / :action => are not segments and are skipped"
       fix: "Replace dynamic segments with explicit routes: get '/admin/:controller/:action' → declare each controller/action pair explicitly with `get '/admin/users', to: 'users#index'` etc."
       variable_name: "DYNAMIC_ROUTE_SEGMENTS"
-
-    - name: "error_on_ignored_order_or_limit config (renamed)"
-      kind: "breaking"
-      pattern: "error_on_ignored_order_or_limit"
-      exclude: ""
-      search_paths:
-        - "config/"
-      explanation: "Rails 5.2 removes config.active_record.error_on_ignored_order_or_limit. The setting was renamed to config.active_record.error_on_ignored_order in 5.1 with a deprecated wrapper; the wrapper is gone in 5.2. Existing config lines using the old name raise NoMethodError at boot"
-      fix: "Rename the config key: config.active_record.error_on_ignored_order_or_limit = X → config.active_record.error_on_ignored_order = X"
-      variable_name: "ERROR_ON_IGNORED_ORDER_OR_LIMIT"
 
     - name: "halt_callback_chains_on_return_false config (deprecated)"
       kind: "breaking"

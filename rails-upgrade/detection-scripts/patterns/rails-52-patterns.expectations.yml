@@ -33,3 +33,9 @@ CLASS_NAME_CONSTANT:
     - "  belongs_to :owner, class_name: User.name"
     - "  has_many :items, class_name: Billing::Item.to_s"
     - "  has_many :items, :class_name => 'Item'"
+
+ERROR_ON_IGNORED_ORDER_OR_LIMIT:
+  match:
+    - "  config.active_record.error_on_ignored_order_or_limit = true"
+  no_match:
+    - "  config.active_record.error_on_ignored_order = true"

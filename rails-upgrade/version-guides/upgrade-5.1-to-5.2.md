@@ -132,6 +132,25 @@ The string form works on 5.1 too.
 
 ---
 
+#### error_on_ignored_order_or_limit Removed
+
+**Pattern:** `ERROR_ON_IGNORED_ORDER_OR_LIMIT`
+
+**What Changed:**
+Rails 5.1 renamed the setting to `error_on_ignored_order` and kept the old name as a deprecated alias. Rails 5.2 removes the alias, so `config.active_record.error_on_ignored_order_or_limit = ...` raises `NoMethodError` when Active Record loads.
+
+**Fix:**
+```ruby
+# BEFORE
+config.active_record.error_on_ignored_order_or_limit = true
+
+# AFTER
+config.active_record.error_on_ignored_order = true
+```
+The new name works on 5.1 too.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Encrypted Secrets → Credentials
@@ -388,6 +407,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Users logged out once after deploy | "Cookie Expiry Format Changed" — expected, one re-authentication |
 | `Using a dynamic :controller segment in a route is deprecated` (or `:action`) | "Dynamic :controller and :action Route Segments" — declare each route explicitly |
 | `` ArgumentError: A class was passed to `:class_name` but we are expecting a string. `` | "Association class_name Must Be a String" — quote the class name |
+| ``NoMethodError: undefined method `error_on_ignored_order_or_limit='`` at boot | "error_on_ignored_order_or_limit Removed" — rename to `error_on_ignored_order` |
 
 ---
 
