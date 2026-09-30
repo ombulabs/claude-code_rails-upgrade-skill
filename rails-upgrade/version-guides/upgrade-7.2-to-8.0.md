@@ -635,9 +635,10 @@ elapsed = Benchmark.ms { run_report }
 elapsed = Benchmark.ms { run_report }
 
 # AFTER
+require "benchmark"
 elapsed = Benchmark.realtime { run_report } * 1000
 ```
-The AFTER works on 7.2 too: `Benchmark.realtime` is Ruby's own method and returns seconds as a Float.
+The AFTER works on 7.2 too: `Benchmark.realtime` is Ruby's own method and returns seconds as a Float. Keep the `require`: Active Support 8.0 loads the library, but 8.1 no longer does, so without it the call raises `NameError: uninitialized constant Benchmark` after the next hop. On Ruby 3.4 and newer, add `gem "benchmark"` to the Gemfile as well: Ruby 3.4 warns that it leaves the default gems in Ruby 4.0.
 
 ---
 

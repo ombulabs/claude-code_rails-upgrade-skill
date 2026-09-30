@@ -256,7 +256,7 @@ upgrade_findings:
         - "app/"
         - "lib/"
       explanation: "Rails 8.0 deprecates the Active Support `Benchmark.ms` core extension. activesupport 8.0 lib/active_support/core_ext/benchmark.rb still returns the elapsed milliseconds but warns `Benchmark.ms is deprecated and will be removed in Rails 8.1 without replacement.` 7.2 has no warning. The method is defined by Active Support, not by the benchmark gem, so adding that gem does not keep it"
-      fix: "Replace `Benchmark.ms { ... }` with `Benchmark.realtime { ... } * 1000` (Ruby's benchmark library, seconds as a Float). Works on 7.2 and 8.0, so no NextRails.next? branch is needed"
+      fix: "Replace `Benchmark.ms { ... }` with `Benchmark.realtime { ... } * 1000` (Ruby's benchmark library, seconds as a Float). Works on 7.2 and 8.0, so no NextRails.next? branch is needed. Add `require \"benchmark\"` where it is called: Active Support 8.0 requires the library, 8.1 no longer does, so without it the call raises NameError after the 8.1 bump. On Ruby 3.4 and newer also add `gem \"benchmark\"` to the Gemfile: Ruby 3.4 warns that benchmark leaves the default gems in Ruby 4.0"
       variable_name: "BENCHMARK_MS"
 
     - name: "rake stats"
