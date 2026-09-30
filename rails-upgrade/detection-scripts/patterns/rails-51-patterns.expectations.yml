@@ -71,3 +71,19 @@ RELATION_UNIQ:
     - "  tags.pluck(:name).uniq"
     - "  User.distinct"
     - "  validates :email, uniqueness: true"
+
+SECRETS_STRING_KEYS:
+  match:
+    - "Rails.application.secrets[:smtp]['address']"
+    - "Rails.application.secrets[\"smtp\"][\"address\"]"
+  no_match:
+    - "Rails.application.secrets[:smtp][:address]"
+    # Top-level keys go through OrderedOptions#[], which calls to_sym.
+    - "Rails.application.secrets['api_key']"
+
+SECRETS_METHOD_ACCESSOR_STRING_KEYS:
+  match:
+    - "Rails.application.secrets.smtp['address']"
+  no_match:
+    - "Rails.application.secrets.smtp[:address]"
+    - "Rails.application.secrets.api_key"

@@ -347,6 +347,35 @@ The AFTER works on Rails 5.0 too.
 
 ---
 
+#### Nested secrets.yml Keys Are Symbols
+
+**Pattern:** `SECRETS_STRING_KEYS`, `SECRETS_METHOD_ACCESSOR_STRING_KEYS`
+
+**What Changed:**
+Rails 5.0 symbolizes only the top-level keys of an environment in `config/secrets.yml`, so a nested hash keeps its string keys. Rails 5.1 loads the file with `deep_symbolize_keys`. A nested lookup by string key returns `nil` with no error, and a nested lookup by symbol returns `nil` on 5.0. Top-level keys work either way.
+
+**Detection Pattern:**
+```ruby
+Rails.application.secrets[:smtp]['address']
+Rails.application.secrets.smtp['address']
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Rails.application.secrets.smtp['address']
+
+# AFTER (while dual booting)
+smtp = Rails.application.secrets.smtp
+NextRails.next? ? smtp[:address] : smtp['address']
+
+# AFTER (on 5.1 only)
+Rails.application.secrets.smtp[:address]
+```
+The symbol lookup does not work on 5.0, so keep the `NextRails.next?` branch until the 5.0 boot is gone.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Ruby Version Requirement
@@ -503,6 +532,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'use_transactional_fixtures='` | "use_transactional_fixtures Removed" — `use_transactional_tests` |
 | `NoMethodError: undefined method 'before_filter'` (or another `*_filter`) | "before_filter and the Other *_filter Methods Removed" — rename to `*_action` |
 | `NoMethodError: undefined method 'uniq'` on a model class, or a query method called on an Array after `.uniq` | "Relation#uniq Removed" — `distinct` |
+| A nested `Rails.application.secrets` value is `nil` after the bump | "Nested secrets.yml Keys Are Symbols" — use symbol keys |
 
 ---
 
