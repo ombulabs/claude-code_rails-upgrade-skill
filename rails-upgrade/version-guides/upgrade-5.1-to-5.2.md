@@ -170,6 +170,34 @@ Removing the line works on 5.1 too.
 
 ---
 
+#### String if: / unless: Conditions Raise
+
+**Pattern:** `CALLBACK_STRING_CONDITIONS`
+
+**What Changed:**
+Rails 5.1 warned when `:if` or `:unless` got a string to evaluate. Rails 5.2 raises `ArgumentError` ("Passing string to be evaluated in :if and :unless conditional options is not supported.") when the callback is defined, so the class fails to load. This covers model callbacks, controller filters, validations and `set_callback`.
+
+**Detection Pattern:**
+```ruby
+before_save :normalize, if: 'name_changed?'
+before_action :authenticate, :if => 'api_request?'
+validates :email, presence: true, unless: 'guest?'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+before_save :normalize, if: 'name_changed?'
+validates :email, presence: true, unless: 'guest? || admin?'
+
+# AFTER
+before_save :normalize, if: :name_changed?
+validates :email, presence: true, unless: -> { guest? || admin? }
+```
+Symbols and lambdas work on 5.1 too.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Encrypted Secrets → Credentials

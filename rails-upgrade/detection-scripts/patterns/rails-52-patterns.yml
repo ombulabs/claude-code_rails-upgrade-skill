@@ -46,6 +46,18 @@ upgrade_findings:
       fix: "Remove the line entirely. Code that relied on `return false` to halt callbacks should already be using `throw :abort` after the 4.2 → 5.0 hop"
       variable_name: "HALT_CALLBACK_CHAINS_ON_RETURN_FALSE"
 
+    - name: "String if:/unless: conditions on callbacks, filters and validations"
+      kind: "breaking"
+      pattern: "\\b(?:(?:prepend_|skip_)?(?:before|after|around)_\\w+|validates?(?:_\\w+)?|set_callback|skip_callback)\\b[^\\n]*?(?:\\b(?:if|unless):|:(?:if|unless)\\s*=>)\\s*\\[?\\s*['\"]"
+      exclude: "(?:^|\\s)#(?!\\{)[^\\n]*(?:\\b(?:if|unless):|:(?:if|unless)\\s*=>)\\s*\\[?\\s*['\"]"
+      search_paths:
+        - "app/models/"
+        - "app/controllers/"
+        - "lib/"
+      explanation: "Rails 5.1 warned when a string was passed to :if or :unless ('Passing string to be evaluated in :if and :unless conditional options is deprecated'). Rails 5.2 raises ArgumentError ('... is not supported. Pass a symbol for an instance method, or a lambda, proc or block, instead.') when the callback is defined, so the class fails to load. Every ActiveSupport callback goes through this check: model callbacks, controller before_action / skip_before_action, validates / validate, and set_callback / skip_callback. Matches a string or an array of strings after if: / :if =>, on the same line as the macro; a condition on a later line of a multi-line call is missed. Commented-out lines are skipped"
+      fix: "Replace the string with a symbol: `if: :record_active?` instead of `if: 'record_active?'`. For inline expressions, use a lambda: `if: -> { record_active? && ... }`"
+      variable_name: "CALLBACK_STRING_CONDITIONS"
+
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
       kind: "deprecation"
@@ -56,16 +68,6 @@ upgrade_findings:
       explanation: "A route whose path has a :controller or :action segment (the old catch-all :controller(/:action(/:id)) shape) emits a deprecation warning when routes load, saying it will be removed in Rails 6.0. The warning exists since 5.0 and is unchanged in 5.1 and 5.2. Matches the segment inside a quoted path; the hash keys controller: / :action => are not segments and are skipped"
       fix: "Replace dynamic segments with explicit routes: get '/admin/:controller/:action' → declare each controller/action pair explicitly with `get '/admin/users', to: 'users#index'` etc."
       variable_name: "DYNAMIC_ROUTE_SEGMENTS"
-
-    - name: "String if:/unless: conditions on model callbacks"
-      kind: "deprecation"
-      pattern: "(before|after|around)_(save|create|update|destroy|validation|commit|rollback|initialize|find|touch)\\b[^\\n]*\\b(if|unless):\\s*['\"]"
-      exclude: ""
-      search_paths:
-        - "app/models/"
-      explanation: "Rails 5.2 deprecates string values for :if and :unless on model callbacks. Use a symbol (method name) or a lambda. PR #38 covers the controller-filter variant for the 5.0 → 5.1 hop; this entry covers the model-callback case so it is caught before the final removal"
-      fix: "Replace the string with a symbol: `if: :record_active?` instead of `if: 'record_active?'`. For inline expressions, use a lambda: `if: -> { record_active? && ... }`"
-      variable_name: "CALLBACK_STRING_CONDITIONS"
 
     - name: "Rails.application.secrets usage"
       kind: "migration"

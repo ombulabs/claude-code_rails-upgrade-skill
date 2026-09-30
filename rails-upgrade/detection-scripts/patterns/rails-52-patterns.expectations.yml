@@ -46,3 +46,22 @@ HALT_CALLBACK_CHAINS_ON_RETURN_FALSE:
     - "  config.active_support.halt_callback_chains_on_return_false = false"
   no_match:
     - "  throw :abort"
+
+CALLBACK_STRING_CONDITIONS:
+  # A string (or array of strings) passed to if: / unless: raises
+  # ArgumentError in 5.2 for every ActiveSupport callback.
+  match:
+    - "  before_save :normalize, if: 'name_changed?'"
+    - "  after_commit :notify, on: :create, unless: \"skip_notify\""
+    - "  before_action :authenticate, if: 'request.format.json?'"
+    - "  skip_before_action :verify_authenticity_token, :if => 'api_request?'"
+    - "  validates :email, presence: true, if: 'active?'"
+    - "  validates_presence_of :email, :unless => 'guest?'"
+    - "  validate :check_limits, if: ['active?', 'paid?']"
+    - "  set_callback :save, :before, :stamp, if: 'stamp?'"
+  no_match:
+    - "  before_save :normalize, if: :name_changed?"
+    - "  before_action :set_format, if: -> { params[:format] == 'json' }"
+    - "  validates :email, presence: { message: 'is required' }, if: :active?"
+    - "  after_save :sync, if: :sync? # was if: 'sync?'"
+    - "  # before_save :normalize, if: 'name_changed?'"
