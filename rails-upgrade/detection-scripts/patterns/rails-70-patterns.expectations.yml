@@ -91,3 +91,14 @@ SPRING:
     # companion gems are not spring itself
     - "  gem \"spring-watcher-listen\""
     - "  gem \"spring-commands-rspec\""
+
+URLSAFE_CSRF_TOKENS:
+  # Rails 7.0 warns on any assignment of the setting (true or false).
+  match:
+    - "  config.action_controller.urlsafe_csrf_tokens = false"
+    - "Rails.application.config.action_controller.urlsafe_csrf_tokens = true"
+    - "  config.action_controller.urlsafe_csrf_tokens=false"
+  no_match:
+    - "  # Rails.application.config.action_controller.urlsafe_csrf_tokens = true"
+    - "  config.action_controller.allow_forgery_protection = false"
+    - "  if ActionController::Base.urlsafe_csrf_tokens"

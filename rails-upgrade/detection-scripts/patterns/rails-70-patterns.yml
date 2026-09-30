@@ -50,18 +50,6 @@ upgrade_findings:
       fix: "Remove local: true (now default is remote with Turbo). Add data: { turbo: false } if needed."
       variable_name: "FORM_WITH_LOCAL"
 
-    - name: "ActionController::Base.allow_forgery_protection"
-      kind: "migration"
-      pattern: "allow_forgery_protection"
-      exclude: ""
-      search_paths:
-        - "config/"
-        - "spec/"
-        - "test/"
-      explanation: "Forgery protection behavior changes in Rails 7.0"
-      fix: "Review CSRF configuration. ensure protect_from_forgery settings are correct"
-      variable_name: "FORGERY_PROTECTION"
-
   medium_priority:
     - name: "secrets.yml usage"
       kind: "migration"
@@ -163,6 +151,16 @@ upgrade_findings:
       explanation: "Rails 7.0 no longer adds spring to new apps (the Gemfile template only has it commented out). An app that keeps it needs spring 4.0 or later: 4.0.0 is the first release whose README lists Rails 7.0, and spring 3.x README stops at 6.0"
       fix: "Remove spring and bin/spring if the team does not rely on it, or bump to gem \"spring\", \">= 4.0\" (needs Rails 6.0 or later, so it runs on both sides of the dual boot)"
       variable_name: "SPRING"
+
+    - name: "config.action_controller.urlsafe_csrf_tokens set explicitly"
+      kind: "deprecation"
+      pattern: "\\burlsafe_csrf_tokens\\s*="
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "Rails 7.0 makes URL-safe CSRF tokens the only default (actionpack 7.0 sets urlsafe_csrf_tokens = true) and deprecates the setting: assigning it warns \"URL-safe CSRF tokens are now the default. Use 6.1 defaults or above.\" for true and \"Non-URL-safe CSRF tokens are deprecated. Use 6.1 defaults or above.\" for false. Rails 7.1 removes the setting. An app on load_defaults below 6.1 gets the second warning with no line of its own, because load_defaults 5.0 sets it to false; this pattern only finds an explicit assignment. Tokens keep working across a rolling deploy: 7.0 still decodes the standard base64 tokens 6.1 issued"
+      fix: "Delete the line on the Rails 7.0 side: `config.action_controller.urlsafe_csrf_tokens = true unless NextRails.next?` keeps it for the 6.1 side only. If the app is on load_defaults below 6.1, move to 6.1 defaults or above, which stops setting it to false"
+      variable_name: "URLSAFE_CSRF_TOKENS"
 
 dependencies:
   importmap:

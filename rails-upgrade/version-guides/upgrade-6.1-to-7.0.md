@@ -451,6 +451,32 @@ The AFTER works on 6.1 as well, so no `NextRails.next?` branch is needed. Spring
 
 ---
 
+#### `urlsafe_csrf_tokens` Setting Deprecated
+
+**Pattern:** `URLSAFE_CSRF_TOKENS`
+
+**What Changed:**
+Rails 7.0 makes URL-safe CSRF tokens the default and deprecates `config.action_controller.urlsafe_csrf_tokens`: assigning it warns for `true` ("URL-safe CSRF tokens are now the default") and for `false` ("Non-URL-safe CSRF tokens are deprecated"). An app on `load_defaults` below 6.1 gets the `false` warning with no line of its own, because `load_defaults 5.0` sets it. Rails 7.1 removes the setting. Nothing breaks during a rolling deploy: 7.0 still decodes the tokens a 6.1 server issued.
+
+**Detection Pattern:**
+```ruby
+# config/application.rb or config/initializers/new_framework_defaults_6_1.rb
+config.action_controller.urlsafe_csrf_tokens = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+config.action_controller.urlsafe_csrf_tokens = true
+
+# AFTER (keep it on the 6.1 side only)
+config.action_controller.urlsafe_csrf_tokens = true unless NextRails.next?
+```
+
+On `load_defaults` below 6.1, moving to 6.1 defaults or above also stops the warning.
+
+---
+
 ## Migration Steps
 
 ### Phase 1: Preparation
