@@ -295,24 +295,28 @@ end
 
 ---
 
-#### per_form_csrf_tokens Default Changed
+#### default_protect_from_forgery Turned On
+
+**Pattern:** none (a default turned on by `load_defaults 5.2`, not a code shape)
 
 **What Changed:**
-`per_form_csrf_tokens` is now enabled by default.
-
-**Detection Pattern:**
-```ruby
-config.action_controller.per_form_csrf_tokens = false
-```
+`load_defaults 5.2` sets `config.action_controller.default_protect_from_forgery = true`, which runs `protect_from_forgery with: :exception` on `ActionController::Base` itself. `per_form_csrf_tokens` does not change at this hop: `load_defaults 5.0` already turns it on.
 
 **Impact:**
-Forms need fresh CSRF tokens. May affect caching of forms.
+Apps whose `ApplicationController` already calls `protect_from_forgery` see no change. A controller that inherits from `ActionController::Base` directly and never called it (a webhook or callback endpoint, for example) now raises `ActionController::InvalidAuthenticityToken` on POST.
 
 **Fix:**
-Keep it enabled (more secure) or explicitly disable:
 ```ruby
-config.action_controller.per_form_csrf_tokens = false
+# BEFORE
+class WebhooksController < ActionController::Base
+end
+
+# AFTER
+class WebhooksController < ActionController::Base
+  skip_forgery_protection
+end
 ```
+`skip_forgery_protection` is new in 5.2; while dual booting use `skip_before_action :verify_authenticity_token, raise: false`, which works on both.
 
 ---
 
@@ -575,7 +579,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Error | See |
 |-------|-----|
 | `attribute_changed?` returns `false` after save | "Active Record attribute_changed? Behavior" — `saved_change_to_attribute?` |
-| `ActionController::InvalidAuthenticityToken` on forms that worked on 5.1 | "per_form_csrf_tokens Default Changed" — fresh token per form, or disable the feature |
+| `ActionController::InvalidAuthenticityToken` on a controller that inherits `ActionController::Base` directly | "default_protect_from_forgery Turned On" — skip forgery protection on that controller |
 | Users logged out after a rollback or during a mixed 5.1/5.2 deploy | "Cookie Expiry Format Changed" — keep `use_authenticated_cookie_encryption` off until 5.1 is gone |
 | `Using a dynamic :controller segment in a route is deprecated` (or `:action`) | "Dynamic :controller and :action Route Segments" — declare each route explicitly |
 | `` ArgumentError: A class was passed to `:class_name` but we are expecting a string. `` | "Association class_name Must Be a String" — quote the class name |
