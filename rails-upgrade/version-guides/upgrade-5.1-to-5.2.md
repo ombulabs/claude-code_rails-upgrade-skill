@@ -92,8 +92,10 @@ user.saved_changes[:name]
 
 #### ActiveStorage Attachment Changes
 
+**Pattern:** none (a new opt-in framework; 5.1 code has nothing to find)
+
 **What Changed:**
-Active Storage is new and becomes the recommended approach for file uploads.
+Active Storage is new and becomes the recommended approach for file uploads. The `rails` 5.2 gem depends on `activestorage`, and `require "rails/all"` loads its engine.
 
 **Impact:**
 If upgrading from CarrierWave or Paperclip, consider migration (optional).
