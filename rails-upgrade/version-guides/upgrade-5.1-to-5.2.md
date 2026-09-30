@@ -295,22 +295,6 @@ end
 
 ---
 
-#### force_ssl Now 301 Redirect
-
-**What Changed:**
-`force_ssl` now uses 301 (permanent) redirects instead of 302.
-
-**Impact:**
-Browsers will cache the redirect. Be careful with staging/development URLs.
-
-**Fix:**
-If you need 302:
-```ruby
-config.ssl_options = { redirect: { status: 302 } }
-```
-
----
-
 #### per_form_csrf_tokens Default Changed
 
 **What Changed:**
