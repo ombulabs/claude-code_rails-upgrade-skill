@@ -212,30 +212,34 @@ Delete the gem outright once the current Rails is 4.1.
 #### MultiJSON Removed from Rails
 
 **What Changed:**
-Rails 4.1 no longer depends on [`MultiJSON`](https://github.com/intridea/multi_json). Apps that reference `MultiJSON` directly will raise `NameError` once the transitive dependency goes away.
+Rails 4.1 no longer depends on [`MultiJSON`](https://github.com/intridea/multi_json). The gem's constant is `MultiJson` (there is no `MultiJSON` constant). Apps that reference `MultiJson` directly will raise `NameError` once the transitive dependency goes away.
 
 **Detection Pattern:**
 ```ruby
 require 'multi_json'
-MultiJSON.dump(obj)
-MultiJSON.load(str)
+MultiJson.dump(obj)
+MultiJson.load(str)
 ```
 
 **Fix:**
 ```ruby
-# Option A — keep MultiJSON explicitly
+# Option A — keep multi_json explicitly
 # Gemfile
 gem 'multi_json'
 
 # Option B — migrate to core JSON
 # BEFORE
-MultiJSON.dump(obj)
-MultiJSON.load(str)
+MultiJson.dump(obj)
+MultiJson.load(str)
+MultiJson.load(str, symbolize_keys: true)
 
 # AFTER
 obj.to_json
 JSON.parse(str)
+JSON.parse(str, symbolize_names: true)
 ```
+
+`JSON.parse` does not know `symbolize_keys:`. Passing it does nothing and the keys come back as strings, so rename the option to `symbolize_names:`.
 
 **Do not** blindly substitute `JSON.dump` / `JSON.load` — those are the `JSON` gem's arbitrary-object (de)serializers and are unsafe on untrusted input.
 
@@ -620,7 +624,7 @@ ruby -v  # 1.9.3+ (2.0+ recommended)
 
 ### Phase 2: Pre-requisites
 1. Fix all current 4.0 deprecation warnings.
-2. Audit for `MultiJSON`, dynamic finders, implicit-join `where` strings, and inline-block callbacks that `return`.
+2. Audit for `MultiJson`, dynamic finders, implicit-join `where` strings, and inline-block callbacks that `return`.
 3. Audit for PG `json` / `hstore` access with symbol keys.
 4. List the locales the app actually uses.
 
@@ -670,7 +674,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 10. Convert `Relation.compact!` / `Relation.map!` etc. to `to_a` then mutate.
 11. Replace `render :text` with `:plain` / `:html` / `:body`.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
-13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
+13. Remove `MultiJson` usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 
 ### Phase 6: Testing
@@ -689,7 +693,7 @@ Error → section lookup for the most common errors encountered during this upgr
 
 | Error | See |
 |-------|-----|
-| `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
+| `NameError: uninitialized constant MultiJson` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
 | `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |

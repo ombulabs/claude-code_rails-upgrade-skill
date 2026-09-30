@@ -24,3 +24,14 @@ CACHE_DIGESTS_BACKPORT:
     - "  ActionView::Digestor.digest(name: name, finder: lookup_context)"
     - "  config.action_view.cache_template_loading = true"
     - "  <% cache [@post, 'v3'] do %>"
+
+MULTI_JSON:
+  match:
+    - "    MultiJson.dump(payload)"
+    - "  data = MultiJson.load(response.body, symbolize_keys: true)"
+    - "require 'multi_json'"
+    - "rescue MultiJson::ParseError => e"
+  no_match:
+    - "  payload.to_json"
+    - "  JSON.parse(response.body)"
+    - "  ActiveSupport::JSON.decode(str)"
