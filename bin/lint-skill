@@ -8,7 +8,8 @@
 # workflow / version-guide files, SKILL.md index rows that don't match what's
 # on disk, gaps in "Step N" header numbering, pattern-catalog filenames whose
 # derived version disagrees with their own `version:` key, and numbered
-# version-guide entries (or cross-references to them).
+# version-guide entries (or cross-references to them), and version-guide
+# entries whose **Pattern:** markers do not match the patterns file.
 #
 # Usage: ruby bin/lint-skill   (exits 1 on any error)
 
@@ -241,6 +242,96 @@ SKILLS.each_value do |skill_dir|
         err(f, "line #{ln}: cross-reference by number (`#{line[BY_NUMBER_REF]}`) — name the heading instead")
       end
     end
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 9. Version-guide entries name the detection patterns that back them
+# ---------------------------------------------------------------------------
+# A breaking-change entry links to its patterns with a marker on the first
+# line under its heading:
+#
+#   #### `default_scope` Chains Onto Other Scopes
+#
+#   **Pattern:** `DEFAULT_SCOPE`, `DEFAULT_SCOPE_WITHOUT_BLOCK`
+#
+# or says why it has none: `**Pattern:** none (config change, no code to match)`.
+# A heading can be reworded freely; the variable_name is what code refers to.
+#
+# Every marker must name a variable_name in the hop's patterns file, and a
+# name may sit on one entry only. Guides opt in: once a guide has one marker,
+# every entry under "## Breaking Changes" needs one and every pattern of the
+# hop must be named by some entry, so a guide can be migrated on its own
+# without turning lint red for the rest.
+MARKER = /\A\*\*Pattern:\*\*\s*(.*)\z/
+
+def pattern_names(file)
+  doc = YAML.safe_load_file(file)
+  findings = doc.is_a?(Hash) ? doc["upgrade_findings"] : nil
+  return [] unless findings.is_a?(Hash)
+
+  %w[high_priority medium_priority low_priority].flat_map { |k| Array(findings[k]) }.map { |e| e["variable_name"] }.compact
+rescue Psych::SyntaxError
+  [] # check 7 already reports the parse error
+end
+
+Dir.glob(File.join(SKILLS.fetch("rails-upgrade"), "version-guides", "upgrade-*-to-*.md")).sort.each do |guide|
+  to = File.basename(guide)[/-to-(\d+)\.(\d+)\.md\z/] && "#{$1}#{$2}"
+  next unless to
+
+  patterns_file = File.join(PATTERNS_DIR, "rails-#{to}-patterns.yml")
+  known = File.file?(patterns_file) ? pattern_names(patterns_file) : []
+
+  entries = [] # [heading, heading_line, marker_value_or_nil, marker_line]
+  section = nil
+  pending = nil
+  in_fence = false
+  File.readlines(guide, chomp: true).each_with_index do |line, i|
+    in_fence = !in_fence if line.start_with?("```")
+    next if in_fence
+
+    if line.start_with?("## ")
+      section = line
+      pending = nil
+    elsif line.start_with?("#### ") && section == "## Breaking Changes"
+      pending = [line.sub(/\A#### /, ""), i + 1, nil]
+      entries << pending
+    elsif pending && !line.strip.empty?
+      pending[2] = line[MARKER, 1]
+      pending[3] = i + 1
+      pending = nil
+    end
+  end
+
+  marked = entries.select { |_, _, m| m }
+  next if marked.empty?
+
+  owner = {}
+  marked.each do |heading, _, value, ln|
+    next if value =~ /\Anone\b/
+
+    names = value.scan(/`([A-Z0-9_]+)`/).flatten
+    if names.empty?
+      err(guide, "line #{ln}: \"#{heading}\" marker lists no `VARIABLE_NAME`; hint: write **Pattern:** `NAME`, or **Pattern:** none (why)")
+    end
+    names.each do |name|
+      unless known.include?(name)
+        err(guide, "line #{ln}: \"#{heading}\" names #{name}, which is not in #{File.basename(patterns_file)}; " \
+                   "hint: fix the spelling, or add the pattern first")
+      end
+      if owner[name]
+        err(guide, "line #{ln}: #{name} is already named by \"#{owner[name]}\"; hint: keep it on the entry whose fix it follows")
+      end
+      owner[name] ||= heading
+    end
+  end
+
+  entries.reject { |_, _, m| m }.each do |heading, ln, _, _|
+    err(guide, "line #{ln}: \"#{heading}\" has no **Pattern:** line; hint: add one under the heading, or **Pattern:** none (why)")
+  end
+  (known - owner.keys).each do |name|
+    err(guide, "#{name} (#{File.basename(patterns_file)}) is not named by any entry; " \
+               "hint: add it to the entry that explains it, or write an entry for it")
   end
 end
 
