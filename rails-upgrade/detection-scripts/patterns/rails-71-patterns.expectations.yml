@@ -1,0 +1,33 @@
+# Fixture expectations for rails-71-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-71-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-71-patterns.yml
+#
+# The patterns without an entry here predate the expectations tooling. Add
+# entries as they are revisited.
+
+CACHE_FORMAT_VERSION_61:
+  match:
+    # load_defaults below 7.0 leaves the cache format at 6.1
+    - "    config.load_defaults 6.1"
+    - "    config.load_defaults \"5.2\""
+    - "    config.load_defaults(6.0)"
+    # the 6.1 format set explicitly
+    - "    config.active_support.cache_format_version = 6.1"
+    - "ActiveSupport::Cache.format_version = 6.1"
+  no_match:
+    # load_defaults 7.0 and 7.1 set the 7.0 and 7.1 formats
+    - "    config.load_defaults 7.0"
+    - "    config.load_defaults 7.1"
+    - "    config.active_support.cache_format_version = 7.0"
+    # commented-out lines, including the new_framework_defaults template
+    - "    # config.load_defaults 6.1"
+    - "# Rails.application.config.active_support.cache_format_version = 7.0"

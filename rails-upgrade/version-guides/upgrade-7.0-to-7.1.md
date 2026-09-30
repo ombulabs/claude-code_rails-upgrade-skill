@@ -234,20 +234,29 @@ config.active_record.query_log_tags_format = :sqlcommenter  # or :legacy
 
 #### Cache Format Version 7.1
 
-**What Changed:**
-New cache serialization format available. 7.1 also **deprecates** the 6.1 format and removes it in 7.2.
+**Pattern:** `CACHE_FORMAT_VERSION_61`
 
-**This usually warns with no line in the codebase to find.** `cache_format_version` is rarely set explicitly — `config.load_defaults 5.1` / `6.0` / `6.1` implies the 6.1 format. An app that has not yet moved `load_defaults` past 6.1 warns on every boot under 7.1 with nothing to grep for, so a clean detection scan is inconclusive here. Check the app's `load_defaults` value instead.
+**What Changed:**
+7.1 adds a new cache serialization format and **deprecates** the 6.1 format, which 7.2 removes. `ActiveSupport::Cache.format_version` defaults to 6.1; only `load_defaults 7.0` (sets 7.0) and `load_defaults 7.1` (sets 7.1) change it. So an app on `load_defaults` 5.x or 6.x that never sets the format warns on every boot under 7.1. The pattern flags that `load_defaults` line and any explicit `cache_format_version = 6.1`. It misses an app with no `load_defaults` line at all, which also warns.
+
+**Detection Pattern:**
+```ruby
+config.load_defaults 6.1
+config.active_support.cache_format_version = 6.1
+```
 
 **Fix:**
 ```ruby
-# Enable after all servers are on 7.1
-config.active_support.cache_format_version = 7.1
+# BEFORE (config/application.rb)
+config.load_defaults 6.1
+
+# AFTER
+config.load_defaults 6.1
+config.active_support.cache_format_version = 7.0
 ```
+The AFTER works on 7.0 too: 7.0 reads both the 6.1 and 7.0 formats, and 7.1 reads 7.0, so no `NextRails.next?` branch is needed and a rolling deploy is safe. Or resolve it as part of the `load_defaults` bump in Workflow 12.
 
-Or resolve it as part of the `load_defaults` bump in Step 7.
-
-**Warning:** Don't enable until ALL servers are upgraded to 7.1. During a rolling deploy, servers still on the old format read new-format entries as misses and vice versa, which can stampede the cache. Deploy the version bump first, then flip the format.
+**Warning:** Don't set `cache_format_version = 7.1` until ALL servers run 7.1. Rails 7.0 cannot read entries written in the 7.1 format, so during a rolling deploy the servers still on 7.0 lose those cache entries. Deploy the version bump first, then flip the format.
 
 ---
 
@@ -440,6 +449,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | SSL redirect loop behind a proxy | "Force SSL Default in Production" — let the proxy handle SSL or set `force_ssl = false` |
 | Constant not found in `lib/` | "lib/ Autoloaded by Default" — `lib/my_file.rb` must define `MyFile` |
 | Boot crashes on `legacy_connection_handling` | "legacy_connection_handling Removed" — delete every occurrence; guard with `NextRails.next?` while dual-booting |
+| `cache_format_version = 6.1` deprecation warning on every boot | "Cache Format Version 7.1" — set `cache_format_version = 7.0` |
 
 ---
 

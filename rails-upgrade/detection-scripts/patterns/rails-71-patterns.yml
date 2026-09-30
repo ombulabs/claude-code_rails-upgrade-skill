@@ -110,6 +110,16 @@ upgrade_findings:
       fix: "Migrate to Rails.application.credentials"
       variable_name: "SECRETS_YML_ENC"
 
+    - name: "Cache format version 6.1 (load_defaults below 7.0)"
+      kind: "deprecation"
+      pattern: "load_defaults[\\s(]+[\"']?[56]\\.\\d+\\b|format_version\\s*=\\s*6\\.1\\b"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "activesupport 7.1 deprecates cache format 6.1 (cache.rb default_serializer: `Support for config.active_support.cache_format_version = 6.1 has been deprecated and will be removed in Rails 7.2`). ActiveSupport::Cache.format_version defaults to 6.1 and only load_defaults 7.0 (sets 7.0) or 7.1 (sets 7.1) changes it, so the warning fires for any app on load_defaults 5.x or 6.x that does not set the format itself, or that sets 6.1 explicitly. The load_defaults value is the proxy signal. False positive: an app on load_defaults 6.x that already sets cache_format_version = 7.0 elsewhere is still flagged. An app with no load_defaults line at all also warns and is missed"
+      fix: "Set config.active_support.cache_format_version = 7.0 after load_defaults in config/application.rb. Rails 7.0 reads both the 6.1 and 7.0 formats and 7.1 reads 7.0, so this is safe on both sides of the dual boot and during a rolling deploy, no NextRails.next? branch needed. Move to 7.1 only after every server runs 7.1"
+      variable_name: "CACHE_FORMAT_VERSION_61"
+
 dependencies:
   ruby:
     minimum: "2.7.0"
