@@ -41,6 +41,8 @@ Generally transparent. If you relied on specific behavior with non-string/symbol
 
 #### render :text Removed
 
+**Pattern:** `RENDER_TEXT`
+
 **What Changed:**
 `render text: 'content'` has been removed.
 
@@ -62,6 +64,8 @@ render plain: 'Hello World'
 ---
 
 #### render :nothing Removed
+
+**Pattern:** `RENDER_NOTHING`
 
 **What Changed:**
 `render nothing: true` has been removed.
@@ -105,6 +109,8 @@ render body: 'raw content', layout: true
 
 #### redirect_to :back Removed
 
+**Pattern:** `REDIRECT_TO_BACK`
+
 **What Changed:**
 `redirect_to :back` was deprecated in Rails 5.0 and **removed** in Rails 5.1. Callers raise at runtime.
 
@@ -132,6 +138,8 @@ redirect_back(fallback_location: root_path, notice: 'Done!')
 
 #### Positional Arguments in Process Methods
 
+**Pattern:** `CONTROLLER_TEST_POSITIONAL`
+
 **What Changed:**
 Controller test methods now prefer keyword arguments.
 
@@ -156,6 +164,8 @@ post :create, params: { user: { name: 'Test' } }
 ---
 
 #### ActiveRecord.raise_in_transactional_callbacks Removed
+
+**Pattern:** `RAISE_IN_TRANSACTIONAL_CALLBACKS`
 
 **What Changed:**
 The configuration option has been removed (was deprecated in 5.0).
