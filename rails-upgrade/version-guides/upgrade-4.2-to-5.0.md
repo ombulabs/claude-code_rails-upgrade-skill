@@ -244,6 +244,7 @@ setting is deprecated.
 Nothing raises. A `before_save` that returns `false` saves the record on Active Record 5.1 and
 later and refuses it on 4.2, for the method form and the block form alike.
 
+**Detection Pattern:**
 Three shapes yield the halting `false`, and the bare trailing one is the easiest to miss:
 
 ```ruby
