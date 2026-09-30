@@ -24,6 +24,8 @@ Rails 5.2 introduces:
 
 #### Bootsnap Required for Performance
 
+**Pattern:** `BOOTSNAP_PRESENCE`
+
 **What Changed:**
 Rails 5.2 recommends bootsnap for faster boot times.
 
@@ -60,6 +62,8 @@ Rails.application.config.action_dispatch.use_authenticated_cookie_encryption = t
 ---
 
 #### Active Record attribute_changed? Behavior
+
+**Pattern:** `DIRTY_TRACKING_AFTER_SAVE`
 
 **What Changed:**
 `attribute_changed?` and related methods now return `false` after saving, even if the record was changed.
@@ -106,6 +110,8 @@ rails db:migrate
 ### 🟡 MEDIUM PRIORITY
 
 #### Encrypted Secrets → Credentials
+
+**Pattern:** `SECRETS_USAGE`
 
 **What Changed:**
 `secrets.yml.enc` is replaced by `credentials.yml.enc`.
