@@ -84,7 +84,7 @@ upgrade_findings:
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
       kind: "deprecation"
-      pattern: "(?<=['\"/(]):(?:controller|action)(?!\\w)"
+      pattern: "(?<=['\"/(]):(?:controller|action)(?!\\w|\\s*=>)"
       exclude: ""
       search_paths:
         - "config/routes.rb"

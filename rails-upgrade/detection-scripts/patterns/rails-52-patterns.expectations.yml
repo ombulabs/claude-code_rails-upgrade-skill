@@ -14,11 +14,15 @@ DYNAMIC_ROUTE_SEGMENTS:
     - "  match 'admin/:controller/:action', via: :get"
     - "  get 'reports/:action', controller: 'reports'"
     - "  get \"/:controller/:id\""
+    - "  get '(:controller)(/:action)'"
   no_match:
     - "  get 'posts', controller: 'posts', action: :index"
     - "  match 'posts' => 'posts#index', :controller => 'posts', :action => 'index'"
     - "  get 'steps/:action_name', to: 'wizard#show'"
     - "  get ':controller_id/show', to: 'a#b'"
+    # A hash key right after ( is an option, not a segment
+    - "  scope(:controller => 'admin') do"
+    - "  constraints(:action => /show/) do"
 
 CLASS_NAME_CONSTANT:
   # A constant passed to class_name raises ArgumentError in 5.2. A string,
