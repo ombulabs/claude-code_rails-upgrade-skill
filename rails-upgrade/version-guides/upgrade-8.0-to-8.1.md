@@ -157,7 +157,7 @@ The AFTER works on 8.0 too.
 
 #### Semicolon Query Separator Removed
 
-**Pattern:** `SEMICOLON_SEPARATOR`
+**Pattern:** `SEMICOLON_SEPARATOR`, `STRICT_QUERY_STRING_SEPARATOR_CONFIG`
 
 **What Changed:**
 On Rails 8.0 with Rack 2, `ActionDispatch::QueryParser` still split a query string, and a form-urlencoded
