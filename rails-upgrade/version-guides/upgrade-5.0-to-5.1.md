@@ -22,24 +22,9 @@ Rails 5.1 introduces:
 
 ### 🔴 HIGH PRIORITY
 
-#### HashWithIndifferentAccess Indexing Change
-
-**What Changed:**
-Non-symbol access in `HashWithIndifferentAccess` returns `nil` for non-existent keys instead of raising errors.
-
-**Detection Pattern:**
-```ruby
-hash = HashWithIndifferentAccess.new
-hash[:missing_key]  # Returns nil
-hash[Object.new]    # Behavior changed
-```
-
-**Fix:**
-Generally transparent. If you relied on specific behavior with non-string/symbol keys, test thoroughly.
-
----
-
 #### render :text Removed
+
+**Pattern:** `RENDER_TEXT`
 
 **What Changed:**
 `render text: 'content'` has been removed.
@@ -63,6 +48,8 @@ render plain: 'Hello World'
 
 #### render :nothing Removed
 
+**Pattern:** `RENDER_NOTHING`
+
 **What Changed:**
 `render nothing: true` has been removed.
 
@@ -85,25 +72,9 @@ head :no_content
 
 ---
 
-#### render :body Default Layout Removed
-
-**What Changed:**
-`render body:` no longer renders with a layout by default.
-
-**Detection Pattern:**
-```ruby
-render body: 'raw content'
-```
-
-**Fix:**
-If you need a layout:
-```ruby
-render body: 'raw content', layout: true
-```
-
----
-
 #### redirect_to :back Removed
+
+**Pattern:** `REDIRECT_TO_BACK`
 
 **What Changed:**
 `redirect_to :back` was deprecated in Rails 5.0 and **removed** in Rails 5.1. Callers raise at runtime.
@@ -128,9 +99,124 @@ redirect_back(fallback_location: root_path, notice: 'Done!')
 
 ---
 
+#### Returning false No Longer Halts Callbacks
+
+**Pattern:** `HALT_CALLBACK_CHAINS_DEPRECATION`
+
+**What Changed:**
+In Rails 5.0 a `before_*` callback on an Active Record or Active Model object that returns `false` still halts the chain, with a deprecation warning, while `ActiveSupport.halt_callback_chains_on_return_false` is `true`. That is the default, and `rails app:update` writes the line as `true`. Rails 5.1 removes the halt: the save or validation goes on and nothing warns. The setter stays until 5.2 but only logs a deprecation warning.
+
+**Detection Pattern:**
+```ruby
+# config/initializers/new_framework_defaults.rb
+ActiveSupport.halt_callback_chains_on_return_false = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+before_save :check_something
+
+def check_something
+  return false if invalid_condition
+end
+
+# AFTER
+def check_something
+  throw :abort if invalid_condition
+end
+```
+The AFTER works on Rails 5.0 too. The pattern finds only the config line, and an app without the line had the same default: run the suite on 5.0, fix every callback behind the warning `will not implicitly halt a callback chain in Rails 5.1`, then delete the line.
+
+---
+
+#### use_transactional_fixtures Removed
+
+**Pattern:** `USE_TRANSACTIONAL_FIXTURES`
+
+**What Changed:**
+Rails 5.0 renamed the test setting to `use_transactional_tests` and kept `use_transactional_fixtures=` as a deprecated alias. Rails 5.1 removes it from `ActiveRecord::TestFixtures`, so the setter raises `NoMethodError` when `test_helper.rb` loads and the suite does not start. RSpec's `config.use_transactional_fixtures` in `spec/rails_helper.rb` is an rspec-rails setting, still valid, and the pattern skips it.
+
+**Detection Pattern:**
+```ruby
+class ActiveSupport::TestCase
+  self.use_transactional_fixtures = true
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+self.use_transactional_fixtures = true
+
+# AFTER
+self.use_transactional_tests = true
+```
+The AFTER works on Rails 5.0 too.
+
+---
+
+#### before_filter and the Other *_filter Methods Removed
+
+**Pattern:** `FILTER_METHODS`
+
+**What Changed:**
+Rails 5.0 kept `before_filter`, `skip_before_filter`, `prepend_around_filter`, `skip_filter` and the rest as deprecated aliases of the `*_action` methods. Rails 5.1 removes them from `AbstractController::Callbacks`, so a controller or mailer that calls one raises `NoMethodError` when the class loads.
+
+**Detection Pattern:**
+```ruby
+before_filter :authenticate_user!
+skip_before_filter :verify_authenticity_token
+```
+
+**Fix:**
+```ruby
+# BEFORE
+before_filter :authenticate_user!
+skip_before_filter :verify_authenticity_token
+skip_filter :require_login
+
+# AFTER
+before_action :authenticate_user!
+skip_before_action :verify_authenticity_token
+skip_before_action :require_login # or skip_after_action / skip_around_action, matching the callback
+```
+The AFTER works on Rails 5.0 too.
+
+---
+
+#### Relation#uniq Removed
+
+**Pattern:** `RELATION_UNIQ`
+
+**What Changed:**
+In Rails 5.0 `uniq` and `uniq!` on a model class or relation are deprecated aliases of `distinct` and `distinct!`, which add SQL `DISTINCT`. Rails 5.1 removes them. `Model.uniq` and `relation.uniq!` raise `NoMethodError`. `relation.uniq` now goes to the loaded records: it runs the query without `DISTINCT`, loads every row, returns an Array, and a query method chained after it (`.uniq.order(:name)`) raises `NoMethodError`. `uniq` on an association such as `post.comments.uniq` behaves as before.
+
+**Detection Pattern:**
+```ruby
+User.uniq.pluck(:city)
+scope :tagged, -> { joins(:tags).uniq }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+User.uniq.pluck(:city)
+scope :tagged, -> { joins(:tags).uniq }
+
+# AFTER
+User.distinct.pluck(:city)
+scope :tagged, -> { joins(:tags).distinct }
+```
+The AFTER works on Rails 5.0 too. The pattern also matches `Array#uniq`; leave those calls as they are.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Positional Arguments in Process Methods
+
+**Pattern:** `CONTROLLER_TEST_POSITIONAL`
 
 **What Changed:**
 Controller test methods now prefer keyword arguments.
@@ -157,6 +243,8 @@ post :create, params: { user: { name: 'Test' } }
 
 #### ActiveRecord.raise_in_transactional_callbacks Removed
 
+**Pattern:** `RAISE_IN_TRANSACTIONAL_CALLBACKS`
+
 **What Changed:**
 The configuration option has been removed (was deprecated in 5.0).
 
@@ -167,6 +255,235 @@ config.active_record.raise_in_transactional_callbacks = true
 
 **Fix:**
 Remove the configuration line. This is now the default behavior.
+
+---
+
+#### config.serve_static_files and config.static_cache_control Removed
+
+**Pattern:** `SERVE_STATIC_FILES_RENAME`, `STATIC_CACHE_CONTROL_RENAME`
+
+**What Changed:**
+Rails 5.0 kept both settings as deprecated aliases that wrote to `config.public_file_server`. Rails 5.1 removes them. Assigning either one no longer raises: the value is stored as an unknown config option and ignored. So `config.serve_static_files = false` stops turning off Rails' static file server (it defaults to on), and `config.static_cache_control` stops adding the `Cache-Control` header to files under `public/`. Reading `config.serve_static_files` without assigning it first raises `NoMethodError`.
+
+**Detection Pattern:**
+```ruby
+config.serve_static_files = ENV['RAILS_SERVE_STATIC_FILES'].present?
+config.static_cache_control = 'public, max-age=3600'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+config.serve_static_files = ENV['RAILS_SERVE_STATIC_FILES'].present?
+config.static_cache_control = 'public, max-age=3600'
+
+# AFTER
+config.public_file_server.enabled = ENV['RAILS_SERVE_STATIC_FILES'].present?
+config.public_file_server.headers = { 'Cache-Control' => 'public, max-age=3600' }
+```
+The AFTER works on Rails 5.0 too, so make the change before the bump.
+
+---
+
+#### String if: / unless: Conditions on Callbacks Deprecated
+
+**Pattern:** `FILTER_STRING_CONDITIONS`, `SET_CALLBACK_STRING_CONDITIONS`
+
+**What Changed:**
+Rails 5.0 evaluates a string passed to `if:` or `unless:` with no warning. Rails 5.1 still evaluates it but `set_callback` and `skip_callback` log a deprecation warning, and controller filters such as `before_action` go through `set_callback`. Rails 5.2 raises `ArgumentError`. The warning only fires when the option is a single string: with `only:` or `except:` also given, Rails wraps the conditions in an array and 5.1 stays silent, so trust the scan over the logs. Model callbacks like `before_save :x, if: 'y?'` warn too, and no 5.1 pattern flags them.
+
+**Detection Pattern:**
+```ruby
+before_action :require_guest, if: 'guest?'
+set_callback :save, :before, :normalize, :unless => 'imported?'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+before_action :require_guest, if: 'guest?'
+before_action :audit, unless: 'current_user.admin?'
+
+# AFTER
+before_action :require_guest, if: :guest?
+before_action :audit, unless: -> { current_user.admin? }
+```
+The AFTER works on Rails 5.0 too.
+
+---
+
+#### Nested secrets.yml Keys Are Symbols
+
+**Pattern:** `SECRETS_STRING_KEYS`, `SECRETS_METHOD_ACCESSOR_STRING_KEYS`
+
+**What Changed:**
+Rails 5.0 symbolizes only the top-level keys of an environment in `config/secrets.yml`, so a nested hash keeps its string keys. Rails 5.1 loads the file with `deep_symbolize_keys`. A nested lookup by string key returns `nil` with no error, and a nested lookup by symbol returns `nil` on 5.0. Top-level keys work either way.
+
+**Detection Pattern:**
+```ruby
+Rails.application.secrets[:smtp]['address']
+Rails.application.secrets.smtp['address']
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Rails.application.secrets.smtp['address']
+
+# AFTER (while dual booting)
+smtp = Rails.application.secrets.smtp
+NextRails.next? ? smtp[:address] : smtp['address']
+
+# AFTER (on 5.1 only)
+Rails.application.secrets.smtp[:address]
+```
+The symbol lookup does not work on 5.0, so keep the `NextRails.next?` branch until the 5.0 boot is gone.
+
+---
+
+#### ActionDispatch::ParamsParser::ParseError Deprecated
+
+**Pattern:** `PARAMS_PARSER_ERROR`
+
+**What Changed:**
+Rails 5.1 moves the error raised on a malformed request body (bad JSON, for example) to `ActionDispatch::Http::Parameters::ParseError`. The old name still resolves to the new class, with a deprecation warning each time it is referenced, so a `rescue` or `rescue_from` keeps working. Rails 5.2 removes the old name, and referencing it raises `NameError`.
+
+**Detection Pattern:**
+```ruby
+rescue_from ActionDispatch::ParamsParser::ParseError, with: :bad_request
+```
+
+**Fix:**
+```ruby
+# BEFORE
+rescue_from ActionDispatch::ParamsParser::ParseError, with: :bad_request
+
+# AFTER
+PARAMS_PARSE_ERROR = NextRails.next? ? ActionDispatch::Http::Parameters::ParseError : ActionDispatch::ParamsParser::ParseError
+rescue_from PARAMS_PARSE_ERROR, with: :bad_request
+```
+`ActionDispatch::Http::Parameters::ParseError` does not exist in 5.0, so keep the `NextRails.next?` branch until the 5.0 boot is gone, then use the new name alone.
+
+---
+
+### 🟢 LOW PRIORITY
+
+#### Ruby Version Requirement
+
+**Pattern:** none (the minimum Ruby does not change at this hop)
+
+**What Changed:**
+The floor does not change: the `rails` 5.1 gemspec requires Ruby `>= 2.2.2`, the same as 5.0, so the Ruby that bundles 5.0 also bundles 5.1. The ceiling rises: the [FastRuby.io compatibility table](https://www.fastruby.io/blog/ruby/rails/versions/compatibility-table.html) lists 5.0 as needing Ruby below 2.5 and 5.1 below 2.6, so 5.1 is the first release that runs on Ruby 2.5. The gemspec sets no upper bound; a Ruby released after 5.1 may need its latest patch release.
+
+**Fix:**
+None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
+
+---
+
+#### raise_on_unfiltered_parameters Deprecated
+
+**Pattern:** `RAISE_ON_UNFILTERED_PARAMS`
+
+**What Changed:**
+In Rails 5.0 this setting chose what `ActionController::Parameters#to_h` does on unpermitted params: `true` raises, `false` (the default when the line is absent) quietly returns only the always-permitted keys. Rails 5.1 ignores the setting and always raises `ActionController::UnfilteredParameters`. Setting it to `true` logs a deprecation warning at boot; setting it to `false` does nothing, so an app that ran with `false` starts raising where it calls `to_h` on unpermitted params.
+
+**Detection Pattern:**
+```ruby
+Rails.application.config.action_controller.raise_on_unfiltered_parameters = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Rails.application.config.action_controller.raise_on_unfiltered_parameters = false
+params.to_h
+
+# AFTER (line removed)
+params.permit(:name, :email).to_h
+params.to_unsafe_h # only where the unfiltered hash is intended
+```
+The AFTER works on Rails 5.0 too. The pattern finds only the config line; search for `to_h` on `params` by hand if the line was `false` or missing.
+
+---
+
+#### lock! on a Record with Unsaved Changes Deprecated
+
+**Pattern:** `LOCK_BANG_DEPRECATION`
+
+**What Changed:**
+`lock!` reloads the record with a row lock, which throws away any attribute changes not yet saved. Rails 5.0 does that silently. Rails 5.1 does the same but logs a deprecation warning when the record has unsaved changes, and Rails 5.2 raises. `with_lock` calls `lock!`, so it warns too, though the pattern does not flag it. Most `lock!` calls are on clean records and need no change.
+
+**Detection Pattern:**
+```ruby
+account.balance -= amount
+account.lock!
+```
+
+**Fix:**
+```ruby
+# BEFORE
+account.balance -= amount
+account.lock!
+account.save!
+
+# AFTER
+account.lock!
+account.balance -= amount
+account.save!
+```
+The AFTER works on Rails 5.0 too. If the changes were meant to be kept, `save` before locking; if not, `reload` first.
+
+---
+
+#### Custom quoted_id Deprecated
+
+**Pattern:** `QUOTED_ID_DEPRECATION`
+
+**What Changed:**
+In Rails 5.0, `connection.quote(value)` returns `value.quoted_id` for any object that defines it, which lets a value object bound into a string condition (`where('total_cents = ?', money)`) choose its own SQL. Rails 5.1 still calls it on a non-Active Record object but logs `Defining #quoted_id is deprecated and will be ignored in Rails 5.2`. An Active Record record is now quoted by its primary key before that check, so a `quoted_id` override on a model stops being called, with no warning. Rails 5.2 ignores `quoted_id` everywhere.
+
+**Detection Pattern:**
+```ruby
+class Money
+  def quoted_id
+    cents.to_s
+  end
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Order.where('total_cents = ?', money) # relies on Money#quoted_id
+
+# AFTER
+Order.where('total_cents = ?', money.cents)
+```
+The AFTER works on Rails 5.0 too. For a value used as an attribute, move the conversion into a custom `ActiveModel::Type` (`serialize` / `cast`) registered with the attributes API, which also exists in 5.0.
+
+---
+
+#### HashWithIndifferentAccess.new_from_hash_copying_default Removed
+
+**Pattern:** `HWIA_NEW_FROM_HASH_COPYING_DEFAULT`
+
+**What Changed:**
+Rails 5.0 deprecated `ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default` and made it call `.new`. Rails 5.1 removes it, so a call raises `NoMethodError`. Lookups such as `hash[:missing]` return `nil` in both versions; indexing did not change.
+
+**Detection Pattern:**
+```ruby
+ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default(hash)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default(hash)
+
+# AFTER
+ActiveSupport::HashWithIndifferentAccess.new(hash)
+```
+The AFTER works on Rails 5.0 too, with the same result.
 
 ---
 
@@ -239,6 +556,8 @@ bundle update rails
 2. Replace `render nothing:` with `head :ok`
 3. Replace `redirect_to :back` with `redirect_back`
 4. Update controller test syntax to keyword arguments
+5. Rename `*_filter` callbacks to `*_action`
+6. Replace `uniq` on relations and model classes with `distinct`
 
 ### Phase 4: Configuration
 ```bash
@@ -278,6 +597,15 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ActionView::Template::Error: Unknown keyword: text` | "render :text Removed" — `render plain:` |
 | `redirect_to :back` raises | "redirect_to :back Removed" — `redirect_back(fallback_location: ...)` |
 | `ArgumentError: missing keyword: :fallback_location` | "redirect_to :back Removed" — `redirect_back` requires `fallback_location:` |
+| Files under `public/` lose their `Cache-Control` header, or Rails serves them although `serve_static_files = false` | "config.serve_static_files and config.static_cache_control Removed" — move to `config.public_file_server` |
+| `ActionController::UnfilteredParameters: unable to convert unpermitted parameters to hash` | "raise_on_unfiltered_parameters Deprecated" — `permit(...)` before `to_h` |
+| A record saves although a `before_*` callback returned `false` | "Returning false No Longer Halts Callbacks" — `throw :abort` |
+| `NoMethodError: undefined method 'use_transactional_fixtures='` | "use_transactional_fixtures Removed" — `use_transactional_tests` |
+| `NoMethodError: undefined method 'before_filter'` (or another `*_filter`) | "before_filter and the Other *_filter Methods Removed" — rename to `*_action` |
+| `NoMethodError: undefined method 'uniq'` on a model class, or a query method called on an Array after `.uniq` | "Relation#uniq Removed" — `distinct` |
+| A nested `Rails.application.secrets` value is `nil` after the bump | "Nested secrets.yml Keys Are Symbols" — use symbol keys |
+| `DEPRECATION WARNING: ActionDispatch::ParamsParser::ParseError is deprecated!` | "ActionDispatch::ParamsParser::ParseError Deprecated" — `ActionDispatch::Http::Parameters::ParseError` |
+| `DEPRECATION WARNING: Locking a record with unpersisted changes is deprecated` | "lock! on a Record with Unsaved Changes Deprecated" — lock before changing attributes |
 
 ---
 

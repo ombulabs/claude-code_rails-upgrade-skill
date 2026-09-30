@@ -1,0 +1,122 @@
+# Fixture expectations for rails-51-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-51-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-51-patterns.yml
+
+USE_TRANSACTIONAL_FIXTURES:
+  match:
+    - "  self.use_transactional_fixtures = true"
+    - "ActiveSupport::TestCase.use_transactional_fixtures = false"
+  no_match:
+    # rspec-rails keeps its own RSpec setting of this name and maps it to
+    # use_transactional_tests, so spec/rails_helper.rb is fine on 5.1.
+    - "  config.use_transactional_fixtures = true"
+    - "  self.use_transactional_tests = true"
+
+FILTER_METHODS:
+  match:
+    - "  before_filter :authenticate_user!"
+    - "  skip_before_filter :verify_authenticity_token, only: :create"
+    - "  skip_filter :require_login"
+    - "  around_filter :wrap_in_transaction"
+    - "  prepend_before_filter :set_locale"
+    - "  append_after_filter :log"
+  no_match:
+    - "  before_action :authenticate_user!"
+    - "  skip_before_action :verify_authenticity_token"
+    - "  config.filter_parameters += [:password]"
+    - "  add_filter { |line| line }"
+    - "  before_filters = []"
+
+FILTER_STRING_CONDITIONS:
+  match:
+    - "  before_action :require_guest, if: 'guest?'"
+    - "  before_action :require_guest, unless: \"admin?\""
+    # Hash-rocket form: a leading \b before `:if` never matched here.
+    - "  before_filter :require_guest, :if => 'guest?'"
+    - "  skip_before_action :authenticate, :unless => \"api?\""
+  no_match:
+    - "  before_action :require_guest, if: :guest?"
+    - "  before_action :require_guest, if: -> { guest? }"
+    - "  before_action :require_guest, :if => :guest?"
+    - "  before_action :x, notify: 'y'"
+
+SET_CALLBACK_STRING_CONDITIONS:
+  match:
+    - "  set_callback :save, :before, :x, if: 'y?'"
+    # Hash-rocket form: a leading \b before `:if` never matched here.
+    - "  set_callback :save, :before, :x, :if => 'y?'"
+    - "  skip_callback :validate, :before, :check, unless: \"new_record?\""
+  no_match:
+    - "  set_callback :save, :before, :x, if: :y?"
+    - "  set_callback :save, :before, :x, :if => -> { y? }"
+    - "  run_callbacks :save"
+
+RELATION_UNIQ:
+  match:
+    - "  User.where(active: true).uniq"
+    - "  scope :tagged, -> { joins(:tags).uniq }"
+    - "  Post.uniq.pluck(:author_id)"
+    - "  relation.uniq!"
+  no_match:
+    - "  ids.map(&:to_i).uniq"
+    - "  tags.pluck(:name).uniq"
+    - "  User.distinct"
+    - "  validates :email, uniqueness: true"
+
+SECRETS_STRING_KEYS:
+  match:
+    - "Rails.application.secrets[:smtp]['address']"
+    - "Rails.application.secrets[\"smtp\"][\"address\"]"
+  no_match:
+    - "Rails.application.secrets[:smtp][:address]"
+    # Top-level keys go through OrderedOptions#[], which calls to_sym.
+    - "Rails.application.secrets['api_key']"
+
+SECRETS_METHOD_ACCESSOR_STRING_KEYS:
+  match:
+    - "Rails.application.secrets.smtp['address']"
+  no_match:
+    - "Rails.application.secrets.smtp[:address]"
+    - "Rails.application.secrets.api_key"
+
+PARAMS_PARSER_ERROR:
+  match:
+    - "  rescue_from ActionDispatch::ParamsParser::ParseError, with: :bad_json"
+    - "  rescue ActionDispatch::ParamsParser::ParseError => e"
+  no_match:
+    - "  rescue ActionDispatch::Http::Parameters::ParseError => e"
+
+LOCK_BANG_DEPRECATION:
+  match:
+    - "  account.lock!"
+    - "  account.lock!(\"FOR UPDATE NOWAIT\")"
+  no_match:
+    # with_lock calls lock! too and warns the same way, but the pattern
+    # does not flag it.
+    - "  account.with_lock do"
+    - "  Account.lock.find(id)"
+
+QUOTED_ID_DEPRECATION:
+  match:
+    - "  def quoted_id"
+    - "  def quoted_id # :nodoc:"
+  no_match:
+    - "  def quoted_identifier"
+    - "  record.quoted_id"
+
+HWIA_NEW_FROM_HASH_COPYING_DEFAULT:
+  match:
+    - "  ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default(hash)"
+    - "  HashWithIndifferentAccess.new_from_hash_copying_default(opts)"
+  no_match:
+    - "  ActiveSupport::HashWithIndifferentAccess.new(hash)"
+    - "  hash.with_indifferent_access"

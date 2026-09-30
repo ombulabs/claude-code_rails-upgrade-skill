@@ -24,8 +24,22 @@ Rails 5.0 is a major release with significant changes:
 
 #### Ruby 2.2.2+ Required
 
+**Pattern:** `RUBY_VERSION`
+
 **What Changed:**
-Rails 5.0 requires Ruby 2.2.2 or later.
+Rails 5.0 requires Ruby 2.2.2 or newer: the `rails` 5.0 gemspec sets `required_ruby_version >= 2.2.2`, while 4.2 accepts `>= 1.9.3`. Bundler refuses to install 5.0 on an older Ruby, so upgrade Ruby first, while the app is still on Rails 4.2, as its own deploy. Rails 5.0 also has a ceiling the gemspec does not state: the [FastRuby.io compatibility table](https://www.fastruby.io/blog/ruby/rails/versions/compatibility-table.html) lists it as needing Ruby below 2.5, so an app already on Ruby 2.5 or newer has to use Ruby 2.4 for this hop. The gemspec sets no upper bound; a Ruby released after a Rails version may need that version's latest patch release.
+
+**Detection Pattern:**
+```ruby
+# Gemfile
+ruby "2.1.10"
+
+# .ruby-version
+2.1.10
+
+# .tool-versions
+ruby 2.1.10
+```
 
 **Fix:**
 ```bash
@@ -43,6 +57,8 @@ gem 'test-unit'
 ---
 
 #### ApplicationRecord Base Class
+
+**Pattern:** `ACTIVERECORD_BASE`
 
 **What Changed:**
 Models now inherit from `ApplicationRecord` instead of `ActiveRecord::Base`.
@@ -72,6 +88,8 @@ end
 ---
 
 #### belongs_to Required by Default
+
+**Pattern:** `BELONGS_TO_REQUIRED`
 
 **What Changed:**
 `belongs_to` associations now require the associated record to exist.
@@ -103,6 +121,8 @@ config.active_record.belongs_to_required_by_default = false
 ---
 
 #### Strong Parameters Required
+
+**Pattern:** `PROTECTED_ATTRIBUTES`, `ATTR_ACCESSIBLE`
 
 **What Changed:**
 `protected_attributes` gem no longer works in Rails 5.
@@ -142,6 +162,8 @@ end
 
 #### Parameters No Longer HashWithIndifferentAccess
 
+**Pattern:** `PARAMS_AS_HASH`
+
 **What Changed:**
 `params` is now `ActionController::Parameters`, not a hash.
 
@@ -170,6 +192,8 @@ params.require(:user).permit(:name, :email).to_h.slice(:name, :email)
 
 #### Controller Tests Changed
 
+**Pattern:** `ASSIGNS_IN_TESTS`, `ASSERT_TEMPLATE`
+
 **What Changed:**
 `assigns` and `assert_template` are extracted to a gem.
 
@@ -190,6 +214,8 @@ gem 'rails-controller-testing', group: :test
 
 #### File Upload Testing Changed
 
+**Pattern:** `UPLOAD_FILE_TEST`
+
 **What Changed:**
 Use `Rack::Test::UploadedFile` instead of `ActionDispatch::Http::UploadedFile`.
 
@@ -206,6 +232,8 @@ Rack::Test::UploadedFile.new(file_path, 'image/png')
 
 #### Callback Halting Changed
 
+**Pattern:** `CALLBACK_HALT`
+
 **What Changed:**
 Returning `false` from a before_* Active Record or Active Model callback no longer halts the
 chain. On 5.0 it still halts, with a deprecation warning, while
@@ -216,6 +244,7 @@ setting is deprecated.
 Nothing raises. A `before_save` that returns `false` saves the record on Active Record 5.1 and
 later and refuses it on 4.2, for the method form and the block form alike.
 
+**Detection Pattern:**
 Three shapes yield the halting `false`, and the bare trailing one is the easiest to miss:
 
 ```ruby
@@ -270,6 +299,8 @@ end
 
 #### Rails Command Replaces Rake
 
+**Pattern:** `RAKE_COMMANDS`
+
 **What Changed:**
 Use `rails` instead of `rake` for many commands.
 
@@ -289,6 +320,8 @@ rails routes
 ---
 
 #### `redirect_to :back` Deprecated
+
+**Pattern:** `REDIRECT_TO_BACK_DEPRECATED`
 
 **What Changed:**
 `redirect_to :back` is deprecated in Rails 5.0. It still works and emits a deprecation warning, but it is **removed outright in Rails 5.1** — fix all call sites now to avoid a runtime break on the next hop.

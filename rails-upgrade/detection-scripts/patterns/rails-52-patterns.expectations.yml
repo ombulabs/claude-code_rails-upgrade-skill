@@ -1,0 +1,130 @@
+# Fixture expectations for rails-52-patterns.yml.
+#
+# Keyed by variable_name. `match` lines the pattern MUST flag, `no_match`
+# lines it MUST NOT flag (a per-line grep + grep -v).
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-52-patterns.yml
+
+DYNAMIC_ROUTE_SEGMENTS:
+  # A :controller or :action segment inside a quoted route path. Hash keys
+  # (controller: 'x', :action => 'y') are options, not segments.
+  match:
+    - "  get ':controller(/:action(/:id))'"
+    - "  match 'admin/:controller/:action', via: :get"
+    - "  get 'reports/:action', controller: 'reports'"
+    - "  get \"/:controller/:id\""
+    - "  get '(:controller)(/:action)'"
+  no_match:
+    - "  get 'posts', controller: 'posts', action: :index"
+    - "  match 'posts' => 'posts#index', :controller => 'posts', :action => 'index'"
+    - "  get 'steps/:action_name', to: 'wizard#show'"
+    - "  get ':controller_id/show', to: 'a#b'"
+    # A hash key right after ( is an option, not a segment
+    - "  scope(:controller => 'admin') do"
+    - "  constraints(:action => /show/) do"
+
+CLASS_NAME_CONSTANT:
+  # A constant passed to class_name raises ArgumentError in 5.2. A string,
+  # or Foo.name / Foo.to_s, is fine.
+  match:
+    - "  belongs_to :owner, class_name: User"
+    - "  has_many :items, class_name: Billing::Item, foreign_key: :order_id"
+    - "  has_many :items, :class_name => Item"
+  no_match:
+    - "  belongs_to :owner, class_name: 'User'"
+    - "  belongs_to :owner, class_name: \"User\""
+    - "  belongs_to :owner, class_name: User.name"
+    - "  has_many :items, class_name: Billing::Item.to_s"
+    - "  has_many :items, :class_name => 'Item'"
+
+ERROR_ON_IGNORED_ORDER_OR_LIMIT:
+  match:
+    - "  config.active_record.error_on_ignored_order_or_limit = true"
+  no_match:
+    - "  config.active_record.error_on_ignored_order = true"
+
+HALT_CALLBACK_CHAINS_ON_RETURN_FALSE:
+  match:
+    - "ActiveSupport.halt_callback_chains_on_return_false = false"
+    - "  config.active_support.halt_callback_chains_on_return_false = false"
+  no_match:
+    - "  throw :abort"
+
+CALLBACK_STRING_CONDITIONS:
+  # A string (or array of strings) passed to if: / unless: raises
+  # ArgumentError in 5.2 for every ActiveSupport callback.
+  match:
+    - "  before_save :normalize, if: 'name_changed?'"
+    - "  after_commit :notify, on: :create, unless: \"skip_notify\""
+    - "  before_action :authenticate, if: 'request.format.json?'"
+    - "  skip_before_action :verify_authenticity_token, :if => 'api_request?'"
+    - "  validates :email, presence: true, if: 'active?'"
+    - "  validates_presence_of :email, :unless => 'guest?'"
+    - "  validate :check_limits, if: ['active?', 'paid?']"
+    - "  set_callback :save, :before, :stamp, if: 'stamp?'"
+  no_match:
+    - "  before_save :normalize, if: :name_changed?"
+    - "  before_action :set_format, if: -> { params[:format] == 'json' }"
+    - "  validates :email, presence: { message: 'is required' }, if: :active?"
+    - "  after_save :sync, if: :sync? # was if: 'sync?'"
+    - "  # before_save :normalize, if: 'name_changed?'"
+
+EVENTED_REDIS_ADAPTER:
+  match:
+    - "  adapter: evented_redis"
+    - "ActionCable::SubscriptionAdapter::EventedRedis.em_redis_connector = ->(config) { EM::Hiredis.connect(config[:url]) }"
+  no_match:
+    - "  adapter: redis"
+    - "  channel_prefix: evented_redis_app"
+
+ERUBIS_HANDLER:
+  # Only the Rails handler constants; the erubis gem itself is not a Rails change.
+  match:
+    - "class LegacyHandler < ActionView::Template::Handlers::Erubis"
+    - "ActionView::Template::Handlers::ERB.erb_implementation = ActionView::Template::Handlers::ERB::Erubis"
+  no_match:
+    - "class CustomHandler < ActionView::Template::Handlers::ERB::Erubi"
+    - "Erubis::Eruby.new(template).result(binding)"
+
+QUOTED_ID_METHOD:
+  match:
+    - "  def quoted_id"
+    - "  sql = \"owner_id = #{owner.quoted_id}\""
+  no_match:
+    - "  def quoted_identifier"
+    - "  where(owner_id: owner.id)"
+
+CONNECTION_VERIFY_ARGUMENTS:
+  # 5.2 defines connection verify! with no parameters.
+  match:
+    - "  ActiveRecord::Base.connection.verify!(0)"
+    - "  ActiveRecord::Base.connection.verify! 5"
+  no_match:
+    - "  ActiveRecord::Base.connection.verify!"
+    - "  ActiveRecord::Base.connection.verify! if defined?(ActiveRecord)"
+    - "  cookies.signed.verify(token)"
+    - "  expect(conn).to receive(:verify!).with(no_args)"
+
+LOCK_BANG_UNPERSISTED:
+  # Every lock! / with_lock call site; the audit decides whether the record
+  # has unsaved changes at that point.
+  match:
+    - "  account.lock!"
+    - "  account.lock!(\"FOR UPDATE NOWAIT\")"
+    - "    lock!"
+    - "  account.with_lock do"
+  no_match:
+    - "  def lock!(lock = true)"
+    - "  account.unlock!"
+    - "  Account.lock.find(params[:id])"
+    - "  user.locked!"
+
+LEGACY_SECRET_TOKEN:
+  match:
+    - "Rails.application.config.secret_token = 'a1b2c3'"
+    - "  secret_token: <%= ENV['SECRET_TOKEN'] %>"
+    - "  Rails.application.secrets.secret_token"
+  no_match:
+    - "  secret_key_base: <%= ENV['SECRET_KEY_BASE'] %>"
+    - "Rails.application.config.secret_key_base = ENV['SECRET_KEY_BASE']"

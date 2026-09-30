@@ -51,3 +51,54 @@ EXPLICIT_TEMPLATE_EXTENSION:
     - "    render layout: \"pdf\""
     # a bare action render is unaffected
     - "    render :show"
+
+RUBY_VERSION:
+  # Rails 7.0 requires Ruby >= 2.7.0 (rails gemspec). Lines come from the
+  # Gemfile, .ruby-version and .tool-versions.
+  match:
+    - "ruby \"2.6.10\""
+    - "ruby '~> 2.6.3'"
+    - "ruby '~> 1.9'"
+    - "2.6.10"
+    - "ruby-2.5.9"
+    - "ruby 2.6.10"
+  no_match:
+    - "ruby \"2.7.8\""
+    - "ruby \"~> 2.6\""
+    - "ruby \">= 2.5.0\""
+    - "3.0.6"
+    - "ruby 3.1.4"
+    - "2.10.0"
+    - "gem \"rack\", \"2.6.1\""
+
+ACTIVE_STORAGE_VARIANT:
+  match:
+    # ImageMagick geometry strings passed to resize:, which libvips rejects
+    - "<%= image_tag user.avatar.variant(resize: \"100x100>\") %>"
+    - "    @photo.image.variant(resize: \"300x300\", auto_orient: true)"
+  no_match:
+    # the image_processing macros work under both processors
+    - "<%= image_tag user.avatar.variant(resize_to_limit: [100, 100]) %>"
+    - "    @photo.image.variant(resize_to_fill: [300, 300])"
+
+SPRING:
+  match:
+    - "  gem \"spring\""
+    - "  gem 'spring', '~> 2.1'"
+  no_match:
+    # the 7.0 Gemfile template ships it commented out, the exclude drops it
+    - "  # gem \"spring\""
+    # companion gems are not spring itself
+    - "  gem \"spring-watcher-listen\""
+    - "  gem \"spring-commands-rspec\""
+
+URLSAFE_CSRF_TOKENS:
+  # Rails 7.0 warns on any assignment of the setting (true or false).
+  match:
+    - "  config.action_controller.urlsafe_csrf_tokens = false"
+    - "Rails.application.config.action_controller.urlsafe_csrf_tokens = true"
+    - "  config.action_controller.urlsafe_csrf_tokens=false"
+  no_match:
+    - "  # Rails.application.config.action_controller.urlsafe_csrf_tokens = true"
+    - "  config.action_controller.allow_forgery_protection = false"
+    - "  if ActionController::Base.urlsafe_csrf_tokens"

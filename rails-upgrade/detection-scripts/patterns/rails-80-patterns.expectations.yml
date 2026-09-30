@@ -61,3 +61,117 @@ READ_ENCRYPTED_SECRETS:
     - "  config.secret_key_base = ENV[\"SECRET_KEY_BASE\"]"
     # commented-out line
     - "  # config.read_encrypted_secrets = true"
+
+RUBY_VERSION:
+  # Rails 8.0 requires Ruby >= 3.2.0 (rails gemspec). Lines come from the
+  # Gemfile, .ruby-version and .tool-versions.
+  match:
+    - "ruby \"3.1.6\""
+    - "ruby '~> 3.1.4'"
+    - "ruby \"~> 2.7\""
+    - "3.1.6"
+    - "ruby-3.0.7"
+    - "ruby 2.7.8"
+  no_match:
+    - "ruby \"3.2.6\""
+    - "ruby \"~> 3.1\""
+    - "ruby \">= 3.1.0\""
+    - "3.3.6"
+    - "ruby 3.4.1"
+    - "3.10.0"
+    - "gem \"rack\", \"3.1.8\""
+
+ENV_SCHEMA_CACHE:
+  match:
+    - "ENV[\"SCHEMA_CACHE\"] = \"tmp/schema_cache.yml\""
+    - "path = ENV['SCHEMA_CACHE']"
+    # the variable set in a CI step or script
+    - "        run: SCHEMA_CACHE=db/cache.yml bin/rails db:schema:cache:dump"
+    - "export SCHEMA_CACHE=db/cache.yml"
+  no_match:
+    # the replacement key in database.yml
+    - "  schema_cache_path: db/cache.yml"
+    - "ENV[\"SCHEMA_CACHE_PATH\"]"
+    - "MY_SCHEMA_CACHE=1"
+    - "SCHEMA_CACHE_PATH=db/cache.yml"
+
+ROUTES_MULTIPLE_PATHS:
+  match:
+    - "  get \"/old1\", \"/old2\", to: \"foo#bar\""
+    - "  get '/a', '/b', to: 'x#y'"
+    - "  match \"a\", \"b\", via: [:get, :post]"
+    - "  post(:create, :update)"
+    - "    get :search, :filter"
+    - "  delete \"/a\", \"/b\""
+  no_match:
+    - "  get \"/a\", to: \"foo#bar\""
+    - "  get \"/a\", :to => \"foo#bar\""
+    - "  get :search, on: :collection"
+    - "  get :search, :on => :collection"
+    - "  get \"/a\", \"to\": \"x#y\""
+    - "  get \"photos/:id\", to: \"photos#show\", as: :photo"
+    # an Array path draws no route on 7.2 or 8.0; not the deprecated shape
+    - "  get [\"/old1\", \"/old2\"], to: \"foo#bar\""
+    - "  target \"/a\", \"/b\""
+    - "  # get \"/a\", \"/b\""
+
+WARN_ON_RECORDS_FETCHED:
+  match:
+    - "    config.active_record.warn_on_records_fetched_greater_than = 1000"
+    - "Rails.application.config.active_record.warn_on_records_fetched_greater_than = 1000"
+    - "ActiveRecord.warn_on_records_fetched_greater_than = 1000"
+  no_match:
+    # commented line, as in the 7.1 new_framework_defaults initializer
+    - "# Rails.application.config.active_record.warn_on_records_fetched_greater_than = 1000"
+    - "    # config.active_record.warn_on_records_fetched_greater_than = 1000"
+
+ALLOW_DEPRECATED_SINGULAR_ASSOCIATIONS_NAME:
+  match:
+    - "    config.active_record.allow_deprecated_singular_associations_name = false"
+    - "Rails.application.config.active_record.allow_deprecated_singular_associations_name = false"
+    - "ActiveRecord.allow_deprecated_singular_associations_name = false"
+  no_match:
+    # commented line, as in the 7.1 new_framework_defaults initializer
+    - "# Rails.application.config.active_record.allow_deprecated_singular_associations_name = false"
+    - "    # config.active_record.allow_deprecated_singular_associations_name = false"
+
+COMMIT_TRANSACTION_ON_NON_LOCAL_RETURN:
+  match:
+    - "    config.active_record.commit_transaction_on_non_local_return = true"
+    - "Rails.application.config.active_record.commit_transaction_on_non_local_return = true"
+    - "ActiveRecord.commit_transaction_on_non_local_return = true"
+  no_match:
+    # commented line, as in the 7.1 new_framework_defaults initializer
+    - "# Rails.application.config.active_record.commit_transaction_on_non_local_return = true"
+    - "    # config.active_record.commit_transaction_on_non_local_return = true"
+
+UNSIGNED_FLOAT_DECIMAL:
+  match:
+    - "      t.unsigned_float :amount"
+    - "      t.unsigned_decimal :price, precision: 10, scale: 2"
+  no_match:
+    # still supported, not deprecated
+    - "      t.unsigned_integer :count"
+    - "      t.unsigned_bigint :count"
+    # the replacement
+    - "      t.float :amount, unsigned: true"
+
+BENCHMARK_MS:
+  match:
+    - "    elapsed = Benchmark.ms { run }"
+    - "ms = ::Benchmark.ms do"
+  no_match:
+    # the replacement
+    - "    elapsed = Benchmark.realtime { run } * 1000"
+    - "Benchmark.msecs"
+    - "MyBenchmark.ms { run }"
+
+RAKE_STATS:
+  match:
+    - "        run: bin/rake stats"
+    - "  - bundle exec rake stats"
+  no_match:
+    # the replacement
+    - "        run: bin/rails stats"
+    - "rake statsd:flush"
+    - "rake stats_report"

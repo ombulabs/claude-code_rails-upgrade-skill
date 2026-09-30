@@ -36,3 +36,25 @@ CALLBACK_HALT:
     - "  before_save { self.flag = true }"
     - "  after_save { false }"
     - "    return falsey_value"
+
+RUBY_VERSION:
+  # Rails 5.0 requires Ruby >= 2.2.2 (rails gemspec). Lines come from the
+  # Gemfile, .ruby-version and .tool-versions.
+  match:
+    - "ruby \"2.1.10\""
+    - "ruby '2.2.1'"
+    - "ruby \"~> 2.1.5\""
+    - "ruby '~> 1.9'"
+    - "2.1.10"
+    - "ruby-2.2.0"
+    - "ruby 2.0.0"
+    - "1.9.3"
+  no_match:
+    - "ruby \"2.2.2\""
+    - "ruby \"~> 2.2.1\""
+    - "ruby \"~> 2.1\""
+    - "ruby \">= 2.0\""
+    - "2.2.10"
+    - "2.3.8"
+    - "ruby 2.4.10"
+    - "gem \"rack\", \"2.1.4\""

@@ -40,3 +40,79 @@ STRICT_QUERY_STRING_SEPARATOR_CONFIG:
     - "  ActionDispatch::QueryParser.strict_query_string_separator = true"
   no_match:
     - "  # config.action_dispatch.strict_query_string_separator = false"
+
+ROUTES_MULTIPLE_PATHS_REMOVED:
+  match:
+    # two string paths: 8.0 warns, 8.1 raises ArgumentError
+    - "  get '/old1', '/old2', to: 'foo#bar'"
+    - "  get \"/a\", \"/b\", to: \"x#y\""
+    - "  match 'a', 'b', via: :get"
+    - "  get('/a', '/b', to: 'x#y')"
+    # two action symbols inside a member or collection block
+    - "      get :preview, :download"
+    - "      post :a, :b, on: :member"
+    # A path list that continues on the next line is found by the scanner
+    # (the `\s*` after the comma crosses the newline), proved with
+    # pattern_lab.rb scan; fixture lines are single lines.
+  no_match:
+    # one path plus options, new and hash-rocket style
+    - "  get '/a', to: 'x#y'"
+    - "  get 'photos/:id', :to => 'photos#show'"
+    - "  get :search, :on => :collection"
+    - "  get :tos, :to => 'x#y'"
+    - "  get :show, on: :member"
+    - "  get '/a' => 'x#y'"
+    - "  match 'x', via: [:get, :post]"
+    # the array form draws no route on 8.0 or 8.1; it is not this change
+    - "  get ['/a', '/b'], to: 'x#y'"
+    # resources takes several names on purpose
+    - "  resources :photos, :comments"
+    # commented out
+    - "  # get '/a', '/b'"
+
+BENCHMARK_MS_REMOVED:
+  match:
+    - "    elapsed = Benchmark.ms { run_report }"
+    - "    Benchmark.ms do"
+    - "    ::Benchmark.ms { run }"
+  no_match:
+    # the replacement, and other Benchmark methods
+    - "    ActiveSupport::Benchmark.realtime(:float_millisecond) { run }"
+    - "    Benchmark.realtime { run }"
+    - "    Benchmark.msg"
+
+AS_CONFIGURABLE:
+  match:
+    - "  include ActiveSupport::Configurable"
+    - "  extend ActiveSupport::Configurable"
+  no_match:
+    # the replacement
+    - "  class_attribute :timeout"
+    - "  config_accessor :timeout"
+
+IGNORE_LEADING_BRACKETS_CONFIG:
+  match:
+    - "    config.action_dispatch.ignore_leading_brackets = true"
+    - "  Rails.application.config.action_dispatch.ignore_leading_brackets = false"
+  no_match:
+    - "    config.action_dispatch.strict_query_string_separator = true"
+
+TO_TIME_PRESERVES_TIMEZONE_CONFIG:
+  match:
+    - "    config.active_support.to_time_preserves_timezone = :offset"
+    - "    config.active_support.to_time_preserves_timezone = :zone unless NextRails.next?"
+    - "Rails.application.config.active_support.to_time_preserves_timezone = false"
+  no_match:
+    # commented-out line in a new_framework_defaults file
+    - "# Rails.application.config.active_support.to_time_preserves_timezone = :zone"
+
+MB_CHARS:
+  match:
+    - "    name.mb_chars.upcase.to_s"
+    - "    ActiveSupport::Multibyte::Chars.new(name)"
+    - "    str.mb_chars"
+  no_match:
+    # the replacement, and lookalike names
+    - "    name.upcase"
+    - "    mb_chars_count = 1"
+    - "    obj.mb_chars_for(x)"

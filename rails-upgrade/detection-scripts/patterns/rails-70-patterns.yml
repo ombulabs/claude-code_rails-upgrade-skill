@@ -5,12 +5,13 @@ upgrade_findings:
   high_priority:
     - name: "Ruby version requirement"
       kind: "breaking"
-      pattern: "ruby.*['\"]2\\.[0-6]"
+      pattern: "^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:=\\s*|~>\\s*(?=\\d+\\.\\d+\\.\\d))?|ruby-|ruby\\s+)?(?:1\\.\\d+|2\\.[0-6])(?:\\.\\d+)*(?![\\d.])|^\\s*ruby\\s*\\(?\\s*[\"']~>\\s*1\\.\\d+(?![\\d.])"
       exclude: ""
       search_paths:
         - "Gemfile"
         - ".ruby-version"
-      explanation: "Rails 7.0 requires Ruby 2.7.0 or newer"
+        - ".tool-versions"
+      explanation: "Rails 7.0 requires Ruby 2.7.0 or newer. Flags a Ruby below 2.7.0 in .ruby-version or .tool-versions, and a Gemfile `ruby` line that rules it out (an exact version, or a `~>` whose upper bound is below 2.7.0); a requirement that still allows 2.7.0, such as `>=`, is not flagged"
       fix: "Upgrade Ruby to 2.7.0+ (3.0+ recommended)"
       variable_name: "RUBY_VERSION"
 
@@ -39,16 +40,6 @@ upgrade_findings:
       fix: "Migrate to Import Maps, esbuild, or rollup. Remove Webpacker."
       variable_name: "WEBPACKER"
 
-    - name: "Spring usage"
-      kind: "optional"
-      pattern: "gem ['\"]spring['\"]"
-      exclude: ""
-      search_paths:
-        - "Gemfile"
-      explanation: "Spring is no longer included by default in Rails 7.0"
-      fix: "Keep if needed, or remove for simpler boot process"
-      variable_name: "SPRING"
-
     - name: "form_with local option"
       kind: "migration"
       pattern: "form_with.*local:\\s*(true|false)"
@@ -58,18 +49,6 @@ upgrade_findings:
       explanation: "Rails 7.0 changes form_with to submit remotely by default with Turbo"
       fix: "Remove local: true (now default is remote with Turbo). Add data: { turbo: false } if needed."
       variable_name: "FORM_WITH_LOCAL"
-
-    - name: "ActionController::Base.allow_forgery_protection"
-      kind: "migration"
-      pattern: "allow_forgery_protection"
-      exclude: ""
-      search_paths:
-        - "config/"
-        - "spec/"
-        - "test/"
-      explanation: "Forgery protection behavior changes in Rails 7.0"
-      fix: "Review CSRF configuration. ensure protect_from_forgery settings are correct"
-      variable_name: "FORGERY_PROTECTION"
 
   medium_priority:
     - name: "secrets.yml usage"
@@ -111,8 +90,8 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/"
-      explanation: "Rails 7.0 makes vips the default variant processor for newly generated apps, but existing apps keep their previous setting (mini_magick) and the resize: form continues to work without any deprecation warning. activestorage/lib/active_storage/transformers/image_processing_transformer.rb is byte-for-byte identical between 6.1 and 7.0. If the app opts into vips by setting config.active_storage.variant_processor = :vips, then ImageMagick-flavored resize: arguments will fail at the libvips layer; that is a consequence of opting in, not a Rails-emitted deprecation"
-      fix: "If staying on mini_magick, no change required. If switching to vips (recommended for new apps), rewrite using libvips primitives: variant(resize_to_limit: [100, 100]), variant(resize_to_fill: [100, 100]), etc."
+      explanation: "load_defaults 7.0 sets config.active_storage.variant_processor = :vips (railties configuration.rb); below that the processor stays :mini_magick and resize: keeps working with no warning. Under vips, resize: is not an image_processing macro, so it is forwarded to libvips, which does not take an ImageMagick geometry string like \"100x100>\". A named variant declared without parentheses (a.variant :thumb, resize: ...) is missed"
+      fix: "Rewrite with the image_processing macros, which work on both processors and both Rails versions: variant(resize_to_limit: [100, 100]), variant(resize_to_fill: [100, 100]). Or keep ImageMagick after load_defaults 7.0 with config.active_storage.variant_processor = :mini_magick"
       variable_name: "ACTIVE_STORAGE_VARIANT"
 
     - name: "Turbolinks"
@@ -161,6 +140,27 @@ upgrade_findings:
       explanation: "to_s(:format) is deprecated in favor of to_fs(:format)"
       fix: "Replace to_s(:format) with to_fs(:format)"
       variable_name: "TO_S_FORMAT"
+
+  low_priority:
+    - name: "Spring usage"
+      kind: "optional"
+      pattern: "gem ['\"]spring['\"]"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "Gemfile"
+      explanation: "Rails 7.0 no longer adds spring to new apps (the Gemfile template only has it commented out). An app that keeps it needs spring 4.0 or later: 4.0.0 is the first release whose README lists Rails 7.0, and spring 3.x README stops at 6.0"
+      fix: "Remove spring and bin/spring if the team does not rely on it, or bump to gem \"spring\", \">= 4.0\" (needs Rails 6.0 or later, so it runs on both sides of the dual boot)"
+      variable_name: "SPRING"
+
+    - name: "config.action_controller.urlsafe_csrf_tokens set explicitly"
+      kind: "deprecation"
+      pattern: "\\burlsafe_csrf_tokens\\s*="
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "Rails 7.0 makes URL-safe CSRF tokens the only default (actionpack 7.0 sets urlsafe_csrf_tokens = true) and deprecates the setting: assigning it warns \"URL-safe CSRF tokens are now the default. Use 6.1 defaults or above.\" for true and \"Non-URL-safe CSRF tokens are deprecated. Use 6.1 defaults or above.\" for false. Rails 7.1 removes the setting. An app on load_defaults below 6.1 gets the second warning with no line of its own, because load_defaults 5.0 sets it to false; this pattern only finds an explicit assignment. Tokens keep working across a rolling deploy: 7.0 still decodes the standard base64 tokens 6.1 issued"
+      fix: "Delete the line on the Rails 7.0 side: `config.action_controller.urlsafe_csrf_tokens = true unless NextRails.next?` keeps it for the 6.1 side only. If the app is on load_defaults below 6.1, move to 6.1 defaults or above, which stops setting it to false"
+      variable_name: "URLSAFE_CSRF_TOKENS"
 
 dependencies:
   importmap:

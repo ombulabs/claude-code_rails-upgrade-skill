@@ -5,12 +5,13 @@ upgrade_findings:
   high_priority:
     - name: "Ruby version below 2.2.2"
       kind: "breaking"
-      pattern: "ruby.*['\"]2\\.[01]\\.|ruby.*['\"]1\\."
+      pattern: "^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:=\\s*|~>\\s*(?=\\d+\\.\\d+\\.\\d))?|ruby-|ruby\\s+)?(?:1\\.\\d+|2\\.[01])(?:\\.\\d+)*(?![\\d.])|^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:=\\s*)?|ruby-|ruby\\s+)?2\\.2\\.[01](?![\\d.])|^\\s*ruby\\s*\\(?\\s*[\"']~>\\s*1\\.\\d+(?![\\d.])"
       exclude: ""
       search_paths:
         - "Gemfile"
         - ".ruby-version"
-      explanation: "Rails 5.0 requires Ruby 2.2.2 or newer"
+        - ".tool-versions"
+      explanation: "Rails 5.0 requires Ruby 2.2.2 or newer. Flags a Ruby below 2.2.2 in .ruby-version or .tool-versions, and a Gemfile `ruby` line that rules it out (an exact version, or a `~>` whose upper bound is below 2.2.2); a requirement that still allows 2.2.2, such as `>=`, is not flagged"
       fix: "Upgrade Ruby to 2.2.2+ (2.3+ recommended)"
       variable_name: "RUBY_VERSION"
 

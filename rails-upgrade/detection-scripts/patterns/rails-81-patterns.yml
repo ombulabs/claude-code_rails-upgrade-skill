@@ -35,6 +35,17 @@ upgrade_findings:
       fix: "Add bundler-audit gem and bin/brakeman script"
       variable_name: "BUNDLER_AUDIT"
 
+    - name: "Routes drawn with multiple paths (removed)"
+      kind: "breaking"
+      pattern: "^\\s*(?:get|post|put|patch|delete|options|match)[\\s(]+(?:\"[^\"\\n]*\"|'[^'\\n]*'|:\\w+[?!]?)\\s*,\\s*(?:\"[^\"\\n]*\"|'[^'\\n]*'|:\\w+[?!]?)(?![\\w?!]|\\s*=>)"
+      exclude: ""
+      search_paths:
+        - "config/routes.rb"
+        - "config/routes/"
+      explanation: "Rails 8.1 removes passing more than one path to one route call (e.g. `get '/old1', '/old2', to: 'foo#bar'`, or `get :preview, :download` inside a `member` block). 8.0 drew one route per path and warned 'Mapping a route with multiple paths is deprecated'; 8.1 raises `ArgumentError: Wrong number of arguments (expect 1, got 2)` while drawing routes, so the app does not boot (actionpack 8.1 lib/action_dispatch/routing/mapper.rb, `match`). The array form `get ['/a', '/b']` is a different shape: it draws no route on 8.0 or 8.1 and is not flagged. Paths held in variables (`get path_a, path_b`) are missed. Was deprecated at 8.0 (see rails-80-patterns.yml ROUTES_MULTIPLE_PATHS)"
+      fix: "Write one call per path: `get '/old1', to: 'foo#bar'` and `get '/old2', to: 'foo#bar'`, or `%w[/old1 /old2].each { |p| get p, to: 'foo#bar' }`. Works on 8.0 too"
+      variable_name: "ROUTES_MULTIPLE_PATHS_REMOVED"
+
   medium_priority:
     - name: "Semicolon query separator"
       kind: "breaking"
@@ -82,16 +93,6 @@ upgrade_findings:
       fix: "Switch to S3, GCS, or Disk storage. Or use azure-storage gem directly."
       variable_name: "AZURE_STORAGE"
 
-    - name: "Routes drawn with multiple paths (removed)"
-      kind: "breaking"
-      pattern: "^\\s*(get|post|put|patch|delete|match)\\s+\\["
-      exclude: ""
-      search_paths:
-        - "config/routes.rb"
-      explanation: "Rails 8.1 removes the deprecated form of drawing one route action with an array of paths (e.g. `get ['/old1', '/old2'], to: 'foo#bar'`). actionpack/CHANGELOG.md: 'Remove deprecated support to a route to multiple paths.' Routes that still use the array form raise at boot when routes are drawn. Was deprecated at 8.0 (see rails-80-patterns.yml ROUTES_MULTIPLE_PATHS)"
-      fix: "Use `with_options` or an explicit loop: `['/old1','/old2'].each { |p| get p, to: 'foo#bar' }`. The new shape is faster at boot time"
-      variable_name: "ROUTES_MULTIPLE_PATHS_REMOVED"
-
     - name: "Benchmark.ms (removed)"
       kind: "breaking"
       pattern: "\\bBenchmark\\.ms\\b"
@@ -99,8 +100,8 @@ upgrade_findings:
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 8.1 removes the `Benchmark.ms` core extension. activesupport/CHANGELOG.md: 'Remove deprecated `Benchmark.ms` method. It is now defined in the `benchmark` gem.' Calls raise NoMethodError unless the `benchmark` gem is required. Was deprecated at 8.0 (see rails-80-patterns.yml BENCHMARK_MS)"
-      fix: "Add `gem 'benchmark'` to the Gemfile (will be bundled with Ruby 3.5; explicit until then) and `require 'benchmark'` wherever `Benchmark.ms` is used. Or replace with `Process.clock_gettime(Process::CLOCK_MONOTONIC)` deltas for hot paths"
+      explanation: "Rails 8.1 removes the `Benchmark.ms` core extension. activesupport/CHANGELOG.md: 'Remove deprecated `Benchmark.ms` method. It is now defined in the `benchmark` gem.' activesupport 8.1 also drops its `benchmark` gem dependency. The `benchmark` gem defines `Benchmark.ms` only from 0.5.0 (0.4.x, the Ruby 3.4 default, does not), so calls raise NoMethodError unless the app bundles benchmark 0.5.0 or later. Was deprecated at 8.0 (see rails-80-patterns.yml BENCHMARK_MS)"
+      fix: "Replace `Benchmark.ms { ... }` with `ActiveSupport::Benchmark.realtime(:float_millisecond) { ... }`, which exists from Rails 8.0.0 and returns the same Float of milliseconds. Or add `gem 'benchmark', '>= 0.5.0'` to the Gemfile. Both work on 8.0 too"
       variable_name: "BENCHMARK_MS_REMOVED"
 
     - name: "ActiveSupport::Configurable"
@@ -111,7 +112,7 @@ upgrade_findings:
         - "app/"
         - "lib/"
         - "config/"
-      explanation: "Rails 8.1 deprecates ActiveSupport::Configurable. activesupport/CHANGELOG.md: 'Deprecate `ActiveSupport::Configurable`.' Apps that include / extend it on their own classes (often as a gem-like in-app component) emit a warning. The deprecation message points users at plain `class_attribute` / `mattr_accessor` / Anyway gem alternatives"
+      explanation: "Rails 8.1 deprecates ActiveSupport::Configurable. activesupport/CHANGELOG.md: 'Deprecate `ActiveSupport::Configurable`.' activesupport 8.1 lib/active_support/configurable.rb warns once, when the module is first loaded: 'ActiveSupport::Configurable is deprecated without replacement, and will be removed in Rails 8.2. You can emulate the previous behavior with `class_attribute`.' The module still works in 8.1"
       fix: "Replace `include ActiveSupport::Configurable` / `extend ActiveSupport::Configurable` with explicit `class_attribute` declarations or a small custom configuration object. The replacement is mechanical for most use sites"
       variable_name: "AS_CONFIGURABLE"
 
@@ -142,17 +143,17 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 8.1 deprecates Rails.application.config.action_dispatch.ignore_leading_brackets. actionpack/CHANGELOG.md: 'Deprecate `Rails.application.config.action_dispatch.ignore_leading_brackets`.' The setting is paired with an 8.1 removal of the leading-bracket-skipping behavior in the parameter parser; existing config lines emit a deprecation warning"
+      explanation: "Rails 8.1 deprecates Rails.application.config.action_dispatch.ignore_leading_brackets. actionpack/CHANGELOG.md: 'Deprecate `Rails.application.config.action_dispatch.ignore_leading_brackets`.' The setting is paired with an 8.1 removal of the leading-bracket-skipping behavior in the parameter parser; existing config lines emit a deprecation warning and have no effect. On 8.0 the parser also skipped leading brackets by default under Rack 2; on 8.1 it never does, so a Rack 2 app with `[user][name]` style params changes even without this config line"
       fix: "Remove the assignment from config/application.rb / environment configs. Audit form names in views for legacy leading-bracket params (e.g. `name=\"[user][name]\"`) and rewrite to the standard `name=\"user[name]\"` shape"
       variable_name: "IGNORE_LEADING_BRACKETS_CONFIG"
 
     - name: "to_time_preserves_timezone config"
       kind: "deprecation"
       pattern: "to_time_preserves_timezone"
-      exclude: ""
+      exclude: "^\\s*#"
       search_paths:
         - "config/"
-      explanation: "Rails 8.1 deprecates config.active_support.to_time_preserves_timezone. activesupport/CHANGELOG.md: 'Deprecate `config.active_support.to_time_preserves_timezone`.' Tied to the broader 8.1 change that #to_time always preserves the receiver timezone (the legacy 'preserve system local time' behavior is gone). The config is now a no-op deprecated shim"
+      explanation: "Rails 8.1 deprecates config.active_support.to_time_preserves_timezone. activesupport/CHANGELOG.md: 'Deprecate `config.active_support.to_time_preserves_timezone`.' Tied to the broader 8.1 change that #to_time always preserves the receiver timezone (the legacy 'preserve system local time' behavior is gone). Setting the config on 8.1 prints a deprecation warning and has no effect. On 8.0, `load_defaults` below 8.0 left it at `:offset`, so those apps also see `to_time` keep the full zone instead of only the offset after the bump"
       fix: "Remove the assignment from config/application.rb / environment configs. If app code depends on Time#to_time returning system-local time, audit those call sites; #to_time now always preserves the receiver's timezone"
       variable_name: "TO_TIME_PRESERVES_TIMEZONE_CONFIG"
 

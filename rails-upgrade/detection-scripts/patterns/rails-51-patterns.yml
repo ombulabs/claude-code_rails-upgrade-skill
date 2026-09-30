@@ -35,24 +35,15 @@ upgrade_findings:
 
     - name: "*_filter callback methods removed"
       kind: "breaking"
-      pattern: "\\b(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_filter\\b"
+      pattern: "\\b(before|after|around|skip|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_filter\\b"
       exclude: ""
       search_paths:
         - "app/controllers/"
+        - "app/mailers/"
         - "lib/"
-      explanation: "Rails 5.1 removes all `*_filter` controller callbacks (deprecated in 4.x, still warning in 5.0). Use `*_action` variants"
-      fix: "Rename: before_filter → before_action, skip_before_filter → skip_before_action, etc. Mechanical rename — behavior is identical"
+      explanation: "Rails 5.1 removes every `*_filter` callback method from AbstractController::Callbacks (deprecated in 5.0, no warning in 4.2), including the bare `skip_filter`. Controllers and mailers both include that module, so a class that calls one raises NoMethodError when it loads. Use the `*_action` variants"
+      fix: "Rename: before_filter to before_action, skip_before_filter to skip_before_action, and so on; behavior is identical and the *_action names exist in 5.0. Replace skip_filter with the skip_before_action / skip_after_action / skip_around_action that matches the callback"
       variable_name: "FILTER_METHODS"
-
-    - name: "String conditions in controller filters"
-      kind: "breaking"
-      pattern: "(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_(action|filter)\\b[^\\n]*\\b(if|unless):\\s*['\"]"
-      exclude: ""
-      search_paths:
-        - "app/controllers/"
-      explanation: "Rails 5.1 no longer accepts string values for `if:` / `unless:` conditions on filters. They must be symbols (method names) or lambdas"
-      fix: "Replace the string with a symbol: `if: :has_project_guest_id` instead of `if: 'has_project_guest_id'`. For inline expressions, use a lambda: `if: -> { ... }`"
-      variable_name: "FILTER_STRING_CONDITIONS"
 
     - name: "ActiveRecord::Relation#uniq removed"
       kind: "breaking"
@@ -61,18 +52,18 @@ upgrade_findings:
       search_paths:
         - "app/models/"
         - "app/controllers/"
-      explanation: "Rails 5.1 removes ActiveRecord::Relation#uniq (was deprecated in 5.0). Use #distinct. NOTE: pattern will false-positive on Array#uniq — the exclude filters common array cases but verify receivers are Relations"
-      fix: "Replace .uniq / .uniq! on ActiveRecord relations with .distinct. Plain Array#uniq is unaffected — keep those as-is"
+      explanation: "Rails 5.1 removes the deprecated uniq / uniq! aliases of distinct / distinct! on relations and model classes. Model.uniq and relation.uniq! raise NoMethodError; relation.uniq now goes to the loaded records, so it runs the query without DISTINCT, loads every row and returns an Array, and a query method chained after it raises NoMethodError. uniq on an association (post.comments.uniq) behaves as before. The pattern also matches Array#uniq: the exclude skips common array chains, so check each receiver"
+      fix: "Replace .uniq / .uniq! on Active Record relations and model classes with .distinct / .distinct!, which exist in 5.0. Leave Array#uniq as it is"
       variable_name: "RELATION_UNIQ"
 
     - name: "use_transactional_fixtures removed"
       kind: "breaking"
       pattern: "use_transactional_fixtures"
-      exclude: ""
+      exclude: "\\bconfig\\.use_transactional_fixtures\\b"
       search_paths:
         - "test/"
         - "spec/"
-      explanation: "Rails 5.1 removes `use_transactional_fixtures` (renamed to `use_transactional_tests` in Rails 5.0)"
+      explanation: "Rails 5.1 removes the `use_transactional_fixtures` class attribute from ActiveRecord::TestFixtures (renamed to `use_transactional_tests` and deprecated in Rails 5.0). Calling the setter raises NoMethodError when test_helper.rb loads. RSpec's `config.use_transactional_fixtures` in spec/rails_helper.rb is an rspec-rails setting that still works, so the exclude skips it"
       fix: "Rename the setting to `self.use_transactional_tests = true` in your test base class / test_helper.rb"
       variable_name: "USE_TRANSACTIONAL_FIXTURES"
 
@@ -88,6 +79,16 @@ upgrade_findings:
       explanation: "Rails 5.1 drops support for positional arguments in controller test helpers. All parameters must be keyword-argument form"
       fix: "Wrap params/session/flash in keyword args: `get :show, params: { id: 1 }, session: { user_id: 1 }, flash: { notice: 'hi' }`"
       variable_name: "CONTROLLER_TEST_POSITIONAL"
+
+    - name: "halt_callback_chains_on_return_false"
+      kind: "deprecation"
+      pattern: "halt_callback_chains_on_return_false"
+      exclude: ""
+      search_paths:
+        - "config/"
+      explanation: "Rails 5.1 removes the `return false` halt: a before_* callback on an Active Record or Active Model object that returns false no longer stops the chain, and nothing warns. In Rails 5.0 it still halted, with a deprecation warning, while ActiveSupport.halt_callback_chains_on_return_false was true (the default; `rails app:update` wrote it as true). The 5.1 setter only logs a deprecation warning and changes nothing; Rails 5.2 removes it (see rails-52-patterns.yml HALT_CALLBACK_CHAINS_ON_RETURN_FALSE). A line set to true means the app may still rely on `return false`; an app with no line had the same default"
+      fix: "Before the bump, run the test suite on Rails 5.0 and replace every callback behind the deprecation warning `will not implicitly halt a callback chain in Rails 5.1` with `throw :abort`, then remove the assignment. throw :abort works on 5.0 too"
+      variable_name: "HALT_CALLBACK_CHAINS_DEPRECATION"
 
   medium_priority:
     - name: "raise_in_transactional_callbacks config (dead setting)"
@@ -158,7 +159,7 @@ upgrade_findings:
 
     - name: "set_callback / skip_callback string :if / :unless"
       kind: "deprecation"
-      pattern: "(set_callback|skip_callback)\\b[^\\n]*\\b(?:(?:if|unless):|:(?:if|unless)\\s*=>)\\s*['\"]"
+      pattern: "(set_callback|skip_callback)\\b[^\\n]*(?:\\b(?:if|unless):|:(?:if|unless)\\s*=>)\\s*['\"]"
       exclude: ""
       search_paths:
         - "app/"
@@ -167,6 +168,17 @@ upgrade_findings:
       fix: "Replace the string with a symbol: `set_callback :save, :before, :method_name, if: :should_run?` instead of `if: 'should_run?'`. For inline expressions use a lambda: `if: -> { ... }`"
       variable_name: "SET_CALLBACK_STRING_CONDITIONS"
 
+    - name: "String conditions in controller filters"
+      kind: "deprecation"
+      pattern: "(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_(action|filter)\\b[^\\n]*(?:\\b(?:if|unless):|:(?:if|unless)\\s*=>)\\s*['\"]"
+      exclude: ""
+      search_paths:
+        - "app/controllers/"
+      explanation: "Rails 5.1 deprecates a string `if:` / `unless:` condition on controller filters: before_action and the rest call set_callback, which logs a deprecation warning and still evaluates the string. Rails 5.2 raises ArgumentError. The warning fires only when the option is a single string, not when only: / except: is also given (Rails wraps the conditions in an array), so trust the pattern over the logs"
+      fix: "Replace the string with a symbol: `if: :has_project_guest_id` instead of `if: 'has_project_guest_id'`. For inline expressions, use a lambda: `if: -> { ... }`"
+      variable_name: "FILTER_STRING_CONDITIONS"
+
+  low_priority:
     - name: "lock! on dirty AR record"
       kind: "deprecation"
       pattern: "\\.lock!(?=\\(|\\s|$)"
@@ -178,26 +190,15 @@ upgrade_findings:
       fix: "Save (or reload) before locking: record.save; record.lock!. If you intended to lock and then mutate, the correct order is record.lock! followed by the assignment + save"
       variable_name: "LOCK_BANG_DEPRECATION"
 
-  low_priority:
     - name: "raise_on_unfiltered_parameters config"
       kind: "deprecation"
       pattern: "raise_on_unfiltered_parameters"
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 5.1 deprecates config.action_controller.raise_on_unfiltered_parameters. The setting has had no effect since 5.1; existing config lines emit a deprecation warning at boot"
-      fix: "Remove the line entirely from config/application.rb or environment configs"
+      explanation: "Rails 5.1 deprecates config.action_controller.raise_on_unfiltered_parameters and ignores it: ActionController::Parameters#to_h and #to_hash always raise ActionController::UnfilteredParameters on unpermitted params. Setting it to true logs a deprecation warning at boot; setting it to false does nothing, so an app that ran with false (the Rails 5.0 default when the line is absent) starts raising where it calls to_h on unpermitted params"
+      fix: "Remove the line from config/application.rb, config/initializers/new_framework_defaults.rb or environment configs. If it was false, call permit(...) before to_h, or to_unsafe_h where the unfiltered hash is intended"
       variable_name: "RAISE_ON_UNFILTERED_PARAMS"
-
-    - name: "halt_callback_chains_on_return_false"
-      kind: "deprecation"
-      pattern: "halt_callback_chains_on_return_false"
-      exclude: ""
-      search_paths:
-        - "config/"
-      explanation: "Rails 5.1 deprecates ActiveSupport.halt_callback_chains_on_return_false. The underlying `return false` halt mechanism was already removed at 5.0; the 5.1 config setter is a no-op deprecated shim. Removed entirely at 5.2 (see rails-52-patterns.yml HALT_CALLBACK_CHAINS_ON_RETURN_FALSE for the breaking entry)"
-      fix: "Remove the assignment from config/application.rb / initializers. Code that relied on `return false` to halt callbacks should already be using `throw :abort` after the 4.2 → 5.0 hop"
-      variable_name: "HALT_CALLBACK_CHAINS_DEPRECATION"
 
     - name: "Defining quoted_id"
       kind: "deprecation"
@@ -206,9 +207,21 @@ upgrade_findings:
       search_paths:
         - "app/models/"
         - "lib/"
-      explanation: "Rails 5.1 deprecates overriding ActiveRecord's #quoted_id. The hook is preserved at 5.1 with a deprecation warning when the user-defined method fires during quoting. Removed at 5.2 — at the 5.2 hop, defining the method no longer raises but is silently dead (see rails-52-patterns.yml QUOTED_ID_METHOD)"
+      explanation: "Rails 5.1 deprecates #quoted_id. connection.quote still calls a quoted_id defined on a non-Active Record object (a value object bound into a string condition such as where('total_cents = ?', money)), with the warning `Defining #quoted_id is deprecated and will be ignored in Rails 5.2`. An Active Record record is now quoted by its primary key before that check, so a quoted_id override on a model is no longer called at all, with no warning. Rails 5.2 ignores quoted_id everywhere (see rails-52-patterns.yml QUOTED_ID_METHOD)"
       fix: "Migrate the logic to a custom ActiveModel::Type (define #serialize / #cast) or accept the model's default quoting behavior"
       variable_name: "QUOTED_ID_DEPRECATION"
+
+    - name: "HashWithIndifferentAccess.new_from_hash_copying_default removed"
+      kind: "breaking"
+      pattern: "\\bnew_from_hash_copying_default\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "config/"
+        - "lib/"
+      explanation: "Rails 5.1 removes ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default, deprecated in 5.0 where it already behaved like .new. Calling it raises NoMethodError"
+      fix: "Call ActiveSupport::HashWithIndifferentAccess.new(hash) instead, which copies the default the same way on 5.0"
+      variable_name: "HWIA_NEW_FROM_HASH_COPYING_DEFAULT"
 
 dependencies:
   webpacker:

@@ -20,6 +20,8 @@ Rails 8.1 is a minor release with:
 
 #### SSL Configuration Commented Out
 
+**Pattern:** `SSL_COMMENTED`
+
 **What Changed:**
 SSL configuration is now commented out by default (assumes Kamal handles SSL).
 
@@ -51,6 +53,8 @@ If using Kamal:
 
 #### pool: → max_connections:
 
+**Pattern:** `POOL_RENAME`
+
 **What Changed:**
 Database configuration renames `pool:` to `max_connections:`. `pool:` stays as a deprecated alias in 8.1 (warning, not an error); setting both keys to different values raises `Ambiguous configuration`.
 
@@ -80,6 +84,8 @@ production:
 ---
 
 #### bundler-audit Required
+
+**Pattern:** `BUNDLER_AUDIT`
 
 **What Changed:**
 Rails 8.1 expects bundler-audit for security vulnerability scanning.
@@ -112,9 +118,46 @@ bundle audit check --update
 
 ---
 
+#### Route With Multiple Paths Raises
+
+**Pattern:** `ROUTES_MULTIPLE_PATHS_REMOVED`
+
+**What Changed:**
+Rails 8.0 drew one route per path when a route call got several paths, and warned that this was deprecated. Rails 8.1 raises `ArgumentError: Wrong number of arguments (expect 1, got 2)` while drawing routes, so the app does not boot. The same holds for several action symbols in one call inside a `member` or `collection` block.
+
+**Detection Pattern:**
+```ruby
+# config/routes.rb
+get "/old1", "/old2", to: "foo#bar"
+
+resources :photos do
+  member do
+    get :preview, :download
+  end
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+get "/old1", "/old2", to: "foo#bar"
+get :preview, :download
+
+# AFTER
+get "/old1", to: "foo#bar"
+get "/old2", to: "foo#bar"
+get :preview
+get :download
+```
+The AFTER works on 8.0 too.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Semicolon Query Separator Removed
+
+**Pattern:** `SEMICOLON_SEPARATOR`, `STRICT_QUERY_STRING_SEPARATOR_CONFIG`
 
 **What Changed:**
 On Rails 8.0 with Rack 2, `ActionDispatch::QueryParser` still split a query string, and a form-urlencoded
@@ -163,6 +206,8 @@ Delete `strict_query_string_separator` from the config. For outside clients that
 
 #### Sidekiq Adapter Removed
 
+**Pattern:** `SIDEKIQ_ADAPTER`
+
 **What Changed:**
 Built-in Sidekiq adapter removed from ActiveJob.
 
@@ -183,6 +228,8 @@ gem 'sidekiq', '>= 7.3.3'
 
 #### SuckerPunch Adapter Removed
 
+**Pattern:** `SUCKER_PUNCH`
+
 **What Changed:**
 Built-in SuckerPunch adapter removed.
 
@@ -196,6 +243,8 @@ gem 'sucker_punch', '>= 3.2'
 ---
 
 #### Azure Storage Service Removed
+
+**Pattern:** `AZURE_STORAGE`
 
 **What Changed:**
 Azure storage service adapter removed from Active Storage.
@@ -213,9 +262,69 @@ azure:
 
 ---
 
+#### Benchmark.ms Removed
+
+**Pattern:** `BENCHMARK_MS_REMOVED`
+
+**What Changed:**
+Rails 8.0 defined `Benchmark.ms` as a deprecated core extension. Rails 8.1 removes it and drops Active Support's dependency on the `benchmark` gem. The gem defines `Benchmark.ms` itself only from 0.5.0 (0.4.x, the Ruby 3.4 default, does not), so on 8.1 a call raises `NoMethodError: undefined method 'ms' for module Benchmark` unless the app bundles benchmark 0.5.0 or later.
+
+**Detection Pattern:**
+```ruby
+elapsed = Benchmark.ms { run_report }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+elapsed = Benchmark.ms { run_report }
+
+# AFTER
+elapsed = ActiveSupport::Benchmark.realtime(:float_millisecond) { run_report }
+```
+The AFTER works on 8.0 too (`ActiveSupport::Benchmark` exists from 8.0.0). To keep the call as it is, add `gem "benchmark", ">= 0.5.0"` to the Gemfile instead.
+
+---
+
+#### ActiveSupport::Configurable Deprecated
+
+**Pattern:** `AS_CONFIGURABLE`
+
+**What Changed:**
+Rails 8.0 offered `ActiveSupport::Configurable` with no warning. Rails 8.1 prints a deprecation warning the first time the module loads: it is deprecated without replacement and will be removed in Rails 8.2. The module still works in 8.1.
+
+**Detection Pattern:**
+```ruby
+class ReportSettings
+  include ActiveSupport::Configurable
+  config_accessor :timeout
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+class ReportSettings
+  include ActiveSupport::Configurable
+  config_accessor :timeout
+end
+ReportSettings.timeout = 5
+
+# AFTER
+class ReportSettings
+  class_attribute :timeout
+end
+ReportSettings.timeout = 5
+```
+The AFTER works on 8.0 too. Code that reads the `config` object itself (`ReportSettings.config.timeout`) needs its own reader, since `class_attribute` does not define `config`.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### schema.rb Column Sorting Change
+
+**Pattern:** none (every app that dumps db/schema.rb gets it; there is no code to find)
 
 **What Changed:**
 Database columns in `schema.rb` are now sorted alphabetically instead of by creation order.
@@ -229,6 +338,8 @@ This is a cosmetic change. Your database structure is unaffected. You may see la
 ---
 
 #### MySQL Unsigned Types Deprecation
+
+**Pattern:** `MYSQL_UNSIGNED`
 
 **What Changed:**
 MySQL `unsigned: true` generates deprecation warnings.
@@ -248,6 +359,8 @@ t.check_constraint "count >= 0"
 
 #### .gitignore Update
 
+**Pattern:** `GITIGNORE_KEYS`
+
 **What Changed:**
 Recommended `.gitignore` pattern for credential keys changed.
 
@@ -259,6 +372,99 @@ Recommended `.gitignore` pattern for credential keys changed.
 # AFTER
 /config/*.key
 ```
+
+---
+
+#### ignore_leading_brackets Deprecated
+
+**Pattern:** `IGNORE_LEADING_BRACKETS_CONFIG`
+
+**What Changed:**
+On 8.0, `config.action_dispatch.ignore_leading_brackets = true` (or the default under Rack 2) made the parameter parser read `[user][name]=a` as `{"user" => {"name" => "a"}}`. Rails 8.1 removes that behavior: the param is always `{"[user]" => {"name" => "a"}}`. Setting the config now prints a deprecation warning (removal in 8.2) and has no effect. A Rack 2 app gets the new parsing even without the config line.
+
+**Detection Pattern:**
+```ruby
+# config/application.rb
+config.action_dispatch.ignore_leading_brackets = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+config.action_dispatch.ignore_leading_brackets = true
+# <input name="[user][name]">
+
+# AFTER
+# (config line removed)
+# <input name="user[name]">
+```
+The AFTER works on 8.0 too. Search views and JavaScript for field names that start with `[`.
+
+---
+
+#### to_time_preserves_timezone Deprecated
+
+**Pattern:** `TO_TIME_PRESERVES_TIMEZONE_CONFIG`
+
+**What Changed:**
+On 8.0, `config.active_support.to_time_preserves_timezone` chose what `to_time` kept: `:zone` (the 8.0 default), `:offset` (the default for `load_defaults` below 8.0) or `false` (system local time). Rails 8.1 removes the choice: `to_time` always keeps the receiver's full time zone. Setting the config prints a deprecation warning (removal in 8.2) and has no effect.
+
+**Detection Pattern:**
+```ruby
+# config/application.rb or config/initializers/new_framework_defaults_*.rb
+config.active_support.to_time_preserves_timezone = :offset
+```
+
+**Fix:**
+```ruby
+# BEFORE
+config.active_support.to_time_preserves_timezone = :offset
+
+# AFTER (while dual booting)
+config.active_support.to_time_preserves_timezone = :zone unless NextRails.next?
+```
+`:zone` gives 8.0 the 8.1 behavior, so both sides run the same `to_time`. Delete the line once 8.0 is gone.
+
+---
+
+#### String#mb_chars Deprecated
+
+**Pattern:** `MB_CHARS`
+
+**What Changed:**
+Rails 8.0 offered `String#mb_chars` and `ActiveSupport::Multibyte::Chars` with no warning. Rails 8.1 prints a deprecation warning on each `mb_chars` call and each `Chars.new` (removal in 8.2). The methods still work in 8.1.
+
+**Detection Pattern:**
+```ruby
+name.mb_chars.upcase.to_s
+ActiveSupport::Multibyte::Chars.new(name)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+name.mb_chars.upcase.to_s
+name.mb_chars.decompose.to_s
+name.mb_chars.grapheme_length
+
+# AFTER
+name.upcase
+name.unicode_normalize(:nfd)
+name.grapheme_clusters.length
+```
+The AFTER works on 8.0 too. `Chars#limit` (truncate to a byte count) has no one-call String equivalent; check each use.
+
+---
+
+#### Ruby Version Requirement
+
+**Pattern:** none (the minimum Ruby does not change at this hop)
+
+**What Changed:**
+Nothing. The `rails` 8.1 gemspec requires Ruby `>= 3.2.0`, the same as 8.0, so the Ruby that bundles 8.0 also bundles 8.1. The gemspec sets no upper bound; a Ruby released after 8.1 may need its latest patch release.
+
+**Fix:**
+None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
 
 ---
 
@@ -335,6 +541,8 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | Deprecation warning for `pool:` in `database.yml`, or `Ambiguous configuration: 'pool' ... and 'max_connections'` | "pool: → max_connections:" — `max_connections: 5`, drop `pool:` |
 | SSL redirect not working in production | "SSL Configuration Commented Out" — uncomment `force_ssl` and `assume_ssl` in `production.rb` |
+| `ArgumentError: Wrong number of arguments (expect 1, got 2)` while drawing routes at boot | "Route With Multiple Paths Raises" — one route call per path |
+| `NoMethodError: undefined method 'ms' for module Benchmark` | "Benchmark.ms Removed" — `ActiveSupport::Benchmark.realtime(:float_millisecond)` |
 | Sidekiq jobs not processing | "Sidekiq Adapter Removed" — `gem 'sidekiq', '>= 7.3.3'` |
 | A request parameter after a `;` in the URL or form body is missing, or the value keeps `;rest=...` | "Semicolon Query Separator Removed" — use `&` |
 | Deprecation warning for `strict_query_string_separator` | "Semicolon Query Separator Removed" — delete the setting |

@@ -1,6 +1,6 @@
 # Rails 7.0 → 7.1 Upgrade Guide
 
-**Ruby Requirement:** 2.7.0+ (3.0+ recommended)
+**Ruby Requirement:** 2.7.3+ (3.0+ recommended)
 
 **Based on "The Complete Guide to Upgrade Rails" by FastRuby.io (OmbuLabs)**
 
@@ -21,7 +21,41 @@ Rails 7.1 introduces:
 
 ### 🔴 HIGH PRIORITY
 
+#### Ruby Version Requirement
+
+**Pattern:** `RUBY_VERSION`
+
+**What Changed:**
+Rails 7.1 needs Ruby 2.7.3 or newer. The `rails` 7.1 gemspec still says `required_ruby_version >= 2.7.0`, the same as 7.0, but activerecord 7.1 defines `def method_missing(name, ...)` in `attribute_methods.rb`. A leading argument before `...` is a syntax error before Ruby 2.7.3 (checked on the `ruby:2.7.2` and `ruby:2.7.3` images), so on Ruby 2.7.0 to 2.7.2 the app fails as soon as Active Record loads. The [FastRuby.io compatibility table](https://www.fastruby.io/blog/ruby/rails/versions/compatibility-table.html) lists the same floor.
+
+**Detection Pattern:**
+```ruby
+# Gemfile
+ruby "2.7.2"
+
+# .ruby-version
+2.7.2
+
+# .tool-versions
+ruby 2.7.2
+```
+
+**Fix:**
+```ruby
+# BEFORE
+ruby "2.7.2"
+
+# AFTER
+ruby "3.2.6"
+```
+
+Upgrade Ruby while the app is still on Rails 7.0, as its own deploy: 7.0 runs on 2.7.3 and newer, so both sides of the dual boot use the new Ruby.
+
+---
+
 #### cache_classes → enable_reloading
+
+**Pattern:** `CACHE_CLASSES`
 
 **What Changed:**
 `config.cache_classes` is replaced by `config.enable_reloading` with **inverted** boolean logic.
@@ -54,6 +88,8 @@ config.enable_reloading = false  # Disable reloading (production)
 
 #### Force SSL Default in Production
 
+**Pattern:** `FORCE_SSL`
+
 **What Changed:**
 `config.force_ssl` is now `true` by default in production.
 
@@ -82,6 +118,8 @@ config.force_ssl = true  # Now the default
 
 #### preview_path → preview_paths (Mailer)
 
+**Pattern:** `PREVIEW_PATH`
+
 **What Changed:**
 Mailer preview path configuration changed from singular to plural.
 
@@ -102,6 +140,8 @@ config.action_mailer.preview_paths = ["#{Rails.root}/spec/mailers/previews"]
 ---
 
 #### SQLite Database Location Changed
+
+**Pattern:** `SQLITE_LOCATION`
 
 **What Changed:**
 SQLite databases now default to `storage/` instead of `db/`.
@@ -138,6 +178,8 @@ development:
 
 #### lib/ Autoloaded by Default
 
+**Pattern:** `LIB_AUTOLOAD`
+
 **What Changed:**
 Files in `lib/` are now autoloaded by Zeitwerk.
 
@@ -165,6 +207,8 @@ Ensure files in `lib/` follow Zeitwerk naming:
 
 #### legacy_connection_handling Removed
 
+**Pattern:** `LEGACY_CONNECTION_HANDLING`
+
 **What Changed:**
 `config.active_record.legacy_connection_handling` was deprecated in Rails 7.0 and is **completely removed in Rails 7.1**. Setting it will raise an error on boot.
 
@@ -173,9 +217,6 @@ Ensure files in `lib/` follow Zeitwerk naming:
 # config/application.rb or config/environments/*.rb
 config.active_record.legacy_connection_handling = false
 config.active_record.legacy_connection_handling = true
-```
-```bash
-grep -rn "legacy_connection_handling" config/
 ```
 
 **Fix:**
@@ -204,6 +245,8 @@ end
 
 #### Query Log Tags Format
 
+**Pattern:** `QUERY_LOG_TAGS`
+
 **What Changed:**
 New query log format options available.
 
@@ -223,57 +266,60 @@ config.active_record.query_log_tags_format = :sqlcommenter  # or :legacy
 
 #### Cache Format Version 7.1
 
-**What Changed:**
-New cache serialization format available. 7.1 also **deprecates** the 6.1 format and removes it in 7.2.
+**Pattern:** `CACHE_FORMAT_VERSION_61`
 
-**This usually warns with no line in the codebase to find.** `cache_format_version` is rarely set explicitly — `config.load_defaults 5.1` / `6.0` / `6.1` implies the 6.1 format. An app that has not yet moved `load_defaults` past 6.1 warns on every boot under 7.1 with nothing to grep for, so a clean detection scan is inconclusive here. Check the app's `load_defaults` value instead.
+**What Changed:**
+7.1 adds a new cache serialization format and **deprecates** the 6.1 format, which 7.2 removes. `ActiveSupport::Cache.format_version` defaults to 6.1; only `load_defaults 7.0` (sets 7.0) and `load_defaults 7.1` (sets 7.1) change it. So an app on `load_defaults` 5.x or 6.x that never sets the format warns on every boot under 7.1. The pattern flags that `load_defaults` line and any explicit `cache_format_version = 6.1`. It misses an app with no `load_defaults` line at all, which also warns.
+
+**Detection Pattern:**
+```ruby
+config.load_defaults 6.1
+config.active_support.cache_format_version = 6.1
+```
 
 **Fix:**
 ```ruby
-# Enable after all servers are on 7.1
-config.active_support.cache_format_version = 7.1
+# BEFORE (config/application.rb)
+config.load_defaults 6.1
+
+# AFTER
+config.load_defaults 6.1
+config.active_support.cache_format_version = 7.0
 ```
+The AFTER works on 7.0 too: 7.0 reads both the 6.1 and 7.0 formats, and 7.1 reads 7.0, so no `NextRails.next?` branch is needed and a rolling deploy is safe. Or resolve it as part of the `load_defaults` bump in Workflow 12.
 
-Or resolve it as part of the `load_defaults` bump in Step 7.
-
-**Warning:** Don't enable until ALL servers are upgraded to 7.1. During a rolling deploy, servers still on the old format read new-format entries as misses and vice versa, which can stampede the cache. Deploy the version bump first, then flip the format.
+**Warning:** Don't set `cache_format_version = 7.1` until ALL servers run 7.1. Rails 7.0 cannot read entries written in the 7.1 format, so during a rolling deploy the servers still on 7.0 lose those cache entries. Deploy the version bump first, then flip the format.
 
 ---
 
-#### Content Security Policy Updates
+#### `Rails.application.secrets` Deprecated
+
+**Pattern:** `SECRETS_YML_ENC`
 
 **What Changed:**
-CSP configuration syntax updated.
+The secrets files do not move: 7.0 and 7.1 both read `config/secrets.yml`, and `config/secrets.yml.enc` when `config.read_encrypted_secrets = true`. 7.1 deprecates the secrets API instead. Every `Rails.application.secrets` call warns, a `secret_key_base` that comes only from secrets warns, and `bin/rails secrets:edit` / `secrets:show` warn. Rails 7.2 removes `Rails.application.secrets`.
 
 **Detection Pattern:**
-Check `config/initializers/content_security_policy.rb`
-
-**Fix:**
-Review and update CSP directives as needed.
-
----
-
-#### Secret Key File Location Changed
-
-**What Changed:**
-The location of `secrets.yml.enc` has changed.
-
-**Detection Pattern:**
-```
-config/secrets.yml.enc
+```ruby
+Rails.application.secrets.stripe_key
+config.read_encrypted_secrets = true
 ```
 
 **Fix:**
-If using encrypted secrets (not credentials), move the file:
-```bash
-mv config/secrets.yml.enc config/secrets.yml.enc.bak
-```
+```ruby
+# BEFORE (value in config/secrets.yml or secrets.yml.enc, under production:)
+Rails.application.secrets.stripe_key
 
-Note: Most applications use `credentials.yml.enc` instead, which is unaffected.
+# AFTER (value moved with bin/rails credentials:edit)
+Rails.application.credentials.stripe_key
+```
+The AFTER works on 7.0 too. `secrets.yml` is keyed by environment and `credentials.yml.enc` is not, so drop the environment level or use per-environment files (`bin/rails credentials:edit --environment production`). Once nothing reads secrets, delete `secrets.yml` / `secrets.yml.enc` and the `read_encrypted_secrets` line.
 
 ---
 
 #### Active Record inspect Output Changed
+
+**Pattern:** `INSPECT_OUTPUT`
 
 **What Changed:**
 `ActiveRecord::Core#inspect` now respects `attributes_for_inspect` configuration.
@@ -296,6 +342,8 @@ config.active_record.attributes_for_inspect = :all
 
 #### `ActiveRecord::Migration.check_pending!` Deprecated
 
+**Pattern:** `MIGRATION_CHECK_PENDING`
+
 **What Changed:**
 `ActiveRecord::Migration.check_pending!` is deprecated in favor of `check_all_pending!`, which loops through all configured databases. It still works in 7.1 but emits a deprecation warning, and is removed entirely in Rails 7.2. Commonly found in `test_helper.rb` or `rails_helper.rb`, but also set up by healthcheck gems (e.g. [`rails-healthcheck`](https://github.com/linqueta/rails-healthcheck)) to run on every `/healthcheck` request.
 
@@ -313,6 +361,32 @@ ActiveRecord::Migration.check_pending!
 # AFTER
 ActiveRecord::Migration.check_all_pending!
 ```
+
+---
+
+### 🟢 LOW PRIORITY
+
+#### Content Security Policy Middleware Constants Removed
+
+**Pattern:** `CSP_MIDDLEWARE_CONSTANTS`
+
+**What Changed:**
+The CSP DSL in `config/initializers/content_security_policy.rb` does not change in 7.1; it only gains the `:unsafe_hashes` source. What 7.1 removes are the `CONTENT_TYPE`, `POLICY` and `POLICY_REPORT_ONLY` constants on `ActionDispatch::ContentSecurityPolicy::Middleware`, so code or specs that read them raise `NameError`.
+
+**Detection Pattern:**
+```ruby
+response.headers[ActionDispatch::ContentSecurityPolicy::Middleware::POLICY]
+```
+
+**Fix:**
+```ruby
+# BEFORE
+response.headers[ActionDispatch::ContentSecurityPolicy::Middleware::POLICY]
+
+# AFTER
+response.headers["Content-Security-Policy"]
+```
+The AFTER works on 7.0 too. The replacement constant, `ActionDispatch::Constants::CONTENT_SECURITY_POLICY`, does not exist on 7.0, so use the string while dual booting.
 
 ---
 
@@ -409,6 +483,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | SSL redirect loop behind a proxy | "Force SSL Default in Production" — let the proxy handle SSL or set `force_ssl = false` |
 | Constant not found in `lib/` | "lib/ Autoloaded by Default" — `lib/my_file.rb` must define `MyFile` |
 | Boot crashes on `legacy_connection_handling` | "legacy_connection_handling Removed" — delete every occurrence; guard with `NextRails.next?` while dual-booting |
+| `cache_format_version = 6.1` deprecation warning on every boot | "Cache Format Version 7.1" — set `cache_format_version = 7.0` |
+| `Rails.application.secrets` is deprecated warning | "`Rails.application.secrets` Deprecated" — move the values to credentials |
 
 ---
 

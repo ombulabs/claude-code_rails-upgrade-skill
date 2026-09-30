@@ -21,6 +21,8 @@ Rails 8.0 is a major release with architectural changes:
 
 #### Sprockets → Propshaft
 
+**Pattern:** `SPROCKETS`, `ASSET_CONFIG`, `JS_INCLUDE`
+
 **What Changed:**
 Propshaft is the new default asset pipeline. Sprockets is no longer included by default.
 
@@ -78,42 +80,9 @@ gem 'propshaft'
 
 ---
 
-#### Multi-Database Configuration for Solid Gems
-
-**What Changed:**
-Rails 8.0 uses Solid Cache/Queue/Cable which may need separate database connections.
-
-**Old database.yml:**
-```yaml
-production:
-  adapter: postgresql
-  database: myapp_production
-  pool: 5
-```
-
-**New database.yml (if using Solid gems):**
-```yaml
-production:
-  primary:
-    adapter: postgresql
-    database: myapp_production
-    pool: 5
-  cache:
-    adapter: sqlite3
-    database: storage/production_cache.sqlite3
-  queue:
-    adapter: sqlite3
-    database: storage/production_queue.sqlite3
-  cable:
-    adapter: sqlite3
-    database: storage/production_cable.sqlite3
-```
-
-**If NOT using Solid gems**, keep your existing structure!
-
----
-
 #### assume_ssl Configuration
+
+**Pattern:** `ASSUME_SSL`
 
 **What Changed:**
 Rails 8.0 introduces `config.assume_ssl` for apps behind SSL-terminating proxies.
@@ -137,6 +106,8 @@ This prevents SSL redirect loops when behind a proxy.
 
 #### sqlite3_deprecated_warning Removed
 
+**Pattern:** `SQLITE3_WARNING`
+
 **What Changed:**
 The `sqlite3_deprecated_warning` configuration option is removed.
 
@@ -152,8 +123,22 @@ Remove this line from your configuration files.
 
 #### Ruby 3.2+ Strictly Required
 
+**Pattern:** `RUBY_VERSION`
+
 **What Changed:**
-Rails 8.0 requires Ruby 3.2.0 or newer.
+Rails 8.0 requires Ruby 3.2.0 or newer: the `rails` 8.0 gemspec sets `required_ruby_version >= 3.2.0`, while 7.2 accepts `>= 3.1.0`. Bundler refuses to install 8.0 on an older Ruby, so upgrade Ruby first, while the app is still on Rails 7.2, as its own deploy. The gemspec sets no upper bound; a Ruby released after a Rails version may need that version's latest patch release.
+
+**Detection Pattern:**
+```ruby
+# Gemfile
+ruby "3.1.6"
+
+# .ruby-version
+3.1.6
+
+# .tool-versions
+ruby 3.1.6
+```
 
 **Fix:**
 ```bash
@@ -164,6 +149,8 @@ rbenv local 3.3.0
 ---
 
 #### `query_constraints:` association option removed (composite foreign keys)
+
+**Pattern:** `QUERY_CONSTRAINTS_OPTION`
 
 **What Changed:**
 Rails 8.0 **removes** the `query_constraints:` option on associations (`belongs_to`/`has_many`/etc.). It was deprecated in Rails 7.2 and now raises `ActiveRecord::ConfigurationError` **at class load**, so the app fails to boot.
@@ -196,9 +183,110 @@ This is **behavior-preserving and version-agnostic**: when `foreign_key:` is giv
 
 ---
 
+#### `enum` Keyword-Arguments Form Removed
+
+**Pattern:** `ENUM_KWARGS`
+
+**What Changed:**
+Rails 7.2 accepted `enum status: { ... }, _prefix: true` with a deprecation warning. Rails 8.0 makes the enum name a required positional argument (`def enum(name, values = nil, **options)`), so the keyword form raises `ArgumentError: wrong number of arguments (given 0, expected 1..2)` when the model loads.
+
+**Detection Pattern:**
+```ruby
+# app/models/*.rb
+enum status: { active: 0, archived: 1 }, _prefix: true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+enum status: { active: 0, archived: 1 }, _prefix: true
+
+# AFTER
+enum :status, { active: 0, archived: 1 }, prefix: true
+```
+The AFTER works on 7.2 too. Drop the leading underscore from the options (`_prefix`, `_suffix`, `_scopes`, `_default`): the positional form raises `ArgumentError: invalid option(s)` on both versions if it is kept.
+
+---
+
+#### Removed Active Record Config Keys Raise NoMethodError
+
+**Pattern:** `WARN_ON_RECORDS_FETCHED`, `ALLOW_DEPRECATED_SINGULAR_ASSOCIATIONS_NAME`, `COMMIT_TRANSACTION_ON_NON_LOCAL_RETURN`
+
+**What Changed:**
+Rails 8.0 removes three Active Record settings that 7.2 still accepted with a deprecation warning. The railtie copies each `config.active_record.*` value onto `ActiveRecord::Base` when it loads, so a leftover line raises `NoMethodError: undefined method '<key>=' for class ActiveRecord::Base` at boot with eager loading, otherwise on the first model access. On 7.2, `allow_deprecated_singular_associations_name` and `commit_transaction_on_non_local_return` already do nothing (a `return`, `break` or `throw` out of a transaction block commits); `warn_on_records_fetched_greater_than` still logs large result sets.
+
+**Detection Pattern:**
+```ruby
+# config/application.rb, config/environments/*.rb, config/initializers/*.rb
+config.active_record.warn_on_records_fetched_greater_than = 1000
+config.active_record.allow_deprecated_singular_associations_name = false
+config.active_record.commit_transaction_on_non_local_return = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+config.active_record.warn_on_records_fetched_greater_than = 1000
+
+# AFTER (line deleted; to keep the check, watch the row count)
+ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+  Rails.logger.warn("Large result: #{payload[:sql]}") if payload[:row_count].to_i > 1000
+end
+```
+Deleting the lines works on 7.2 too, and so does the subscriber: both versions put `row_count` in the `sql.active_record` payload.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
+#### Multi-Database Configuration for Solid Gems
+
+**Pattern:** `DB_POOL`
+
+**What Changed:**
+Rails 8.0 changes nothing in how `database.yml` is read: a single `production:` block and the `pool:` key work as they did on 7.2. What changed is the 8.0 app generator, which splits `production:` into `primary`, `cache`, `queue` and `cable` databases, each with its own `migrations_paths`, for Solid Cache, Solid Queue and Solid Cable. Change the file only when adopting those gems.
+
+**Detection Pattern:**
+```yaml
+# config/database.yml
+production:
+  adapter: postgresql
+  database: myapp_production
+  pool: 5
+```
+
+**Fix (only if adopting Solid gems):**
+```yaml
+# BEFORE
+production:
+  <<: *default
+  database: myapp_production
+
+# AFTER (same shape as the 8.0 generator)
+production:
+  primary: &primary_production
+    <<: *default
+    database: myapp_production
+  cache:
+    <<: *primary_production
+    database: myapp_production_cache
+    migrations_paths: db/cache_migrate
+  queue:
+    <<: *primary_production
+    database: myapp_production_queue
+    migrations_paths: db/queue_migrate
+  cable:
+    <<: *primary_production
+    database: myapp_production_cable
+    migrations_paths: db/cable_migrate
+```
+The AFTER works on 7.2 too. If the app keeps Redis, Sidekiq or its current cache store, leave `database.yml` as it is.
+
+---
+
 #### Solid Cache (Optional)
+
+**Pattern:** `REDIS_CACHE`
 
 **What Changed:**
 Rails 8.0 defaults to Solid Cache for caching (database-backed).
@@ -232,6 +320,8 @@ config.cache_store = :solid_cache_store
 ---
 
 #### Solid Queue (Optional)
+
+**Pattern:** `SIDEKIQ_QUEUE`
 
 **What Changed:**
 Rails 8.0 defaults to Solid Queue for background jobs (database-backed).
@@ -269,6 +359,8 @@ bin/jobs
 
 #### Solid Cable (Optional)
 
+**Pattern:** `CABLE_REDIS`
+
 **What Changed:**
 Rails 8.0 defaults to Solid Cable for WebSockets (database-backed).
 
@@ -300,6 +392,8 @@ production:
 
 #### Docker/Thruster for Production
 
+**Pattern:** `THRUSTER`
+
 **What Changed:**
 Rails 8.0 apps include Dockerfile and Thruster gem.
 
@@ -319,6 +413,8 @@ Thruster provides:
 
 #### Kamal Deployment
 
+**Pattern:** `KAMAL_DEPLOY`
+
 **What Changed:**
 Rails 8.0 includes Kamal configuration for deployment.
 
@@ -331,6 +427,8 @@ Rails 8.0 includes Kamal configuration for deployment.
 ---
 
 #### to_time Preserves the Full Timezone
+
+**Pattern:** `TO_TIME_PRESERVES_TIMEZONE`, `TO_TIME_PRESERVES_TIMEZONE_ASSIGNMENT`
 
 **What Changed:**
 Rails 8.0 warns whenever `to_time_preserves_timezone` is set to anything other than `:zone`, because 8.1 makes `:zone` the only behavior. `load_defaults 8.0` sets `:zone`. `load_defaults` 5.0 to 7.2 leave it at `:offset` on 8.0 (7.2 stores the same setting as `true`), so an app still on an older `load_defaults` warns at boot:
@@ -381,9 +479,45 @@ On 8.0 `:zone` is a behavior change: `to_time` returns a Time that carries the r
 
 ---
 
+#### Routes Drawn With Multiple Paths Deprecated
+
+**Pattern:** `ROUTES_MULTIPLE_PATHS`
+
+**What Changed:**
+Rails 7.2 accepts several paths in one route call (`get "/old1", "/old2", to: "foo#bar"`) with no warning. Rails 8.0 still draws every route but warns at boot, once per call:
+
+```
+DEPRECATION WARNING: Mapping a route with multiple paths is deprecated and will be removed in Rails 8.1. Please use multiple method calls instead.
+```
+
+An Array path (`get ["/old1", "/old2"], ...`) is a different shape: it draws no route at all on 7.2 or 8.0.
+
+**Detection Pattern:**
+```ruby
+# config/routes.rb
+get "/old1", "/old2", to: "foo#bar"
+get :search, :filter
+```
+
+**Fix:**
+```ruby
+# BEFORE
+get "/old1", "/old2", to: "foo#bar"
+
+# AFTER
+get "/old1", to: "foo#bar"
+get "/old2", to: "foo#bar"
+# or: %w[/old1 /old2].each { |path| get path, to: "foo#bar" }
+```
+The AFTER works on 7.2 too.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### read_encrypted_secrets Removed
+
+**Pattern:** `READ_ENCRYPTED_SECRETS`
 
 **What Changed:**
 Rails 8.0 removes `config.read_encrypted_secrets`. The setting drove the legacy `config/secrets.yml.enc` feature, already dead since 7.2 removed `Rails.application.secrets`. The assignment does not raise on 8.0: it is stored with no effect and no warning. Only the 7.2 side of a dual boot warns, which clutters boot and `assets:precompile` logs:
@@ -411,6 +545,131 @@ config.read_encrypted_secrets = true
 ```
 
 If the app still keeps secrets in `config/secrets.yml.enc`, move them to credentials (`bin/rails credentials:edit`) first.
+
+---
+
+#### `SCHEMA_CACHE` Environment Variable No Longer Read
+
+**Pattern:** `ENV_SCHEMA_CACHE`
+
+**What Changed:**
+Rails 7.1 used `ENV["SCHEMA_CACHE"]` as the path for `db:schema:cache:dump` and the schema cache load. Rails 7.2 already ignores it and only warns; 8.0 removes the warning too, so the variable is ignored silently and the default `db/schema_cache.yml` (or `db/<name>_schema_cache.yml`) is used. Nothing raises: a script or CI step that sets it has been using the default path since 7.2.
+
+```
+DEPRECATION WARNING: Setting `ENV["SCHEMA_CACHE"]` is deprecated and will be removed in Rails 8.0. Configure the `:schema_cache_path` in the database configuration instead.
+```
+
+**Detection Pattern:**
+```ruby
+ENV["SCHEMA_CACHE"] = "tmp/schema_cache.yml"
+# CI step or script
+SCHEMA_CACHE=tmp/schema_cache.yml bin/rails db:schema:cache:dump
+```
+
+**Fix:**
+```yaml
+# BEFORE
+SCHEMA_CACHE=tmp/schema_cache.yml bin/rails db:schema:cache:dump
+
+# AFTER
+# config/database.yml
+production:
+  <<: *default
+  schema_cache_path: tmp/schema_cache.yml
+```
+The AFTER works on 7.2 too.
+
+---
+
+#### `unsigned_float` and `unsigned_decimal` Column Methods Deprecated
+
+**Pattern:** `UNSIGNED_FLOAT_DECIMAL`
+
+**What Changed:**
+The MySQL adapter's `t.unsigned_float` and `t.unsigned_decimal` shorthands work on 7.2 with no warning. Rails 8.0 still creates the same column but warns each time a migration calls them:
+
+```
+DEPRECATION WARNING: unsigned_float is deprecated and will be removed from Rails 8.1
+```
+
+`unsigned_integer` and `unsigned_bigint` are not deprecated. `db/schema.rb` already writes the `unsigned: true` option form, so only migrations that still run (a fresh `db:migrate`) warn.
+
+**Detection Pattern:**
+```ruby
+# db/migrate/*.rb
+t.unsigned_float :amount
+t.unsigned_decimal :price, precision: 10, scale: 2
+```
+
+**Fix:**
+```ruby
+# BEFORE
+t.unsigned_float :amount
+
+# AFTER
+t.float :amount, unsigned: true
+```
+The AFTER works on 7.2 too: the shorthand only sets `unsigned: true` on both versions.
+
+---
+
+#### `Benchmark.ms` Deprecated
+
+**Pattern:** `BENCHMARK_MS`
+
+**What Changed:**
+`Benchmark.ms` is an Active Support core extension, not part of Ruby's `benchmark` library. Rails 7.2 runs it with no warning. Rails 8.0 still returns the elapsed milliseconds but warns on every call:
+
+```
+DEPRECATION WARNING: `Benchmark.ms` is deprecated and will be removed in Rails 8.1 without replacement.
+```
+
+**Detection Pattern:**
+```ruby
+elapsed = Benchmark.ms { run_report }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+elapsed = Benchmark.ms { run_report }
+
+# AFTER
+require "benchmark"
+elapsed = Benchmark.realtime { run_report } * 1000
+```
+The AFTER works on 7.2 too: `Benchmark.realtime` is Ruby's own method and returns seconds as a Float. Keep the `require`: Active Support 8.0 loads the library, but 8.1 no longer does, so without it the call raises `NameError: uninitialized constant Benchmark` after the next hop. On Ruby 3.4 and newer, add `gem "benchmark"` to the Gemfile as well: Ruby 3.4 warns that it leaves the default gems in Ruby 4.0.
+
+---
+
+#### `bin/rake stats` Deprecated
+
+**Pattern:** `RAKE_STATS`
+
+**What Changed:**
+Rails 8.0 adds a `bin/rails stats` command and keeps the `stats` rake task only as a deprecated wrapper. `bin/rake stats` still prints the report, with a warning first:
+
+```
+DEPRECATION WARNING: `bin/rake stats` has been deprecated and will be removed in Rails 8.1.
+```
+
+The same release deprecates adding directories through `STATS_DIRECTORIES` in favor of `Rails::CodeStatistics.register_directory`, which does not exist on 7.2.
+
+**Detection Pattern:**
+```yaml
+# .github/workflows/*.yml, bin/*
+- run: bin/rake stats
+```
+
+**Fix:**
+```yaml
+# BEFORE
+- run: bin/rake stats
+
+# AFTER
+- run: bin/rails stats
+```
+The AFTER works on 7.2 too: `bin/rails` hands a name it does not know to Rake, so it runs the same task.
 
 ---
 
@@ -517,6 +776,12 @@ Error → section lookup for the most common errors encountered during this upgr
 | Solid Queue jobs stuck in pending | "Solid Queue (Optional)" — start the supervisor, `bin/jobs` |
 | `` DEPRECATION WARNING: `to_time` will always preserve the full timezone `` (or `receiver timezone`) at boot | "to_time Preserves the Full Timezone": set `to_time_preserves_timezone = :zone`; `load_defaults 8.0` later |
 | `DEPRECATION WARNING: 'config.read_encrypted_secrets=' is deprecated` on the 7.2 side | "read_encrypted_secrets Removed": delete the line |
+| `ArgumentError: wrong number of arguments (given 0, expected 1..2)` from an `enum` line | "`enum` Keyword-Arguments Form Removed": `enum :status, { ... }, prefix: true` |
+| `` DEPRECATION WARNING: Setting `ENV["SCHEMA_CACHE"]` is deprecated `` on the 7.2 side | "`SCHEMA_CACHE` Environment Variable No Longer Read": set `schema_cache_path:` in `database.yml` |
+| `DEPRECATION WARNING: Mapping a route with multiple paths is deprecated` at boot | "Routes Drawn With Multiple Paths Deprecated": one route call per path |
+| `NoMethodError: undefined method 'warn_on_records_fetched_greater_than='` (or `allow_deprecated_singular_associations_name=`, `commit_transaction_on_non_local_return=`) for class ActiveRecord::Base | "Removed Active Record Config Keys Raise NoMethodError": delete the line |
+| `` DEPRECATION WARNING: `Benchmark.ms` is deprecated `` | "`Benchmark.ms` Deprecated": `Benchmark.realtime { ... } * 1000` |
+| `` DEPRECATION WARNING: `bin/rake stats` has been deprecated `` | "`bin/rake stats` Deprecated": run `bin/rails stats` |
 
 ---
 
