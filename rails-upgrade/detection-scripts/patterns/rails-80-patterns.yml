@@ -110,13 +110,13 @@ upgrade_findings:
       variable_name: "THRUSTER"
 
     - name: "Database pool configuration"
-      kind: "migration"
+      kind: "optional"
       pattern: "pool:\\s*\\d+"
       exclude: "max_connections"
       search_paths:
         - "config/database.yml"
-      explanation: "Rails 8.0 restructures database.yml for Solid gems"
-      fix: "Review database.yml structure for multi-database support"
+      explanation: "A hard-coded pool: in database.yml is a sign the file predates the Rails 8.0 generator layout, which splits production into primary, cache, queue and cable databases for Solid Cache, Solid Queue and Solid Cable. Rails 8.0 reads a single-database file and the pool: key as 7.2 did, so nothing breaks"
+      fix: "Only if adopting Solid gems: split production into primary, cache, queue and cable entries, each non-primary one with its own migrations_paths (db/cache_migrate, db/queue_migrate, db/cable_migrate). Otherwise leave database.yml as it is"
       variable_name: "DB_POOL"
 
     - name: "ENV[\"SCHEMA_CACHE\"] usage"

@@ -80,41 +80,6 @@ gem 'propshaft'
 
 ---
 
-#### Multi-Database Configuration for Solid Gems
-
-**What Changed:**
-Rails 8.0 uses Solid Cache/Queue/Cable which may need separate database connections.
-
-**Old database.yml:**
-```yaml
-production:
-  adapter: postgresql
-  database: myapp_production
-  pool: 5
-```
-
-**New database.yml (if using Solid gems):**
-```yaml
-production:
-  primary:
-    adapter: postgresql
-    database: myapp_production
-    pool: 5
-  cache:
-    adapter: sqlite3
-    database: storage/production_cache.sqlite3
-  queue:
-    adapter: sqlite3
-    database: storage/production_queue.sqlite3
-  cable:
-    adapter: sqlite3
-    database: storage/production_cable.sqlite3
-```
-
-**If NOT using Solid gems**, keep your existing structure!
-
----
-
 #### assume_ssl Configuration
 
 **Pattern:** `ASSUME_SSL`
@@ -244,6 +209,51 @@ The AFTER works on 7.2 too. Drop the leading underscore from the options (`_pref
 ---
 
 ### 🟡 MEDIUM PRIORITY
+
+#### Multi-Database Configuration for Solid Gems
+
+**Pattern:** `DB_POOL`
+
+**What Changed:**
+Rails 8.0 changes nothing in how `database.yml` is read: a single `production:` block and the `pool:` key work as they did on 7.2. What changed is the 8.0 app generator, which splits `production:` into `primary`, `cache`, `queue` and `cable` databases, each with its own `migrations_paths`, for Solid Cache, Solid Queue and Solid Cable. Change the file only when adopting those gems.
+
+**Detection Pattern:**
+```yaml
+# config/database.yml
+production:
+  adapter: postgresql
+  database: myapp_production
+  pool: 5
+```
+
+**Fix (only if adopting Solid gems):**
+```yaml
+# BEFORE
+production:
+  <<: *default
+  database: myapp_production
+
+# AFTER (same shape as the 8.0 generator)
+production:
+  primary: &primary_production
+    <<: *default
+    database: myapp_production
+  cache:
+    <<: *primary_production
+    database: myapp_production_cache
+    migrations_paths: db/cache_migrate
+  queue:
+    <<: *primary_production
+    database: myapp_production_queue
+    migrations_paths: db/queue_migrate
+  cable:
+    <<: *primary_production
+    database: myapp_production_cable
+    migrations_paths: db/cable_migrate
+```
+The AFTER works on 7.2 too. If the app keeps Redis, Sidekiq or its current cache store, leave `database.yml` as it is.
+
+---
 
 #### Solid Cache (Optional)
 
