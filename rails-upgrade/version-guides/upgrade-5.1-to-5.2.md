@@ -274,8 +274,10 @@ Rails.application.credentials.api_key
 
 #### DSL for Content Security Policy
 
+**Pattern:** none (a new opt-in DSL; 5.1 code has nothing to find)
+
 **What Changed:**
-New DSL for configuring Content Security Policy.
+New DSL for configuring Content Security Policy. No policy is set by default (`config.content_security_policy` is `nil`), so no header is sent until you define one. The generated `config/initializers/content_security_policy.rb` is fully commented out.
 
 **Fix:**
 Create initializer:
@@ -289,6 +291,7 @@ Rails.application.configure do
   end
 end
 ```
+`config.content_security_policy` does not exist on 5.1 and raises `NoMethodError`, so while dual booting wrap the block in `if NextRails.next?`.
 
 ---
 
