@@ -20,6 +20,8 @@ Rails 8.1 is a minor release with:
 
 #### SSL Configuration Commented Out
 
+**Pattern:** `SSL_COMMENTED`
+
 **What Changed:**
 SSL configuration is now commented out by default (assumes Kamal handles SSL).
 
@@ -51,6 +53,8 @@ If using Kamal:
 
 #### pool: → max_connections:
 
+**Pattern:** `POOL_RENAME`
+
 **What Changed:**
 Database configuration renames `pool:` to `max_connections:`. `pool:` stays as a deprecated alias in 8.1 (warning, not an error); setting both keys to different values raises `Ambiguous configuration`.
 
@@ -80,6 +84,8 @@ production:
 ---
 
 #### bundler-audit Required
+
+**Pattern:** `BUNDLER_AUDIT`
 
 **What Changed:**
 Rails 8.1 expects bundler-audit for security vulnerability scanning.
@@ -115,6 +121,8 @@ bundle audit check --update
 ### 🟡 MEDIUM PRIORITY
 
 #### Semicolon Query Separator Removed
+
+**Pattern:** `SEMICOLON_SEPARATOR`
 
 **What Changed:**
 On Rails 8.0 with Rack 2, `ActionDispatch::QueryParser` still split a query string, and a form-urlencoded
@@ -163,6 +171,8 @@ Delete `strict_query_string_separator` from the config. For outside clients that
 
 #### Sidekiq Adapter Removed
 
+**Pattern:** `SIDEKIQ_ADAPTER`
+
 **What Changed:**
 Built-in Sidekiq adapter removed from ActiveJob.
 
@@ -183,6 +193,8 @@ gem 'sidekiq', '>= 7.3.3'
 
 #### SuckerPunch Adapter Removed
 
+**Pattern:** `SUCKER_PUNCH`
+
 **What Changed:**
 Built-in SuckerPunch adapter removed.
 
@@ -196,6 +208,8 @@ gem 'sucker_punch', '>= 3.2'
 ---
 
 #### Azure Storage Service Removed
+
+**Pattern:** `AZURE_STORAGE`
 
 **What Changed:**
 Azure storage service adapter removed from Active Storage.
@@ -230,6 +244,8 @@ This is a cosmetic change. Your database structure is unaffected. You may see la
 
 #### MySQL Unsigned Types Deprecation
 
+**Pattern:** `MYSQL_UNSIGNED`
+
 **What Changed:**
 MySQL `unsigned: true` generates deprecation warnings.
 
@@ -247,6 +263,8 @@ t.check_constraint "count >= 0"
 ---
 
 #### .gitignore Update
+
+**Pattern:** `GITIGNORE_KEYS`
 
 **What Changed:**
 Recommended `.gitignore` pattern for credential keys changed.
