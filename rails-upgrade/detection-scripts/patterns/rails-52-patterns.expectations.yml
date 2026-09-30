@@ -73,3 +73,12 @@ EVENTED_REDIS_ADAPTER:
   no_match:
     - "  adapter: redis"
     - "  channel_prefix: evented_redis_app"
+
+ERUBIS_HANDLER:
+  # Only the Rails handler constants; the erubis gem itself is not a Rails change.
+  match:
+    - "class LegacyHandler < ActionView::Template::Handlers::Erubis"
+    - "ActionView::Template::Handlers::ERB.erb_implementation = ActionView::Template::Handlers::ERB::Erubis"
+  no_match:
+    - "class CustomHandler < ActionView::Template::Handlers::ERB::Erubi"
+    - "Erubis::Eruby.new(template).result(binding)"

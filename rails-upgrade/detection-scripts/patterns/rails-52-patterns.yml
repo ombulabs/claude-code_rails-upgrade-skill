@@ -105,14 +105,14 @@ upgrade_findings:
 
     - name: "Erubis template handler references"
       kind: "breaking"
-      pattern: "\\bErubis\\b|::Handlers::Erubis"
+      pattern: "\\bHandlers::(?:ERB::)?Erubis\\b"
       exclude: ""
       search_paths:
         - "app/"
         - "config/"
         - "lib/"
-      explanation: "Rails 5.1 replaced the Erubis ERB handler with Erubi. Rails 5.2 removes the Erubis handler entirely; references to ActionView::Template::Handlers::Erubis raise NameError ('uninitialized constant'). Most apps never touch this directly; explicit references usually come from gems registering custom handlers that have not been updated for 5.2"
-      fix: "Replace ActionView::Template::Handlers::Erubis references with ActionView::Template::Handlers::ERB (which is now Erubi-backed). For gems that register Erubis explicitly, check for an updated gem version or open an issue upstream"
+      explanation: "Rails 5.1 made Erubi the default ERB implementation and kept two Erubis constants: ActionView::Template::Handlers::ERB::Erubis, and ActionView::Template::Handlers::Erubis, which warns that it is deprecated and will be removed from Rails 5.2. Rails 5.2 removes both files, so either reference raises NameError when the code loads. Direct use of the erubis gem (Erubis::Eruby) is not a Rails change and is not flagged. Most apps never reference these; custom template handlers and old gems do"
+      fix: "Replace ActionView::Template::Handlers::Erubis and ActionView::Template::Handlers::ERB::Erubis with ActionView::Template::Handlers::ERB::Erubi, which exists in 5.1 too. A subclass that relied on Erubis-only methods needs porting to Erubi's API. For a gem that references Erubis, update the gem"
       variable_name: "ERUBIS_HANDLER"
 
     - name: "Defining quoted_id method"

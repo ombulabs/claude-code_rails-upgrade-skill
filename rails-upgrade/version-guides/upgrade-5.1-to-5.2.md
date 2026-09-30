@@ -348,6 +348,25 @@ None needed for this hop. Upgrade Ruby as a separate step, not in the same deplo
 
 ---
 
+#### Erubis Template Handler Removed
+
+**Pattern:** `ERUBIS_HANDLER`
+
+**What Changed:**
+Rails 5.1 defaults to Erubi but still ships `ActionView::Template::Handlers::ERB::Erubis` and a deprecated `ActionView::Template::Handlers::Erubis`. Rails 5.2 removes both, so a reference raises `NameError` when the code loads. Direct use of the `erubis` gem is not affected.
+
+**Fix:**
+```ruby
+# BEFORE
+class MyHandler < ActionView::Template::Handlers::Erubis
+
+# AFTER
+class MyHandler < ActionView::Template::Handlers::ERB::Erubi
+```
+`ERB::Erubi` exists on 5.1 too. A subclass that calls Erubis-only methods needs porting to Erubi.
+
+---
+
 ## New Features
 
 ### Active Storage
