@@ -94,3 +94,23 @@ ENV_SCHEMA_CACHE:
     - "ENV[\"SCHEMA_CACHE_PATH\"]"
     - "MY_SCHEMA_CACHE=1"
     - "SCHEMA_CACHE_PATH=db/cache.yml"
+
+ROUTES_MULTIPLE_PATHS:
+  match:
+    - "  get \"/old1\", \"/old2\", to: \"foo#bar\""
+    - "  get '/a', '/b', to: 'x#y'"
+    - "  match \"a\", \"b\", via: [:get, :post]"
+    - "  post(:create, :update)"
+    - "    get :search, :filter"
+    - "  delete \"/a\", \"/b\""
+  no_match:
+    - "  get \"/a\", to: \"foo#bar\""
+    - "  get \"/a\", :to => \"foo#bar\""
+    - "  get :search, on: :collection"
+    - "  get :search, :on => :collection"
+    - "  get \"/a\", \"to\": \"x#y\""
+    - "  get \"photos/:id\", to: \"photos#show\", as: :photo"
+    # an Array path draws no route on 7.2 or 8.0; not the deprecated shape
+    - "  get [\"/old1\", \"/old2\"], to: \"foo#bar\""
+    - "  target \"/a\", \"/b\""
+    - "  # get \"/a\", \"/b\""

@@ -141,12 +141,13 @@ upgrade_findings:
 
     - name: "Routes drawn with multiple paths"
       kind: "deprecation"
-      pattern: "^\\s*(get|post|put|patch|delete|match)\\s+\\["
+      pattern: "^\\s*(?:get|post|put|patch|delete|match)\\s*\\(?\\s*(?:\"[^\"\\n]*\"|'[^'\\n]*'|:\\w+(?!\\w))\\s*,\\s*(?:\"[^\"\\n]*\"|'[^'\\n]*'|:\\w+(?!\\w))(?!\\s*(?:=>|:[^:]))"
       exclude: ""
       search_paths:
         - "config/routes.rb"
-      explanation: "Rails 8.0 deprecates drawing a single route action with an array of paths (e.g. `get ['/old1', '/old2'], to: 'foo#bar'`). actionpack/CHANGELOG.md: 'Deprecate drawing routes with multiple paths to make routing faster. You may use `with_options` or a loop to make drawing multiple paths easier.' Removed at 8.1"
-      fix: "Replace the array with a `with_options` block or an explicit loop: `['/old1','/old2'].each { |p| get p, to: 'foo#bar' }`. The new shape is faster at boot time"
+        - "config/routes/"
+      explanation: "Rails 8.0 deprecates passing more than one path to a single route call (`get \"/old1\", \"/old2\", to: \"foo#bar\"`). actionpack 8.0 Mapper#map_match warns `Mapping a route with multiple paths is deprecated and will be removed in Rails 8.1. Please use multiple method calls instead.` The routes are still drawn. 7.2 accepts the same call with no warning. An Array path (`get [\"/a\", \"/b\"], ...`) is a different shape: it draws no route at all on 7.2 or 8.0 and is not flagged here. Symbol paths (`get :a, :b`) are flagged; a call whose paths are built from variables is missed"
+      fix: "Write one route call per path: `get \"/old1\", to: \"foo#bar\"` and `get \"/old2\", to: \"foo#bar\"`, or loop: `%w[/old1 /old2].each { |path| get path, to: \"foo#bar\" }`. Works on 7.2 and 8.0, so no NextRails.next? branch is needed"
       variable_name: "ROUTES_MULTIPLE_PATHS"
 
   low_priority:

@@ -450,6 +450,40 @@ On 8.0 `:zone` is a behavior change: `to_time` returns a Time that carries the r
 
 ---
 
+#### Routes Drawn With Multiple Paths Deprecated
+
+**Pattern:** `ROUTES_MULTIPLE_PATHS`
+
+**What Changed:**
+Rails 7.2 accepts several paths in one route call (`get "/old1", "/old2", to: "foo#bar"`) with no warning. Rails 8.0 still draws every route but warns at boot, once per call:
+
+```
+DEPRECATION WARNING: Mapping a route with multiple paths is deprecated and will be removed in Rails 8.1. Please use multiple method calls instead.
+```
+
+An Array path (`get ["/old1", "/old2"], ...`) is a different shape: it draws no route at all on 7.2 or 8.0.
+
+**Detection Pattern:**
+```ruby
+# config/routes.rb
+get "/old1", "/old2", to: "foo#bar"
+get :search, :filter
+```
+
+**Fix:**
+```ruby
+# BEFORE
+get "/old1", "/old2", to: "foo#bar"
+
+# AFTER
+get "/old1", to: "foo#bar"
+get "/old2", to: "foo#bar"
+# or: %w[/old1 /old2].each { |path| get path, to: "foo#bar" }
+```
+The AFTER works on 7.2 too.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### read_encrypted_secrets Removed
@@ -623,6 +657,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `DEPRECATION WARNING: 'config.read_encrypted_secrets=' is deprecated` on the 7.2 side | "read_encrypted_secrets Removed": delete the line |
 | `ArgumentError: wrong number of arguments (given 0, expected 1..2)` from an `enum` line | "`enum` Keyword-Arguments Form Removed": `enum :status, { ... }, prefix: true` |
 | `` DEPRECATION WARNING: Setting `ENV["SCHEMA_CACHE"]` is deprecated `` on the 7.2 side | "`SCHEMA_CACHE` Environment Variable No Longer Read": set `schema_cache_path:` in `database.yml` |
+| `DEPRECATION WARNING: Mapping a route with multiple paths is deprecated` at boot | "Routes Drawn With Multiple Paths Deprecated": one route call per path |
 
 ---
 
