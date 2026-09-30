@@ -22,23 +22,6 @@ Rails 5.1 introduces:
 
 ### 🔴 HIGH PRIORITY
 
-#### HashWithIndifferentAccess Indexing Change
-
-**What Changed:**
-Non-symbol access in `HashWithIndifferentAccess` returns `nil` for non-existent keys instead of raising errors.
-
-**Detection Pattern:**
-```ruby
-hash = HashWithIndifferentAccess.new
-hash[:missing_key]  # Returns nil
-hash[Object.new]    # Behavior changed
-```
-
-**Fix:**
-Generally transparent. If you relied on specific behavior with non-string/symbol keys, test thoroughly.
-
----
-
 #### render :text Removed
 
 **Pattern:** `RENDER_TEXT`
@@ -477,6 +460,30 @@ Order.where('total_cents = ?', money) # relies on Money#quoted_id
 Order.where('total_cents = ?', money.cents)
 ```
 The AFTER works on Rails 5.0 too. For a value used as an attribute, move the conversion into a custom `ActiveModel::Type` (`serialize` / `cast`) registered with the attributes API, which also exists in 5.0.
+
+---
+
+#### HashWithIndifferentAccess.new_from_hash_copying_default Removed
+
+**Pattern:** `HWIA_NEW_FROM_HASH_COPYING_DEFAULT`
+
+**What Changed:**
+Rails 5.0 deprecated `ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default` and made it call `.new`. Rails 5.1 removes it, so a call raises `NoMethodError`. Lookups such as `hash[:missing]` return `nil` in both versions; indexing did not change.
+
+**Detection Pattern:**
+```ruby
+ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default(hash)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default(hash)
+
+# AFTER
+ActiveSupport::HashWithIndifferentAccess.new(hash)
+```
+The AFTER works on Rails 5.0 too, with the same result.
 
 ---
 

@@ -112,3 +112,11 @@ QUOTED_ID_DEPRECATION:
   no_match:
     - "  def quoted_identifier"
     - "  record.quoted_id"
+
+HWIA_NEW_FROM_HASH_COPYING_DEFAULT:
+  match:
+    - "  ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default(hash)"
+    - "  HashWithIndifferentAccess.new_from_hash_copying_default(opts)"
+  no_match:
+    - "  ActiveSupport::HashWithIndifferentAccess.new(hash)"
+    - "  hash.with_indifferent_access"

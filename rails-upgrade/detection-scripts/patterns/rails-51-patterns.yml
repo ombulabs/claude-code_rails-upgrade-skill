@@ -211,6 +211,18 @@ upgrade_findings:
       fix: "Migrate the logic to a custom ActiveModel::Type (define #serialize / #cast) or accept the model's default quoting behavior"
       variable_name: "QUOTED_ID_DEPRECATION"
 
+    - name: "HashWithIndifferentAccess.new_from_hash_copying_default removed"
+      kind: "breaking"
+      pattern: "\\bnew_from_hash_copying_default\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "config/"
+        - "lib/"
+      explanation: "Rails 5.1 removes ActiveSupport::HashWithIndifferentAccess.new_from_hash_copying_default, deprecated in 5.0 where it already behaved like .new. Calling it raises NoMethodError"
+      fix: "Call ActiveSupport::HashWithIndifferentAccess.new(hash) instead, which copies the default the same way on 5.0"
+      variable_name: "HWIA_NEW_FROM_HASH_COPYING_DEFAULT"
+
 dependencies:
   webpacker:
     check: false
