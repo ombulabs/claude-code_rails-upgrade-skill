@@ -22,26 +22,6 @@ Rails 5.2 introduces:
 
 ### 🔴 HIGH PRIORITY
 
-#### Bootsnap Required for Performance
-
-**Pattern:** `BOOTSNAP_PRESENCE`
-
-**What Changed:**
-Rails 5.2 recommends bootsnap for faster boot times.
-
-**Fix:**
-```ruby
-# Gemfile
-gem 'bootsnap', require: false
-```
-
-```ruby
-# config/boot.rb (add at top)
-require 'bootsnap/setup'
-```
-
----
-
 #### Cookie Expiry Format Changed
 
 **Pattern:** none (a default turned on by `load_defaults 5.2`, not a code shape)
@@ -451,6 +431,26 @@ Rails.application.config.secret_token = ENV["SECRET_TOKEN"]
 # (file deleted; secret_key_base set in config/secrets.yml)
 ```
 `config/secrets.yml` works on both versions; credentials and a direct `ENV["SECRET_KEY_BASE"]` read are 5.2 only. While both secrets are set, Rails upgrades cookies signed with the old token; once the token is gone, users whose cookie was never upgraded are logged out once.
+
+---
+
+#### Bootsnap Added to New Apps
+
+**Pattern:** `BOOTSNAP_PRESENCE`
+
+**What Changed:**
+The Rails 5.2 app generator adds `gem "bootsnap", require: false` and `require "bootsnap/setup"` in `config/boot.rb` to new apps (`--skip-bootsnap` leaves them out). It is not a dependency of the `rails` gem, so an upgraded app boots and runs its tests without it. Adding it is optional and only speeds up boot.
+
+**Fix:**
+```ruby
+# Gemfile
+gem 'bootsnap', require: false
+```
+
+```ruby
+# config/boot.rb (add at top)
+require 'bootsnap/setup'
+```
 
 ---
 
