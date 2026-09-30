@@ -376,6 +376,31 @@ The symbol lookup does not work on 5.0, so keep the `NextRails.next?` branch unt
 
 ---
 
+#### ActionDispatch::ParamsParser::ParseError Deprecated
+
+**Pattern:** `PARAMS_PARSER_ERROR`
+
+**What Changed:**
+Rails 5.1 moves the error raised on a malformed request body (bad JSON, for example) to `ActionDispatch::Http::Parameters::ParseError`. The old name still resolves to the new class, with a deprecation warning each time it is referenced, so a `rescue` or `rescue_from` keeps working. Rails 5.2 removes the old name, and referencing it raises `NameError`.
+
+**Detection Pattern:**
+```ruby
+rescue_from ActionDispatch::ParamsParser::ParseError, with: :bad_request
+```
+
+**Fix:**
+```ruby
+# BEFORE
+rescue_from ActionDispatch::ParamsParser::ParseError, with: :bad_request
+
+# AFTER
+PARAMS_PARSE_ERROR = NextRails.next? ? ActionDispatch::Http::Parameters::ParseError : ActionDispatch::ParamsParser::ParseError
+rescue_from PARAMS_PARSE_ERROR, with: :bad_request
+```
+`ActionDispatch::Http::Parameters::ParseError` does not exist in 5.0, so keep the `NextRails.next?` branch until the 5.0 boot is gone, then use the new name alone.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Ruby Version Requirement
@@ -533,6 +558,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'before_filter'` (or another `*_filter`) | "before_filter and the Other *_filter Methods Removed" — rename to `*_action` |
 | `NoMethodError: undefined method 'uniq'` on a model class, or a query method called on an Array after `.uniq` | "Relation#uniq Removed" — `distinct` |
 | A nested `Rails.application.secrets` value is `nil` after the bump | "Nested secrets.yml Keys Are Symbols" — use symbol keys |
+| `DEPRECATION WARNING: ActionDispatch::ParamsParser::ParseError is deprecated!` | "ActionDispatch::ParamsParser::ParseError Deprecated" — `ActionDispatch::Http::Parameters::ParseError` |
 
 ---
 

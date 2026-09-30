@@ -87,3 +87,10 @@ SECRETS_METHOD_ACCESSOR_STRING_KEYS:
   no_match:
     - "Rails.application.secrets.smtp[:address]"
     - "Rails.application.secrets.api_key"
+
+PARAMS_PARSER_ERROR:
+  match:
+    - "  rescue_from ActionDispatch::ParamsParser::ParseError, with: :bad_json"
+    - "  rescue ActionDispatch::ParamsParser::ParseError => e"
+  no_match:
+    - "  rescue ActionDispatch::Http::Parameters::ParseError => e"
