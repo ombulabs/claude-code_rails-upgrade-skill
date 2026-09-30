@@ -31,3 +31,15 @@ CACHE_FORMAT_VERSION_61:
     # commented-out lines, including the new_framework_defaults template
     - "    # config.load_defaults 6.1"
     - "# Rails.application.config.active_support.cache_format_version = 7.0"
+
+CSP_MIDDLEWARE_CONSTANTS:
+  match:
+    # the three constants 7.1 removes from the middleware class
+    - "    headers[ActionDispatch::ContentSecurityPolicy::Middleware::POLICY]"
+    - "  expect(response.headers[ActionDispatch::ContentSecurityPolicy::Middleware::POLICY_REPORT_ONLY]).to be_present"
+    - "ContentSecurityPolicy::Middleware::CONTENT_TYPE"
+  no_match:
+    # the header name as a string works on both versions
+    - "  expect(response.headers[\"Content-Security-Policy\"]).to be_present"
+    # the middleware class itself still exists
+    - "config.middleware.use ActionDispatch::ContentSecurityPolicy::Middleware"

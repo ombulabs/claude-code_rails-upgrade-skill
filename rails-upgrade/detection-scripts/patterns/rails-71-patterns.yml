@@ -120,6 +120,21 @@ upgrade_findings:
       fix: "Set config.active_support.cache_format_version = 7.0 after load_defaults in config/application.rb. Rails 7.0 reads both the 6.1 and 7.0 formats and 7.1 reads 7.0, so this is safe on both sides of the dual boot and during a rolling deploy, no NextRails.next? branch needed. Move to 7.1 only after every server runs 7.1"
       variable_name: "CACHE_FORMAT_VERSION_61"
 
+  low_priority:
+    - name: "ContentSecurityPolicy::Middleware header constants removed"
+      kind: "breaking"
+      pattern: "ContentSecurityPolicy::Middleware::(?:POLICY_REPORT_ONLY|POLICY|CONTENT_TYPE)(?!\\w)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+        - "spec/"
+        - "test/"
+      explanation: "actionpack 7.1 removes the CONTENT_TYPE, POLICY and POLICY_REPORT_ONLY constants from ActionDispatch::ContentSecurityPolicy::Middleware (content_security_policy.rb now uses ActionDispatch::Constants, which 7.0 does not have). Code that reads them raises NameError on 7.1. The CSP DSL itself (config.content_security_policy, policy.script_src and friends) does not change; 7.1 only adds the :unsafe_hashes source"
+      fix: "Use the header name string instead, which works on both 7.0 and 7.1: \"Content-Security-Policy\" or \"Content-Security-Policy-Report-Only\""
+      variable_name: "CSP_MIDDLEWARE_CONSTANTS"
+
 dependencies:
   ruby:
     minimum: "2.7.0"

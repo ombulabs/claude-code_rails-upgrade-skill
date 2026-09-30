@@ -260,19 +260,6 @@ The AFTER works on 7.0 too: 7.0 reads both the 6.1 and 7.0 formats, and 7.1 read
 
 ---
 
-#### Content Security Policy Updates
-
-**What Changed:**
-CSP configuration syntax updated.
-
-**Detection Pattern:**
-Check `config/initializers/content_security_policy.rb`
-
-**Fix:**
-Review and update CSP directives as needed.
-
----
-
 #### Secret Key File Location Changed
 
 **Pattern:** `SECRETS_YML_ENC`
@@ -353,6 +340,30 @@ Nothing. The `rails` 7.1 gemspec requires Ruby `>= 2.7.0`, the same as 7.0, so t
 
 **Fix:**
 None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
+
+---
+
+#### Content Security Policy Middleware Constants Removed
+
+**Pattern:** `CSP_MIDDLEWARE_CONSTANTS`
+
+**What Changed:**
+The CSP DSL in `config/initializers/content_security_policy.rb` does not change in 7.1; it only gains the `:unsafe_hashes` source. What 7.1 removes are the `CONTENT_TYPE`, `POLICY` and `POLICY_REPORT_ONLY` constants on `ActionDispatch::ContentSecurityPolicy::Middleware`, so code or specs that read them raise `NameError`.
+
+**Detection Pattern:**
+```ruby
+response.headers[ActionDispatch::ContentSecurityPolicy::Middleware::POLICY]
+```
+
+**Fix:**
+```ruby
+# BEFORE
+response.headers[ActionDispatch::ContentSecurityPolicy::Middleware::POLICY]
+
+# AFTER
+response.headers["Content-Security-Policy"]
+```
+The AFTER works on 7.0 too. The replacement constant, `ActionDispatch::Constants::CONTENT_SECURITY_POLICY`, does not exist on 7.0, so use the string while dual booting.
 
 ---
 
