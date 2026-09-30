@@ -442,6 +442,25 @@ The AFTER works on 5.1 too.
 
 ---
 
+#### secret_token Deprecated
+
+**Pattern:** `LEGACY_SECRET_TOKEN`
+
+**What Changed:**
+Rails 5.1 used a `secret_token` from `config/secrets.yml` or `config.secret_token` without comment. Rails 5.2 warns at boot whenever one is set ("`secrets.secret_token` is deprecated in favor of `secret_key_base` and will be removed in Rails 6.0."). `config.secret_key_base` does not warn.
+
+**Fix:**
+```ruby
+# BEFORE (config/initializers/secret_token.rb)
+Rails.application.config.secret_token = ENV["SECRET_TOKEN"]
+
+# AFTER
+# (file deleted; secret_key_base set in config/secrets.yml)
+```
+`config/secrets.yml` works on both versions; credentials and a direct `ENV["SECRET_KEY_BASE"]` read are 5.2 only. While both secrets are set, Rails upgrades cookies signed with the old token; once the token is gone, users whose cookie was never upgraded are logged out once.
+
+---
+
 ## New Features
 
 ### Active Storage

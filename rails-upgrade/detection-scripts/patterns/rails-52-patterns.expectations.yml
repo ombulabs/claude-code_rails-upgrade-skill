@@ -115,3 +115,12 @@ LOCK_BANG_UNPERSISTED:
     - "  account.unlock!"
     - "  Account.lock.find(params[:id])"
     - "  user.locked!"
+
+LEGACY_SECRET_TOKEN:
+  match:
+    - "Rails.application.config.secret_token = 'a1b2c3'"
+    - "  secret_token: <%= ENV['SECRET_TOKEN'] %>"
+    - "  Rails.application.secrets.secret_token"
+  no_match:
+    - "  secret_key_base: <%= ENV['SECRET_KEY_BASE'] %>"
+    - "Rails.application.config.secret_key_base = ENV['SECRET_KEY_BASE']"

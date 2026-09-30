@@ -149,16 +149,17 @@ upgrade_findings:
       fix: "Save (or reload) before locking: record.save; record.lock!. If you intended to lock and then mutate, the correct order is record.lock! followed by the assignment + save"
       variable_name: "LOCK_BANG_UNPERSISTED"
 
-    - name: "Legacy secret_key_base configuration"
+    - name: "secret_token (legacy signing secret)"
       kind: "deprecation"
-      pattern: "Rails\\.application\\.config\\.secret_(token|key_base)"
+      pattern: "\\bsecret_token\\b"
       exclude: ""
       search_paths:
         - "config/"
         - "app/"
-      explanation: "Rails 5.2 emits a deprecation warning when secret_key_base is missing or read from the legacy Rails.application.config path. NOISY REGEX: presence check for legacy reads; ABSENCE does not prove the app is fine, since secret_key_base may simply be unconfigured (which is itself the deprecation 5.2 warns about). Review config/credentials.yml.enc, config/secrets.yml, and the SECRET_KEY_BASE env var to confirm the value is set somewhere. MANUAL: also check for the presence of config/initializers/secret_token.rb directly (grep does not search filenames)"
-      fix: "Migrate to credentials: `rails credentials:edit` and store secret_key_base inside. For env-based deploys, ensure the SECRET_KEY_BASE environment variable is set in production. Delete config/initializers/secret_token.rb after migration"
-      variable_name: "LEGACY_SECRET_KEY_BASE"
+        - "lib/"
+      explanation: "Rails 5.2 warns at boot whenever a secret_token is set, whether in config/secrets.yml or through Rails.application.config.secret_token (config/initializers/secret_token.rb): '`secrets.secret_token` is deprecated in favor of `secret_key_base` and will be removed in Rails 6.0.' Rails 5.1 used the same fallback with no warning. Matches every secret_token key, assignment and read. Reading or setting Rails.application.config.secret_key_base does not warn in 5.2; secrets.secret_key_base still falls back to it"
+      fix: "Make sure secret_key_base is set (config/secrets.yml works on 5.1 and 5.2; credentials and a direct ENV['SECRET_KEY_BASE'] read are 5.2 only), then delete secret_token and config/initializers/secret_token.rb. While both are set, Rails upgrades cookies signed with the old token; once the token is gone, users whose cookie was never upgraded are logged out once"
+      variable_name: "LEGACY_SECRET_TOKEN"
 
 dependencies:
   bootsnap:
