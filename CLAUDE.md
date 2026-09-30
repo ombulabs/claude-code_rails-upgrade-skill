@@ -22,6 +22,8 @@ This file captures project-specific conventions Claude should follow when workin
   - `ruby rails-upgrade/detection-scripts/scan_patterns.rb --root path/to/app` scans the hop after the app's `Gemfile.lock` Rails version; `--target X.Y` picks the hop
   - `ruby rails-upgrade/detection-scripts/scan_patterns.rb --self-test` runs built-in assertions and loads every patterns file. CI runs it
   - It matches file content, not single lines, so a pattern that crosses newlines (`[^)]*`, `\s*`) can report more sites than `bin/test-patterns` fixtures suggest. That is intended
+  - Each finding carries `guide_entry` (file, heading, line range), derived from the guide's `**Pattern:**` markers, and `--explain VAR` prints that entry's text. Both are empty for a guide without markers
+  - Prove Ruby 2.1 compatibility by running it, not by reading it: `docker run --rm -v "$PWD":/w -w /w ruby:2.1 ruby rails-upgrade/detection-scripts/scan_patterns.rb --self-test`. The image's locale is US-ASCII, as on many legacy app boxes, so read any UTF-8 file (the guides have emoji) with an explicit `:encoding => "UTF-8"`
 
 ## Workflows and references (`rails-upgrade/workflows/`, `rails-upgrade/references/`)
 

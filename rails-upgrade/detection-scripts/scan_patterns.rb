@@ -13,7 +13,7 @@
 #   ruby <skill>/detection-scripts/scan_patterns.rb --patterns path/to/rails-70-patterns.yml
 #   ruby <skill>/detection-scripts/scan_patterns.rb --summary   # summary table only
 #   ruby <skill>/detection-scripts/scan_patterns.rb --only VAR1,VAR2   # detail for these patterns only
-#   ruby <skill>/detection-scripts/scan_patterns.rb --explain VAR1     # what a pattern means + guide index
+#   ruby <skill>/detection-scripts/scan_patterns.rb --explain VAR1     # what a pattern means + its guide entry
 #   ruby <skill>/detection-scripts/scan_patterns.rb --format json --output tmp/pattern-scan.json
 #   ruby <skill>/detection-scripts/scan_patterns.rb --self-test
 #
@@ -350,7 +350,7 @@ end
 # [[heading, first_line, last_line]] for every "## " and "#### " heading, so a
 # reader can open one entry by line range instead of loading the whole guide.
 def guide_index(path)
-  lines = File.readlines(path)
+  lines = File.readlines(path, :encoding => "UTF-8")
   heads = []
   fence = false
   lines.each_with_index do |l, i|
@@ -364,8 +364,58 @@ def guide_index(path)
   end
 end
 
+# { variable_name => { :heading, :first, :last } } for every breaking-change
+# entry whose `**Pattern:**` marker names it (the first line under the
+# heading, see CLAUDE.md "Version guides"). A guide with no markers yet
+# returns {}, and callers fall back to the heading index.
+def guide_markers(path)
+  return {} unless path && File.file?(path)
+  lines = File.readlines(path, :encoding => "UTF-8")
+  ranges = {}
+  guide_index(path).each { |h, a, b| ranges[a] = [h, b] }
+  found = {}
+  section = nil
+  fence = false
+  lines.each_with_index do |l, i|
+    fence = !fence if l.start_with?("```")
+    next if fence
+    section = l.strip if l.start_with?("## ")
+    next unless l.start_with?("#### ") && section == "## Breaking Changes"
+    marker = lines[(i + 1)..-1].find { |x| !x.strip.empty? }.to_s[/\A\*\*Pattern:\*\*\s*(.*)/, 1]
+    next unless marker
+    heading, last = ranges[i + 1]
+    marker.scan(/`([A-Z0-9_]+)`/).flatten.each do |v|
+      found[v] ||= { :heading => heading, :first => i + 1, :last => last }
+    end
+  end
+  found
+end
+
+# The entry's own lines, without the trailing rule and blank lines.
+def guide_entry_text(path, entry)
+  body = File.readlines(path, :encoding => "UTF-8")[(entry[:first] - 1)..(entry[:last] - 1)]
+  body.pop while body.any? && (body.last.strip.empty? || body.last.strip == "---")
+  body.join
+end
+
+def guide_rel(path)
+  path.sub(%r{\A.*/(version-guides/)}, '\1')
+end
+
+# Adds :guide_entry ({ :file, :heading, :first, :last } or nil) to each result.
+def attach_guide_entries(results, target)
+  guide = guide_for(target)
+  markers = guide_markers(guide)
+  results.each do |r|
+    m = markers[r[:variable]]
+    r[:guide_entry] = m ? m.merge(:file => guide_rel(guide)) : nil
+  end
+  results
+end
+
 # --explain: what one pattern means and where its guide entry is, without
-# scanning the app.
+# scanning the app. When the guide names the pattern in a `**Pattern:**`
+# marker, the entry itself is printed; otherwise the guide's heading index.
 def render_explain(patterns_path, target, vars)
   doc = YAML.load_file(patterns_path)["upgrade_findings"] || {}
   entries = {}
@@ -373,6 +423,8 @@ def render_explain(patterns_path, target, vars)
   unknown = vars - entries.keys
   abort("scan_patterns: --explain names no pattern in #{File.basename(patterns_path)}: #{unknown.join(', ')}") unless unknown.empty?
   out = []
+  guide = guide_for(target)
+  markers = guide_markers(guide)
   vars.each do |v|
     pr, e = entries[v]
     out << "## #{e['name']} (`#{v}`)"
@@ -382,10 +434,17 @@ def render_explain(patterns_path, target, vars)
     out << "- Fix: #{e['fix']}"
     Array(e["prereqs"]).each { |q| out << "- Prereq: #{q['gem']} >= #{q['min_version']} (#{q['reason']}#{q['when'] ? "; when #{q['when']}" : ''})" }
     out << ""
+    next unless (m = markers[v])
+    out << "### Guide entry: `#{guide_rel(guide)}` lines #{m[:first]}-#{m[:last]}"
+    out << ""
+    out << guide_entry_text(guide, m)
+    out << ""
   end
-  guide = guide_for(target)
-  if guide
-    rel = guide.sub(%r{\A.*/(version-guides/)}, '\1')
+  unmarked = vars.reject { |v| markers[v] }
+  if unmarked.empty?
+    # Every pattern asked about has its entry printed above.
+  elsif guide
+    rel = guide_rel(guide)
     out << "## Guide entries in `#{rel}`"
     out << ""
     out << "Read only the entry you need, by line range. The entry for a pattern is usually the one whose title names the same API."
@@ -472,6 +531,10 @@ def render_markdown(meta, results, opts)
         out << "### #{PRIORITY_LABEL[r[:priority]]} · #{r[:kind]} · #{r[:name]} (`#{r[:variable]}`), #{r[:hits].length} site(s)"
         out << ""
         out << "Fix: #{r[:fix]}" if r[:fix]
+        if (g = r[:guide_entry])
+          out << ""
+          out << "Guide: \"#{g[:heading]}\", `#{g[:file]}` lines #{g[:first]}-#{g[:last]} (or `--explain #{r[:variable]}`)"
+        end
         out << ""
         out << "| Location | Code |"
         out << "|----------|------|"
@@ -561,6 +624,12 @@ def render_json(meta, results)
         # true when the entry fires on a path existing (pattern: ""); its sites
         # have "line" => null and "file" is the search path.
         "path_only" => r[:path_only] ? true : false,
+        # The version-guide entry whose **Pattern:** marker names this
+        # pattern, or null while the guide has no markers.
+        "guide_entry" => r[:guide_entry] && {
+          "file" => r[:guide_entry][:file], "heading" => r[:guide_entry][:heading],
+          "lines" => [r[:guide_entry][:first], r[:guide_entry][:last]]
+        },
         "sites" => r[:hits].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } },
         "suppressed" => r[:suppressed].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } }
       }
@@ -671,6 +740,20 @@ def self_test
   ex = render_explain(patterns_file_for("4.1"), "4.1", ["DEFAULT_SCOPE"])
   check.call("--explain prints the pattern and the guide entry index",
              ex.include?("`DEFAULT_SCOPE`") && ex.include?("upgrade-4.0-to-4.1.md") && ex =~ /^- \d+-\d+: `default_scope` Chains/)
+  # A guide with **Pattern:** markers (7.2) links each pattern to its entry;
+  # a guide without them (4.1) links nothing and --explain keeps the index.
+  m72 = guide_markers(guide_for("7.2"))
+  rv = m72["RUBY_VERSION"]
+  check.call("reads the 7.2 markers (got #{rv.inspect})",
+             rv && rv[:heading] == "Ruby Version Requirement" && rv[:first] < rv[:last])
+  check.call("a guide without markers links nothing", guide_markers(guide_for("4.1")).empty?)
+  check.call("a none marker names no pattern", !m72.values.any? { |x| x[:heading] =~ /alias_attribute/ })
+  ex72 = render_explain(patterns_file_for("7.2"), "7.2", ["RUBY_VERSION"])
+  check.call("--explain prints the marked guide entry, not the index",
+             ex72.include?("### Guide entry:") && ex72.include?("required_ruby_version") && ex72 !~ /^## Guide entries in/)
+  r72 = attach_guide_entries([{ :variable => "RUBY_VERSION" }, { :variable => "NOT_A_PATTERN" }], "7.2")
+  check.call("attaches the guide entry to a result",
+             r72[0][:guide_entry] && r72[0][:guide_entry][:file] == "version-guides/upgrade-7.1-to-7.2.md" && r72[1][:guide_entry].nil?)
   check.call("normalizes 41 and 4.1.2", normalize_target("41") == "4.1" && normalize_target("4.1.2") == "4.1")
 
   # Every shipped patterns file must load and scan without raising.
@@ -708,7 +791,7 @@ if $PROGRAM_NAME == __FILE__
     o.on("--format FORMAT", %w[markdown json], "markdown (default) or json") { |v| opts[:format] = v }
     o.on("--summary", "print the summary table only, no per-site detail") { opts[:summary] = true }
     o.on("--only VARS", "per-site detail only for these variable_names (comma-separated)") { |v| opts[:only] = v.split(",").map(&:strip) }
-    o.on("--explain VARS", "print these patterns' explanation, fix and prereqs plus the guide's entry index, without scanning") { |v| opts[:explain] = v.split(",").map(&:strip) }
+    o.on("--explain VARS", "print these patterns' explanation, fix, prereqs and guide entry (or the guide's entry index while it has no markers), without scanning") { |v| opts[:explain] = v.split(",").map(&:strip) }
     o.on("--show-suppressed", "list the sites dropped by each entry's exclude:") { opts[:show_suppressed] = true }
     o.on("--output FILE", "write to FILE instead of stdout (creates its directory; removed first, written only on success)") { |v| opts[:output] = v }
     o.on("--self-test", "run built-in assertions and exit") { opts[:self_test] = true }
@@ -759,6 +842,7 @@ if $PROGRAM_NAME == __FILE__
   end
 
   results, roots = run_scan(patterns, root)
+  attach_guide_entries(results, target)
   if opts[:only]
     unknown = opts[:only] - results.map { |r| r[:variable] }
     unless unknown.empty?
