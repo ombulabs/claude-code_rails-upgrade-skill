@@ -23,6 +23,8 @@ Rails 7.1 introduces:
 
 #### cache_classes → enable_reloading
 
+**Pattern:** `CACHE_CLASSES`
+
 **What Changed:**
 `config.cache_classes` is replaced by `config.enable_reloading` with **inverted** boolean logic.
 
@@ -54,6 +56,8 @@ config.enable_reloading = false  # Disable reloading (production)
 
 #### Force SSL Default in Production
 
+**Pattern:** `FORCE_SSL`
+
 **What Changed:**
 `config.force_ssl` is now `true` by default in production.
 
@@ -82,6 +86,8 @@ config.force_ssl = true  # Now the default
 
 #### preview_path → preview_paths (Mailer)
 
+**Pattern:** `PREVIEW_PATH`
+
 **What Changed:**
 Mailer preview path configuration changed from singular to plural.
 
@@ -102,6 +108,8 @@ config.action_mailer.preview_paths = ["#{Rails.root}/spec/mailers/previews"]
 ---
 
 #### SQLite Database Location Changed
+
+**Pattern:** `SQLITE_LOCATION`
 
 **What Changed:**
 SQLite databases now default to `storage/` instead of `db/`.
@@ -138,6 +146,8 @@ development:
 
 #### lib/ Autoloaded by Default
 
+**Pattern:** `LIB_AUTOLOAD`
+
 **What Changed:**
 Files in `lib/` are now autoloaded by Zeitwerk.
 
@@ -165,6 +175,8 @@ Ensure files in `lib/` follow Zeitwerk naming:
 
 #### legacy_connection_handling Removed
 
+**Pattern:** `LEGACY_CONNECTION_HANDLING`
+
 **What Changed:**
 `config.active_record.legacy_connection_handling` was deprecated in Rails 7.0 and is **completely removed in Rails 7.1**. Setting it will raise an error on boot.
 
@@ -173,9 +185,6 @@ Ensure files in `lib/` follow Zeitwerk naming:
 # config/application.rb or config/environments/*.rb
 config.active_record.legacy_connection_handling = false
 config.active_record.legacy_connection_handling = true
-```
-```bash
-grep -rn "legacy_connection_handling" config/
 ```
 
 **Fix:**
@@ -203,6 +212,8 @@ end
 ### 🟡 MEDIUM PRIORITY
 
 #### Query Log Tags Format
+
+**Pattern:** `QUERY_LOG_TAGS`
 
 **What Changed:**
 New query log format options available.
@@ -255,6 +266,8 @@ Review and update CSP directives as needed.
 
 #### Secret Key File Location Changed
 
+**Pattern:** `SECRETS_YML_ENC`
+
 **What Changed:**
 The location of `secrets.yml.enc` has changed.
 
@@ -274,6 +287,8 @@ Note: Most applications use `credentials.yml.enc` instead, which is unaffected.
 ---
 
 #### Active Record inspect Output Changed
+
+**Pattern:** `INSPECT_OUTPUT`
 
 **What Changed:**
 `ActiveRecord::Core#inspect` now respects `attributes_for_inspect` configuration.
@@ -295,6 +310,8 @@ config.active_record.attributes_for_inspect = :all
 ```
 
 #### `ActiveRecord::Migration.check_pending!` Deprecated
+
+**Pattern:** `MIGRATION_CHECK_PENDING`
 
 **What Changed:**
 `ActiveRecord::Migration.check_pending!` is deprecated in favor of `check_all_pending!`, which loops through all configured databases. It still works in 7.1 but emits a deprecation warning, and is removed entirely in Rails 7.2. Commonly found in `test_helper.rb` or `rails_helper.rb`, but also set up by healthcheck gems (e.g. [`rails-healthcheck`](https://github.com/linqueta/rails-healthcheck)) to run on every `/healthcheck` request.
