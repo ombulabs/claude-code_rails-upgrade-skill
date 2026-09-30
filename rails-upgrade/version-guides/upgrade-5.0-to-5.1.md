@@ -221,6 +221,32 @@ None needed for this hop. Upgrade Ruby as a separate step, not in the same deplo
 
 ---
 
+#### raise_on_unfiltered_parameters Deprecated
+
+**Pattern:** `RAISE_ON_UNFILTERED_PARAMS`
+
+**What Changed:**
+In Rails 5.0 this setting chose what `ActionController::Parameters#to_h` does on unpermitted params: `true` raises, `false` (the default when the line is absent) quietly returns only the always-permitted keys. Rails 5.1 ignores the setting and always raises `ActionController::UnfilteredParameters`. Setting it to `true` logs a deprecation warning at boot; setting it to `false` does nothing, so an app that ran with `false` starts raising where it calls `to_h` on unpermitted params.
+
+**Detection Pattern:**
+```ruby
+Rails.application.config.action_controller.raise_on_unfiltered_parameters = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Rails.application.config.action_controller.raise_on_unfiltered_parameters = false
+params.to_h
+
+# AFTER (line removed)
+params.permit(:name, :email).to_h
+params.to_unsafe_h # only where the unfiltered hash is intended
+```
+The AFTER works on Rails 5.0 too. The pattern finds only the config line; search for `to_h` on `params` by hand if the line was `false` or missing.
+
+---
+
 ## New Features
 
 ### Encrypted Secrets
@@ -330,6 +356,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `redirect_to :back` raises | "redirect_to :back Removed" — `redirect_back(fallback_location: ...)` |
 | `ArgumentError: missing keyword: :fallback_location` | "redirect_to :back Removed" — `redirect_back` requires `fallback_location:` |
 | Files under `public/` lose their `Cache-Control` header, or Rails serves them although `serve_static_files = false` | "config.serve_static_files and config.static_cache_control Removed" — move to `config.public_file_server` |
+| `ActionController::UnfilteredParameters: unable to convert unpermitted parameters to hash` | "raise_on_unfiltered_parameters Deprecated" — `permit(...)` before `to_h` |
 
 ---
 

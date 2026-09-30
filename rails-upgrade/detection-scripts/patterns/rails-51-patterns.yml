@@ -185,8 +185,8 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 5.1 deprecates config.action_controller.raise_on_unfiltered_parameters. The setting has had no effect since 5.1; existing config lines emit a deprecation warning at boot"
-      fix: "Remove the line entirely from config/application.rb or environment configs"
+      explanation: "Rails 5.1 deprecates config.action_controller.raise_on_unfiltered_parameters and ignores it: ActionController::Parameters#to_h and #to_hash always raise ActionController::UnfilteredParameters on unpermitted params. Setting it to true logs a deprecation warning at boot; setting it to false does nothing, so an app that ran with false (the Rails 5.0 default when the line is absent) starts raising where it calls to_h on unpermitted params"
+      fix: "Remove the line from config/application.rb, config/initializers/new_framework_defaults.rb or environment configs. If it was false, call permit(...) before to_h, or to_unsafe_h where the unfiltered hash is intended"
       variable_name: "RAISE_ON_UNFILTERED_PARAMS"
 
     - name: "halt_callback_chains_on_return_false"
