@@ -581,6 +581,38 @@ The AFTER works on 7.2 too.
 
 ---
 
+#### `unsigned_float` and `unsigned_decimal` Column Methods Deprecated
+
+**Pattern:** `UNSIGNED_FLOAT_DECIMAL`
+
+**What Changed:**
+The MySQL adapter's `t.unsigned_float` and `t.unsigned_decimal` shorthands work on 7.2 with no warning. Rails 8.0 still creates the same column but warns each time a migration calls them:
+
+```
+DEPRECATION WARNING: unsigned_float is deprecated and will be removed from Rails 8.1
+```
+
+`unsigned_integer` and `unsigned_bigint` are not deprecated. `db/schema.rb` already writes the `unsigned: true` option form, so only migrations that still run (a fresh `db:migrate`) warn.
+
+**Detection Pattern:**
+```ruby
+# db/migrate/*.rb
+t.unsigned_float :amount
+t.unsigned_decimal :price, precision: 10, scale: 2
+```
+
+**Fix:**
+```ruby
+# BEFORE
+t.unsigned_float :amount
+
+# AFTER
+t.float :amount, unsigned: true
+```
+The AFTER works on 7.2 too: the shorthand only sets `unsigned: true` on both versions.
+
+---
+
 ## Solid Gems Decision Guide
 
 | Current Setup | Recommendation |

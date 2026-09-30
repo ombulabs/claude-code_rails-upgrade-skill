@@ -144,3 +144,14 @@ COMMIT_TRANSACTION_ON_NON_LOCAL_RETURN:
     # commented line, as in the 7.1 new_framework_defaults initializer
     - "# Rails.application.config.active_record.commit_transaction_on_non_local_return = true"
     - "    # config.active_record.commit_transaction_on_non_local_return = true"
+
+UNSIGNED_FLOAT_DECIMAL:
+  match:
+    - "      t.unsigned_float :amount"
+    - "      t.unsigned_decimal :price, precision: 10, scale: 2"
+  no_match:
+    # still supported, not deprecated
+    - "      t.unsigned_integer :count"
+    - "      t.unsigned_bigint :count"
+    # the replacement
+    - "      t.float :amount, unsigned: true"
