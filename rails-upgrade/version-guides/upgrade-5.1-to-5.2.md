@@ -413,6 +413,35 @@ The AFTER works on 5.1 too; then delete `quoted_id`.
 
 ---
 
+#### lock! Raises on a Record with Unsaved Changes
+
+**Pattern:** `LOCK_BANG_UNPERSISTED`
+
+**What Changed:**
+`lock!` reloads the record, so unsaved changes were always thrown away. Rails 5.1 warned about it; Rails 5.2 raises `RuntimeError` ("Locking a record with unpersisted changes is not supported."). `with_lock` calls `lock!` first, so it raises too.
+
+**Detection Pattern:**
+```ruby
+account.balance += 10
+account.lock!
+```
+
+**Fix:**
+```ruby
+# BEFORE
+account.balance += 10
+account.with_lock { account.save! }
+
+# AFTER
+account.with_lock do
+  account.balance += 10
+  account.save!
+end
+```
+The AFTER works on 5.1 too.
+
+---
+
 ## New Features
 
 ### Active Storage

@@ -101,3 +101,17 @@ CONNECTION_VERIFY_ARGUMENTS:
     - "  ActiveRecord::Base.connection.verify! if defined?(ActiveRecord)"
     - "  cookies.signed.verify(token)"
     - "  expect(conn).to receive(:verify!).with(no_args)"
+
+LOCK_BANG_UNPERSISTED:
+  # Every lock! / with_lock call site; the audit decides whether the record
+  # has unsaved changes at that point.
+  match:
+    - "  account.lock!"
+    - "  account.lock!(\"FOR UPDATE NOWAIT\")"
+    - "    lock!"
+    - "  account.with_lock do"
+  no_match:
+    - "  def lock!(lock = true)"
+    - "  account.unlock!"
+    - "  Account.lock.find(params[:id])"
+    - "  user.locked!"
