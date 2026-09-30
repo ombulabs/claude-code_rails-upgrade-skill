@@ -43,7 +43,7 @@ upgrade_findings:
       search_paths:
         - "config/"
       explanation: "Rails 5.2 removes ActiveSupport.halt_callback_chains_on_return_false and its setter. In 5.1 both only emitted a deprecation warning and changed nothing. The line usually sits in config/initializers/new_framework_defaults.rb, which the 5.0 generator wrote; `ActiveSupport.halt_callback_chains_on_return_false = false` there raises NoMethodError at boot. A config.active_support.halt_callback_chains_on_return_false line is skipped silently (the railtie checks respond_to?), but is dead and should go too"
-      fix: "Remove the line entirely. Code that relied on `return false` to halt callbacks should already be using `throw :abort` after the 4.2 → 5.0 hop"
+      fix: "Remove the line entirely. Removing it works on 5.1 too. A callback that still returns false to halt the chain stopped halting in 5.1 (5.0 halted with a warning); use `throw :abort`"
       variable_name: "HALT_CALLBACK_CHAINS_ON_RETURN_FALSE"
 
     - name: "String if:/unless: conditions on callbacks, filters and validations"
