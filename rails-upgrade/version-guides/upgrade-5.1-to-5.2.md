@@ -221,6 +221,25 @@ The `redis` adapter works on 5.1 too. It needs only the `redis` gem, so `em-hire
 
 ---
 
+#### connection.verify! No Longer Takes Arguments
+
+**Pattern:** `CONNECTION_VERIFY_ARGUMENTS`
+
+**What Changed:**
+Rails 5.1 ignored any arguments to the connection's `verify!` and warned about them. Rails 5.2 defines `verify!` with no parameters, so `verify!(0)` raises `ArgumentError`. A call in a forking server hook (`config/unicorn.rb`, `config/puma.rb`) is not run by the test suite, so it can first fail in production.
+
+**Fix:**
+```ruby
+# BEFORE
+ActiveRecord::Base.connection.verify!(0)
+
+# AFTER
+ActiveRecord::Base.connection.verify!
+```
+The no-argument call works on 5.1 too.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Encrypted Secrets → Credentials

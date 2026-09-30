@@ -90,3 +90,14 @@ QUOTED_ID_METHOD:
   no_match:
     - "  def quoted_identifier"
     - "  where(owner_id: owner.id)"
+
+CONNECTION_VERIFY_ARGUMENTS:
+  # 5.2 defines connection verify! with no parameters.
+  match:
+    - "  ActiveRecord::Base.connection.verify!(0)"
+    - "  ActiveRecord::Base.connection.verify! 5"
+  no_match:
+    - "  ActiveRecord::Base.connection.verify!"
+    - "  ActiveRecord::Base.connection.verify! if defined?(ActiveRecord)"
+    - "  cookies.signed.verify(token)"
+    - "  expect(conn).to receive(:verify!).with(no_args)"
