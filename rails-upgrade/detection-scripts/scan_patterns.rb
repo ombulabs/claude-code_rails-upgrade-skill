@@ -371,19 +371,25 @@ end
 def guide_markers(path)
   return {} unless path && File.file?(path)
   lines = File.readlines(path, :encoding => "UTF-8")
-  ranges = {}
-  guide_index(path).each { |h, a, b| ranges[a] = [h, b] }
-  found = {}
-  section = nil
+  # Line indexes of every heading outside a code fence. An entry ends at the
+  # next heading of any level, so a `### 🟡 MEDIUM PRIORITY` after the last
+  # HIGH entry is not part of that entry.
+  heads = []
   fence = false
   lines.each_with_index do |l, i|
     fence = !fence if l.start_with?("```")
-    next if fence
+    heads << i if !fence && l =~ /\A#+ /
+  end
+  found = {}
+  section = nil
+  heads.each_with_index do |i, n|
+    l = lines[i]
     section = l.strip if l.start_with?("## ")
     next unless l.start_with?("#### ") && section == "## Breaking Changes"
     marker = lines[(i + 1)..-1].find { |x| !x.strip.empty? }.to_s[/\A\*\*Pattern:\*\*\s*(.*)/, 1]
     next unless marker
-    heading, last = ranges[i + 1]
+    last = heads[n + 1] ? heads[n + 1] : lines.length
+    heading = l.sub(/\A#+\s*/, "").strip
     marker.scan(/`([A-Z0-9_]+)`/).flatten.each do |v|
       found[v] ||= { :heading => heading, :first => i + 1, :last => last }
     end
@@ -748,6 +754,9 @@ def self_test
              rv && rv[:heading] == "Ruby Version Requirement" && rv[:first] < rv[:last])
   check.call("a guide without markers links nothing", guide_markers(guide_for("4.1")).empty?)
   check.call("a none marker names no pattern", !m72.values.any? { |x| x[:heading] =~ /alias_attribute/ })
+  mc = m72["MIGRATION_CHECK_PENDING_REMOVED"]
+  check.call("an entry ends before the next priority heading (got #{mc.inspect})",
+             mc && guide_entry_text(guide_for("7.2"), mc) !~ /PRIORITY/)
   ex72 = render_explain(patterns_file_for("7.2"), "7.2", ["RUBY_VERSION"])
   check.call("--explain prints the marked guide entry, not the index",
              ex72.include?("### Guide entry:") && ex72.include?("required_ruby_version") && ex72 !~ /^## Guide entries in/)
