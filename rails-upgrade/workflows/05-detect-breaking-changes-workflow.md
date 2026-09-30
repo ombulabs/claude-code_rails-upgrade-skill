@@ -106,7 +106,7 @@ Without `--summary` the output is markdown:
 - **Suppressed by exclude**: sites the pattern matched that `exclude:` dropped;
 - **UNSCANNED**: patterns whose search_paths resolved to no files in this app. A path-based pattern (`pattern: ""`, such as `VENDOR_PLUGINS`) is never UNSCANNED: its path being absent is the clean answer.
 
-Flags: `--summary` prints only the summary and the status lists; `--only VAR1,VAR2` prints the per-site detail for those patterns only; `--explain VAR1,VAR2` prints those patterns' explanation, fix and `prereqs:` plus a line-numbered index of the version guide's entries, without scanning; `--format json` prints a `summary` block (patterns checked and fired, sites, files, counts by kind, unscanned and fully suppressed patterns) and one object per pattern with its bucket, status (`found` / `clean` / `suppressed` / `unscanned`), explanation, fix, `prereqs:` and sites; `--show-suppressed` lists every suppressed site.
+Flags: `--summary` prints only the summary and the status lists; `--only VAR1,VAR2` prints the per-site detail for those patterns only; `--explain VAR1,VAR2` prints those patterns' explanation, fix and `prereqs:` plus the text of each one's guide entry (or, for a guide without `**Pattern:**` markers yet, a line-numbered index of its entries), without scanning; `--format json` prints a `summary` block (patterns checked and fired, sites, files, counts by kind, unscanned and fully suppressed patterns) and one object per pattern with its bucket, status (`found` / `clean` / `suppressed` / `unscanned`), explanation, fix, `prereqs:`, sites and `guide_entry` (the guide file, heading and line range of the entry whose `**Pattern:**` marker names it, or `null` while that guide has no markers); `--show-suppressed` lists every suppressed site.
 
 The scanner matches against file content, so a call split across lines is found when the pattern is written to cross newlines. It also searches Packwerk packs, engines and components (`app/models/` also reaches `packs/*/app/models/`) and skips `node_modules` anywhere and `vendor`, `tmp` and `log` at the app or pack root, unless a search_path names them. A site that spans lines is reported as `file:start-end`.
 
@@ -186,7 +186,7 @@ A HIGH `deprecation` (silently wrong, like `DIRTY_TRACKING_AFTER_SAVE`) lands in
 
 Pull context per finding, not in bulk:
 
-- What the change is: `--explain VAR` (explanation, fix, prereqs). When that is not enough, read only the matching guide entry: `--explain` lists every entry of `version-guides/upgrade-{FROM}-to-{TO}.md` with its line range, so Read it with `offset` / `limit` instead of loading the whole guide.
+- What the change is: `--explain VAR` (explanation, fix, prereqs, and the guide entry itself when the guide names the pattern in a `**Pattern:**` marker). The markdown report also shows a `Guide:` line with that entry's line range. For a guide without markers yet, `--explain` lists every entry of `version-guides/upgrade-{FROM}-to-{TO}.md` with its line range instead, so Read only the matching one with `offset` / `limit`.
 - The app's code: read around each site (`offset` / `limit` near the reported line), and the whole file only when the change depends on more of it (an initializer, a model's callbacks).
 
 Read the app's code to:
