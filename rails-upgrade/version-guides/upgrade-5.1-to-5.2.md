@@ -44,19 +44,19 @@ require 'bootsnap/setup'
 
 #### Cookie Expiry Format Changed
 
+**Pattern:** none (a default turned on by `load_defaults 5.2`, not a code shape)
+
 **What Changed:**
-Signed/encrypted cookie expiry timestamps are now embedded in the cookie value.
+With `config.action_dispatch.use_authenticated_cookie_encryption = true` (set by `load_defaults 5.2`; the framework default is still `false`), encrypted cookies switch from AES-256-CBC to AES-256-GCM, and signed and encrypted cookies carry their expiry inside the value.
 
 **Impact:**
-Cookies set before upgrading may be reset after upgrading.
+Rails 5.2 still reads the old CBC cookies and rewrites them, so the upgrade itself does not log users out. A server without the flag (5.1, or 5.2 before the flag) cannot read the new cookies, so a rollback or a mixed 5.1/5.2 deploy logs out users whose cookie was rewritten.
 
 **Fix:**
-This is handled automatically. Users may need to re-login after upgrade.
-
-For explicit control:
+Keep the flag off until no 5.1 server is left, then turn it on:
 ```ruby
-# config/initializers/cookies_serializer.rb
-Rails.application.config.action_dispatch.use_authenticated_cookie_encryption = true
+# config/initializers/new_framework_defaults_5_2.rb
+Rails.application.config.action_dispatch.use_authenticated_cookie_encryption = false
 ```
 
 ---
@@ -587,7 +587,7 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `attribute_changed?` returns `false` after save | "Active Record attribute_changed? Behavior" — `saved_change_to_attribute?` |
 | `ActionController::InvalidAuthenticityToken` on forms that worked on 5.1 | "per_form_csrf_tokens Default Changed" — fresh token per form, or disable the feature |
-| Users logged out once after deploy | "Cookie Expiry Format Changed" — expected, one re-authentication |
+| Users logged out after a rollback or during a mixed 5.1/5.2 deploy | "Cookie Expiry Format Changed" — keep `use_authenticated_cookie_encryption` off until 5.1 is gone |
 | `Using a dynamic :controller segment in a route is deprecated` (or `:action`) | "Dynamic :controller and :action Route Segments" — declare each route explicitly |
 | `` ArgumentError: A class was passed to `:class_name` but we are expecting a string. `` | "Association class_name Must Be a String" — quote the class name |
 | ``NoMethodError: undefined method `error_on_ignored_order_or_limit='`` at boot | "error_on_ignored_order_or_limit Removed" — rename to `error_on_ignored_order` |
