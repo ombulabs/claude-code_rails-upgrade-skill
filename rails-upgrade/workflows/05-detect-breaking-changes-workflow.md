@@ -110,7 +110,7 @@ Flags: `--summary` prints only the summary and the status lists; `--only VAR1,VA
 
 The scanner matches against file content, so a call split across lines is found when the pattern is written to cross newlines. It also searches Packwerk packs, engines and components (`app/models/` also reaches `packs/*/app/models/`) and skips `node_modules` anywhere and `vendor`, `tmp` and `log` at the app or pack root, unless a search_path names them. A site that spans lines is reported as `file:start-end`.
 
-If Ruby cannot run in the app's environment at all, fall back to the Grep tool: for every pattern in `upgrade_findings.high_priority`, `medium_priority` and `low_priority`, run one Grep per search_path with `output_mode: "content"` and `-n: true`, then drop lines that match `exclude:`. Grep is line-based, so its counts are a floor for patterns that span lines.
+If Ruby cannot run in the app's environment at all, fall back to the Grep tool: for every pattern in `upgrade_findings.high_priority`, `medium_priority` and `low_priority`, run one Grep per search_path with `output_mode: "content"` and `-n: true`, then drop lines that match `exclude:`. Grep is line-based, so its counts are a floor for patterns that span lines. Grep rejects look-around (`(?=`, `(?!`, `(?<=`, `(?<!`) and, without `multiline: true`, a `\n`, with a parse error rather than zero hits: split such a pattern at its top-level `|`, drop the look-around from the alternatives that carry it, and read each of the broader hits.
 
 ---
 

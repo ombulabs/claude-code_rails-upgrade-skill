@@ -1,0 +1,38 @@
+# Fixture expectations for rails-50-patterns.yml.
+#
+# Keyed by variable_name. See rails-40-patterns.expectations.yml for the format.
+# A fixture may span lines ("  false\n  end"): the pattern is matched against
+# the string, the same way scan_patterns.rb matches file content.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-50-patterns.yml
+
+CALLBACK_HALT:
+  match:
+    - "    return false if locked?"
+    - "    return false"
+    # a bare false as the method's last line
+    - "    false\n  end"
+    - "      false\n    end\n  end"
+    - "    false # stop the save\n  end"
+    # a bare false ending a branch, and a trailing modifier
+    - "      false\n    else\n      true\n    end"
+    - "      false\n    elsif draft?"
+    - "    false\n  rescue StandardError"
+    - "    false if archived?\n  end"
+    - "    false unless valid_state? # halt\n  end"
+    # one-line blocks
+    - "  before_save { false if archived? }"
+    - "  before_destroy(if: :protected?) { false }"
+  no_match:
+    - "    # return false to stop the save"
+    - "  # false\n  end"
+    - "    throw :abort if locked?"
+    - "    self.active = false\n  end"
+    - "    false_positive_count\n  end"
+    - "    false\n    log_it\n  end"
+    - "    false if archived?\n    log_it\n  end"
+    - "    enabled = false"
+    - "  before_save { self.flag = true }"
+    - "  after_save { false }"
+    - "    return falsey_value"

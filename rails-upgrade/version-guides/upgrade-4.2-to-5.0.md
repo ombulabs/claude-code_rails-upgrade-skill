@@ -207,16 +207,41 @@ Rack::Test::UploadedFile.new(file_path, 'image/png')
 #### Callback Halting Changed
 
 **What Changed:**
-Returning `false` from a callback no longer halts the chain.
+Returning `false` from a before_* Active Record or Active Model callback no longer halts the
+chain. On 5.0 it still halts, with a deprecation warning, while
+`ActiveSupport.halt_callback_chains_on_return_false` is `true` (the setting an upgraded app gets);
+new 5.0 apps set it to `false`. From 5.1 the setting is ignored (it only warns, and 5.2 removes
+it), so an app still on `true` starts saving or destroying at the 5.1 hop, warned only that the
+setting is deprecated.
+Nothing raises. A `before_save` that returns `false` saves the record on Active Record 5.1 and
+later and refuses it on 4.2, for the method form and the block form alike.
 
-**Detection Pattern:**
+Three shapes yield the halting `false`, and the bare trailing one is the easiest to miss:
+
 ```ruby
 before_save :check_something
+before_destroy :guard
+before_save { false if archived? }
 
 def check_something
-  return false if invalid_condition  # No longer halts!
+  return false if invalid_condition
+end
+
+def guard
+  if protected?
+    false            # the method's value; halts on 4.2, ignored from 5.1
+  else
+    true
+  end
 end
 ```
+
+A callback whose last expression only evaluates to `false` (`!locked?`) halts too, and no grep
+finds it, so read the last line of each before_* callback.
+
+Controller filters are not affected: `before_action` never halted on `false`. Its terminator was
+`response_body` through 4.2 and is `performed?` from 5.0, so only `render` or `redirect_to` has
+ever stopped the action.
 
 **Fix:**
 ```ruby
@@ -228,6 +253,16 @@ end
 # AFTER
 def check_something
   throw :abort if invalid_condition
+end
+```
+
+`throw :abort` raises `UncaughtThrowError: uncaught throw :abort` on 4.2, so a dual-boot app
+branches it:
+
+```ruby
+def check_something
+  return unless invalid_condition
+  NextRails.next? ? throw(:abort) : false
 end
 ```
 

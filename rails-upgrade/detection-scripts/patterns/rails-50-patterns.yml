@@ -68,13 +68,12 @@ upgrade_findings:
   medium_priority:
     - name: "Callback returning false to halt"
       kind: "deprecation"
-      pattern: "return\\s+false"
-      exclude: ""
+      pattern: "\\breturn\\s+false\\b|^[ \\t]*false(?:[ \\t]+(?:if|unless)\\b[^\\n]*)?(?=[ \\t]*(#[^\\n]*)?\\n\\s*(end|else|elsif|when|rescue|ensure)\\b)|\\bbefore_(save|create|update|destroy|validation)\\b[^\\n{]*\\{[^}\\n]*\\bfalse\\b"
+      exclude: "\\A\\s*#"
       search_paths:
         - "app/models/"
-        - "app/controllers/"
-      explanation: "Returning false from a callback no longer halts the chain in Rails 5.0. This is a noisy pattern -- only matches inside before_* callbacks need fixing"
-      fix: "Replace 'return false' with 'throw :abort' in before_* callbacks. Ignore matches in non-callback methods"
+      explanation: "Rails 5.0 stops halting an Active Record or Active Model callback chain on a `false` return: with `ActiveSupport.halt_callback_chains_on_return_false = false` (the 5.0 default for new apps, and the only behavior from 5.1 on, where the setting is ignored) the save or destroy goes ahead, and on the upgrade setting of `true` it still halts but warns. Only a before_* callback that yields `false` on purpose needs a fix. The pattern flags the three shapes that yield it: `return false`, a bare `false`, alone or with a trailing `if`/`unless`, ending a method or a branch (the line before `end`, `else`, `elsif`, `when`, `rescue` or `ensure`), and a one-line `before_* { ... false ... }` block. It cannot see a callback whose last expression merely evaluates to false (`!locked?`, `errors.add(...) && false`), so read each before_* callback's last line too. Controllers are not searched: `before_action` halted on `response_body` in 3.2 and 4.x and on `performed?` from 5.0 (AbstractController::Callbacks terminator), so a `false` return from a controller filter never stopped the action on any version. Callbacks declared on plain Active Model objects outside app/models/ are not searched either"
+      fix: "In a before_* callback, replace the halting `false` with `throw :abort` (`return false` becomes `throw :abort`, a bare trailing `false` becomes `throw :abort`). `throw :abort` raises UncaughtThrowError on 4.2, so on a dual-boot app branch it: `NextRails.next? ? throw(:abort) : false`. A match in a method that is not registered as a before_* callback is not a finding. A controller filter that relied on returning false never halted; make it `render` or `redirect_to` to stop the action"
       variable_name: "CALLBACK_HALT"
 
     - name: "assigns in tests"
