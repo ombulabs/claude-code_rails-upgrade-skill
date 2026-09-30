@@ -112,7 +112,7 @@ upgrade_findings:
         - "app/"
         - "lib/"
         - "config/"
-      explanation: "Rails 8.1 deprecates ActiveSupport::Configurable. activesupport/CHANGELOG.md: 'Deprecate `ActiveSupport::Configurable`.' Apps that include / extend it on their own classes (often as a gem-like in-app component) emit a warning. The deprecation message points users at plain `class_attribute` / `mattr_accessor` / Anyway gem alternatives"
+      explanation: "Rails 8.1 deprecates ActiveSupport::Configurable. activesupport/CHANGELOG.md: 'Deprecate `ActiveSupport::Configurable`.' activesupport 8.1 lib/active_support/configurable.rb warns once, when the module is first loaded: 'ActiveSupport::Configurable is deprecated without replacement, and will be removed in Rails 8.2. You can emulate the previous behavior with `class_attribute`.' The module still works in 8.1"
       fix: "Replace `include ActiveSupport::Configurable` / `extend ActiveSupport::Configurable` with explicit `class_attribute` declarations or a small custom configuration object. The replacement is mechanical for most use sites"
       variable_name: "AS_CONFIGURABLE"
 

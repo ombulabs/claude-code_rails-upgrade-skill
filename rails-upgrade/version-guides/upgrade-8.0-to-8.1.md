@@ -286,6 +286,40 @@ The AFTER works on 8.0 too (`ActiveSupport::Benchmark` exists from 8.0.0). To ke
 
 ---
 
+#### ActiveSupport::Configurable Deprecated
+
+**Pattern:** `AS_CONFIGURABLE`
+
+**What Changed:**
+Rails 8.0 offered `ActiveSupport::Configurable` with no warning. Rails 8.1 prints a deprecation warning the first time the module loads: it is deprecated without replacement and will be removed in Rails 8.2. The module still works in 8.1.
+
+**Detection Pattern:**
+```ruby
+class ReportSettings
+  include ActiveSupport::Configurable
+  config_accessor :timeout
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+class ReportSettings
+  include ActiveSupport::Configurable
+  config_accessor :timeout
+end
+ReportSettings.timeout = 5
+
+# AFTER
+class ReportSettings
+  class_attribute :timeout
+end
+ReportSettings.timeout = 5
+```
+The AFTER works on 8.0 too. Code that reads the `config` object itself (`ReportSettings.config.timeout`) needs its own reader, since `class_attribute` does not define `config`.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### schema.rb Column Sorting Change

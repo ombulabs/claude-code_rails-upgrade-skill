@@ -80,3 +80,12 @@ BENCHMARK_MS_REMOVED:
     - "    ActiveSupport::Benchmark.realtime(:float_millisecond) { run }"
     - "    Benchmark.realtime { run }"
     - "    Benchmark.msg"
+
+AS_CONFIGURABLE:
+  match:
+    - "  include ActiveSupport::Configurable"
+    - "  extend ActiveSupport::Configurable"
+  no_match:
+    # the replacement
+    - "  class_attribute :timeout"
+    - "  config_accessor :timeout"
