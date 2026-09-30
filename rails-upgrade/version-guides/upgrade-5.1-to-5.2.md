@@ -51,25 +51,6 @@ user.saved_changes[:name]
 
 ---
 
-#### ActiveStorage Attachment Changes
-
-**Pattern:** none (a new opt-in framework; 5.1 code has nothing to find)
-
-**What Changed:**
-Active Storage is new and becomes the recommended approach for file uploads. The `rails` 5.2 gem depends on `activestorage`, and `require "rails/all"` loads its engine.
-
-**Impact:**
-If upgrading from CarrierWave or Paperclip, consider migration (optional).
-
-**Fix:**
-If adding Active Storage:
-```bash
-rails active_storage:install
-rails db:migrate
-```
-
----
-
 #### Association class_name Must Be a String
 
 **Pattern:** `CLASS_NAME_CONSTANT`
@@ -450,6 +431,25 @@ gem 'bootsnap', require: false
 ```ruby
 # config/boot.rb (add at top)
 require 'bootsnap/setup'
+```
+
+---
+
+#### ActiveStorage Attachment Changes
+
+**Pattern:** none (a new opt-in framework; 5.1 code has nothing to find)
+
+**What Changed:**
+Active Storage is new and becomes the recommended approach for file uploads. The `rails` 5.2 gem depends on `activestorage`, and `require "rails/all"` loads its engine.
+
+**Impact:**
+None for an app that does not use it: activestorage 5.2.8.1 only reads `config/storage.yml` when `config.active_storage.service` is set, and only once `ActiveStorage::Blob` loads. If `rails app:update` adds a `config.active_storage.service` line to the environment files, keep the `config/storage.yml` it writes alongside (railties 5.2 `config_when_updating` creates it when missing), or loading a Blob raises "Couldn't find Active Storage configuration". Moving from CarrierWave or Paperclip is optional.
+
+**Fix:**
+If adding Active Storage:
+```bash
+rails active_storage:install
+rails db:migrate
 ```
 
 ---
