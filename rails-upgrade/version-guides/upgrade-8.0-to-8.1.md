@@ -118,6 +118,41 @@ bundle audit check --update
 
 ---
 
+#### Route With Multiple Paths Raises
+
+**Pattern:** `ROUTES_MULTIPLE_PATHS_REMOVED`
+
+**What Changed:**
+Rails 8.0 drew one route per path when a route call got several paths, and warned that this was deprecated. Rails 8.1 raises `ArgumentError: Wrong number of arguments (expect 1, got 2)` while drawing routes, so the app does not boot. The same holds for several action symbols in one call inside a `member` or `collection` block.
+
+**Detection Pattern:**
+```ruby
+# config/routes.rb
+get "/old1", "/old2", to: "foo#bar"
+
+resources :photos do
+  member do
+    get :preview, :download
+  end
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+get "/old1", "/old2", to: "foo#bar"
+get :preview, :download
+
+# AFTER
+get "/old1", to: "foo#bar"
+get "/old2", to: "foo#bar"
+get :preview
+get :download
+```
+The AFTER works on 8.0 too.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Semicolon Query Separator Removed
@@ -365,6 +400,7 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | Deprecation warning for `pool:` in `database.yml`, or `Ambiguous configuration: 'pool' ... and 'max_connections'` | "pool: → max_connections:" — `max_connections: 5`, drop `pool:` |
 | SSL redirect not working in production | "SSL Configuration Commented Out" — uncomment `force_ssl` and `assume_ssl` in `production.rb` |
+| `ArgumentError: Wrong number of arguments (expect 1, got 2)` while drawing routes at boot | "Route With Multiple Paths Raises" — one route call per path |
 | Sidekiq jobs not processing | "Sidekiq Adapter Removed" — `gem 'sidekiq', '>= 7.3.3'` |
 | A request parameter after a `;` in the URL or form body is missing, or the value keeps `;rest=...` | "Semicolon Query Separator Removed" — use `&` |
 | Deprecation warning for `strict_query_string_separator` | "Semicolon Query Separator Removed" — delete the setting |

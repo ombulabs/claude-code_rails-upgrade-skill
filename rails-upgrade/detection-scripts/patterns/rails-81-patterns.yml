@@ -35,6 +35,17 @@ upgrade_findings:
       fix: "Add bundler-audit gem and bin/brakeman script"
       variable_name: "BUNDLER_AUDIT"
 
+    - name: "Routes drawn with multiple paths (removed)"
+      kind: "breaking"
+      pattern: "^\\s*(?:get|post|put|patch|delete|options|match)[\\s(]+(?:\"[^\"\\n]*\"|'[^'\\n]*'|:\\w+[?!]?)\\s*,\\s*(?:\"[^\"\\n]*\"|'[^'\\n]*'|:\\w+[?!]?)(?![\\w?!]|\\s*=>)"
+      exclude: ""
+      search_paths:
+        - "config/routes.rb"
+        - "config/routes/"
+      explanation: "Rails 8.1 removes passing more than one path to one route call (e.g. `get '/old1', '/old2', to: 'foo#bar'`, or `get :preview, :download` inside a `member` block). 8.0 drew one route per path and warned 'Mapping a route with multiple paths is deprecated'; 8.1 raises `ArgumentError: Wrong number of arguments (expect 1, got 2)` while drawing routes, so the app does not boot (actionpack 8.1 lib/action_dispatch/routing/mapper.rb, `match`). The array form `get ['/a', '/b']` is a different shape: it draws no route on 8.0 or 8.1 and is not flagged. Paths held in variables (`get path_a, path_b`) are missed. Was deprecated at 8.0 (see rails-80-patterns.yml ROUTES_MULTIPLE_PATHS)"
+      fix: "Write one call per path: `get '/old1', to: 'foo#bar'` and `get '/old2', to: 'foo#bar'`, or `%w[/old1 /old2].each { |p| get p, to: 'foo#bar' }`. Works on 8.0 too"
+      variable_name: "ROUTES_MULTIPLE_PATHS_REMOVED"
+
   medium_priority:
     - name: "Semicolon query separator"
       kind: "breaking"
@@ -81,16 +92,6 @@ upgrade_findings:
       explanation: "Rails 8.1 removes Azure storage service adapter"
       fix: "Switch to S3, GCS, or Disk storage. Or use azure-storage gem directly."
       variable_name: "AZURE_STORAGE"
-
-    - name: "Routes drawn with multiple paths (removed)"
-      kind: "breaking"
-      pattern: "^\\s*(get|post|put|patch|delete|match)\\s+\\["
-      exclude: ""
-      search_paths:
-        - "config/routes.rb"
-      explanation: "Rails 8.1 removes the deprecated form of drawing one route action with an array of paths (e.g. `get ['/old1', '/old2'], to: 'foo#bar'`). actionpack/CHANGELOG.md: 'Remove deprecated support to a route to multiple paths.' Routes that still use the array form raise at boot when routes are drawn. Was deprecated at 8.0 (see rails-80-patterns.yml ROUTES_MULTIPLE_PATHS)"
-      fix: "Use `with_options` or an explicit loop: `['/old1','/old2'].each { |p| get p, to: 'foo#bar' }`. The new shape is faster at boot time"
-      variable_name: "ROUTES_MULTIPLE_PATHS_REMOVED"
 
     - name: "Benchmark.ms (removed)"
       kind: "breaking"
