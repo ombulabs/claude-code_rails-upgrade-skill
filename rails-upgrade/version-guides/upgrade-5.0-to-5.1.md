@@ -441,6 +441,35 @@ The AFTER works on Rails 5.0 too. The pattern finds only the config line; search
 
 ---
 
+#### lock! on a Record with Unsaved Changes Deprecated
+
+**Pattern:** `LOCK_BANG_DEPRECATION`
+
+**What Changed:**
+`lock!` reloads the record with a row lock, which throws away any attribute changes not yet saved. Rails 5.0 does that silently. Rails 5.1 does the same but logs a deprecation warning when the record has unsaved changes, and Rails 5.2 raises. `with_lock` calls `lock!`, so it warns too, though the pattern does not flag it. Most `lock!` calls are on clean records and need no change.
+
+**Detection Pattern:**
+```ruby
+account.balance -= amount
+account.lock!
+```
+
+**Fix:**
+```ruby
+# BEFORE
+account.balance -= amount
+account.lock!
+account.save!
+
+# AFTER
+account.lock!
+account.balance -= amount
+account.save!
+```
+The AFTER works on Rails 5.0 too. If the changes were meant to be kept, `save` before locking; if not, `reload` first.
+
+---
+
 ## New Features
 
 ### Encrypted Secrets
@@ -559,6 +588,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'uniq'` on a model class, or a query method called on an Array after `.uniq` | "Relation#uniq Removed" — `distinct` |
 | A nested `Rails.application.secrets` value is `nil` after the bump | "Nested secrets.yml Keys Are Symbols" — use symbol keys |
 | `DEPRECATION WARNING: ActionDispatch::ParamsParser::ParseError is deprecated!` | "ActionDispatch::ParamsParser::ParseError Deprecated" — `ActionDispatch::Http::Parameters::ParseError` |
+| `DEPRECATION WARNING: Locking a record with unpersisted changes is deprecated` | "lock! on a Record with Unsaved Changes Deprecated" — lock before changing attributes |
 
 ---
 

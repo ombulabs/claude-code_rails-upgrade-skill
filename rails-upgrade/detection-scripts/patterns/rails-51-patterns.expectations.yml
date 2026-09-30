@@ -94,3 +94,13 @@ PARAMS_PARSER_ERROR:
     - "  rescue ActionDispatch::ParamsParser::ParseError => e"
   no_match:
     - "  rescue ActionDispatch::Http::Parameters::ParseError => e"
+
+LOCK_BANG_DEPRECATION:
+  match:
+    - "  account.lock!"
+    - "  account.lock!(\"FOR UPDATE NOWAIT\")"
+  no_match:
+    # with_lock calls lock! too and warns the same way, but the pattern
+    # does not flag it.
+    - "  account.with_lock do"
+    - "  Account.lock.find(id)"
