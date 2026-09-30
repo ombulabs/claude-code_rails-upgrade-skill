@@ -68,11 +68,11 @@ upgrade_findings:
     - name: "use_transactional_fixtures removed"
       kind: "breaking"
       pattern: "use_transactional_fixtures"
-      exclude: ""
+      exclude: "\\bconfig\\.use_transactional_fixtures\\b"
       search_paths:
         - "test/"
         - "spec/"
-      explanation: "Rails 5.1 removes `use_transactional_fixtures` (renamed to `use_transactional_tests` in Rails 5.0)"
+      explanation: "Rails 5.1 removes the `use_transactional_fixtures` class attribute from ActiveRecord::TestFixtures (renamed to `use_transactional_tests` and deprecated in Rails 5.0). Calling the setter raises NoMethodError when test_helper.rb loads. RSpec's `config.use_transactional_fixtures` in spec/rails_helper.rb is an rspec-rails setting that still works, so the exclude skips it"
       fix: "Rename the setting to `self.use_transactional_tests = true` in your test base class / test_helper.rb"
       variable_name: "USE_TRANSACTIONAL_FIXTURES"
 

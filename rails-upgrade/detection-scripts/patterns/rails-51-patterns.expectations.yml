@@ -1,0 +1,22 @@
+# Fixture expectations for rails-51-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-51-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-51-patterns.yml
+
+USE_TRANSACTIONAL_FIXTURES:
+  match:
+    - "  self.use_transactional_fixtures = true"
+    - "ActiveSupport::TestCase.use_transactional_fixtures = false"
+  no_match:
+    # rspec-rails keeps its own RSpec setting of this name and maps it to
+    # use_transactional_tests, so spec/rails_helper.rb is fine on 5.1.
+    - "  config.use_transactional_fixtures = true"
+    - "  self.use_transactional_tests = true"

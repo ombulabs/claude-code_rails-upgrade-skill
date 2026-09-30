@@ -165,6 +165,32 @@ The AFTER works on Rails 5.0 too. The pattern finds only the config line, and an
 
 ---
 
+#### use_transactional_fixtures Removed
+
+**Pattern:** `USE_TRANSACTIONAL_FIXTURES`
+
+**What Changed:**
+Rails 5.0 renamed the test setting to `use_transactional_tests` and kept `use_transactional_fixtures=` as a deprecated alias. Rails 5.1 removes it from `ActiveRecord::TestFixtures`, so the setter raises `NoMethodError` when `test_helper.rb` loads and the suite does not start. RSpec's `config.use_transactional_fixtures` in `spec/rails_helper.rb` is an rspec-rails setting, still valid, and the pattern skips it.
+
+**Detection Pattern:**
+```ruby
+class ActiveSupport::TestCase
+  self.use_transactional_fixtures = true
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+self.use_transactional_fixtures = true
+
+# AFTER
+self.use_transactional_tests = true
+```
+The AFTER works on Rails 5.0 too.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Positional Arguments in Process Methods
@@ -389,6 +415,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Files under `public/` lose their `Cache-Control` header, or Rails serves them although `serve_static_files = false` | "config.serve_static_files and config.static_cache_control Removed" — move to `config.public_file_server` |
 | `ActionController::UnfilteredParameters: unable to convert unpermitted parameters to hash` | "raise_on_unfiltered_parameters Deprecated" — `permit(...)` before `to_h` |
 | A record saves although a `before_*` callback returned `false` | "Returning false No Longer Halts Callbacks" — `throw :abort` |
+| `NoMethodError: undefined method 'use_transactional_fixtures='` | "use_transactional_fixtures Removed" — `use_transactional_tests` |
 
 ---
 
