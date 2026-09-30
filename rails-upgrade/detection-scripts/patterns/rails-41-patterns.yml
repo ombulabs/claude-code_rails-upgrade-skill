@@ -82,6 +82,20 @@ upgrade_findings:
       fix: "Gate the gem out of the 4.1 bundle rather than delete it while the current bundle is still 4.0 and depends on it: `gem 'cache_digests' unless NextRails.next?`. Then confirm no first-party code calls the gem API, because core's is not call-compatible: CacheDigests::TemplateDigestor.digest(name, format, finder, options) (positional) became ActionView::Digestor.digest(name:, finder:, dependencies:, partial:) (single options hash); cache_prefix and the swappable cache accessor are gone; the ['v3', 'key'] explicitly-versioned cache-key form is gone, leaving only skip_digest: true; view_cache_dependency survives unchanged in ActionView::Helpers::CacheHelper. Core's ERB dependency tracker also detects more dependencies than the gem's (it parses layout: keys and method chains), so fragment digests can shift — that is a cold fragment cache on first deploy, not an error. A hit in Gemfile.lock with nothing in the Gemfile means another gem pulls cache_digests in transitively — run `bundle why cache_digests` and gate or upgrade that parent gem instead. Delete cache_digests outright once the current Rails is 4.1"
       variable_name: "CACHE_DIGESTS_BACKPORT"
 
+    - name: "JoinDependency::JoinAssociation internals (parent_table_name, join_to)"
+      kind: breaking
+      pattern: "(\\.(?:parent_table(?:_name)?|aliased_prefix|join_dependency)\\b|JoinDependency::JoinAssociation\\b|\\bclass JoinAssociation\\b|def join_to\\b|:join_to\\b)"
+      exclude: "^\\s*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/initializers/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.1 rewrote ActiveRecord::Associations::JoinDependency. JoinAssociation no longer keeps a parent, so parent_table_name (4.0 delegated it to the parent) is gone, along with parent, parent_table, join_dependency, join_type and aliased_prefix, and join_to(manager) became join_constraints(foreign_table, foreign_klass, node, join_type, tables, scope_chain, chain). Two kinds of app code reach into it. An association scope that takes an argument receives the JoinAssociation when the association is joined, so a scope that builds SQL from join.parent_table_name raises NoMethodError on 4.1 as soon as the association is used in joins. A monkeypatch on join_to fails in one of two ways: alias_method_chain :join_to raises NameError at load, while a prepended module that overrides join_to loads fine and is never called, so the SQL it added silently disappears from every join. The pattern flags calls to .parent_table_name, .parent_table, .aliased_prefix and .join_dependency, any reference to JoinDependency::JoinAssociation or a reopened class JoinAssociation, a def join_to, and the :join_to symbol an alias_method_chain or alias_method takes. It does not flag .parent or .join_type, which are too common outside this class: check any association scope that takes an argument for them by hand"
+      fix: "In an association scope, aliased_table_name still exists on the 4.1 JoinAssociation, but the parent side's table name does not. Use the parent model's table name directly when the parent table is not aliased, or move the condition into a scope applied where the query is built. For a join_to patch, write a join_constraints version for 4.1 (new signature) and pick between the two with NextRails.next?. Then compare the generated SQL (to_sql) on both bundles: a patch that silently stops running changes queries without necessarily failing a test"
+      variable_name: "JOIN_DEPENDENCY_INTERNALS"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking
@@ -157,6 +171,45 @@ upgrade_findings:
       explanation: "Rails 4.1 adds millisecond precision to Time/DateTime/TimeWithZone JSON output by default. Presence check — ABSENCE means the app inherits the new default and clients parsing fixed-length ISO-8601 strings may break"
       fix: "If clients require second precision: `ActiveSupport::JSON::Encoding.time_precision = 0` in an initializer. Otherwise accept the new default"
       variable_name: "JSON_TIME_PRECISION"
+
+    - name: "Relation#all on a relation or association (returns a Relation, not an Array)"
+      kind: breaking
+      pattern: "\\.all\\s*$|\\.all\\s*[^(?\\w]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "On Rails 4.0 the bundled activerecord-deprecated_finders gem defines Relation#all: calling it on a relation or an association (Post.where(published: true).all, user.posts.all) emits a deprecation warning and returns an Array. Rails 4.1 drops that gem, so the same call falls through to the model's class-level all and returns a Relation. Code that treats the result as an Array breaks: sort!, pop, shift and the other bang mutators raise NoMethodError, and is_a?(Array) turns false. Passing finder options (.all(conditions: ...)) raises ArgumentError on 4.1; this pattern skips `.all(` with the parenthesis right after `all`, but still matches `.all (...)` with a space before it. HIGH FALSE-POSITIVE RATE: most hits are Model.all on a constant, which is the replacement and is fine. Capybara's page.all(\".row\") is skipped, but page.all \".row\" without parentheses matches, and so does any object that defines its own all method. Check the receiver of every hit before rewriting it"
+      fix: "Replace rel.all with rel.to_a, which returns an Array on 4.0 and 4.1 and does not warn. Prefer to_a over the load the deprecation message also suggests: load returns the Relation, so it changes the return type. Where the caller only iterates (each, map), dropping .all also works, but keep to_a when the result is appended to with <<: on a has_many association of a saved record, << saves the new record. Leave Model.all, page.all(...) and custom all methods alone. As a short-term bridge, gem 'activerecord-deprecated_finders' restores the 4.0 behavior on 4.1"
+      variable_name: "RELATION_ALL"
+
+    - name: "count on a relation with a multi-column select"
+      kind: breaking
+      pattern: "(?<![A-Za-z0-9_])select(?:\\(\\s*|\\s+)(?:[\"'][^\"'\\n]*,[^\"'\\n]*[\"']|[\"'][^\"'\\n]*\\.\\*[^\"'\\n]*[\"']|(?:[\"'][^\"'\\n]*[\"']|:[a-z_]+)\\s*,\\s*(?:[\"']|:[a-z_])|\\[[^\\]\\n]*,[^\\]\\n]*\\]|%[wi][\\[(]\\s*\\w+\\s+\\w)"
+      exclude: "\\b(?:f|form|builder)\\.select\\b|(?:<%=?|^\\s*[=-])\\s*select\\b"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.0 ignores a select list that contains a comma or `*` when it builds a count, so Post.select(\"title, version\").count runs COUNT(*). Rails 4.1 passes the select list straight into COUNT, producing COUNT(title, version), which SQLite, PostgreSQL and MySQL all reject with ActiveRecord::StatementInvalid. A table-qualified star breaks the same way: Post.joins(:author).select(\"posts.*\").count runs COUNT(posts.*) on 4.1, which SQLite and MySQL reject (PostgreSQL accepts it). A bare select(\"*\") is fine, it becomes COUNT(*). The pattern flags the shapes a multi-column select takes: a comma inside one string, a string containing `.*`, several string or symbol arguments, an array or a %w[] list, with or without parentheses, called on a receiver or bare inside a scope body. The ActionView select form helper takes several string arguments too, so select calls right after <%=, a HAML/Slim = or on a form builder (f.select) are excluded. A hit only breaks when something calls count with no argument on that relation, so trace the callers, including specs and any method that returns the relation. size on a relation is safe on 4.1 (it calls count(:all) when the relation is not loaded), and so is an explicit count(:all) or count(:column). size on a has_many association that is not loaded is not safe: it calls count with no argument, so a multi-column select in the association scope raises on owner.things.size. empty? and any? run exists? and are safe"
+      fix: "Call count(:all) on the relation, which runs COUNT(*) on 4.0 and 4.1. size also works on a relation, but not on an unloaded has_many association whose scope has the select: use count(:all) there too. Or stop handing a multi-column select relation to callers that count it"
+      variable_name: "COUNT_MULTI_COLUMN_SELECT"
+
+    - name: "RecordNotFound message text asserted or passed on"
+      kind: breaking
+      pattern: "Couldn\\\\?'t find [\\w:]+ with [a-z_]+=|Couldn\\\\?'t find all [\\w:]+ with IDs"
+      exclude: ""
+      search_paths:
+        - "spec/"
+        - "test/"
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 quotes the primary key in the ActiveRecord::RecordNotFound message: Post.find(999) raises \"Couldn't find Post with 'id'=999\" where 4.0 raised \"Couldn't find Post with id=999\", and the several-ids form changes from \"with IDs (1, 999)\" to \"with 'id': (1, 999)\" (relation/finder_methods.rb, raise_record_not_found_exception!). Specs that assert the message text fail. The apostrophe may be escaped (Couldn\\'t, as in a single-quoted Ruby string) or not. The single-id half needs `=` right after the column name, so app-written messages with spaces around `=` do not match. An app-written message in exactly the Rails shape does match, and does not change on upgrade. Also check app code that puts e.message into a response body: API clients get the quoted form after the upgrade"
+      fix: "Assert on what the app controls instead of Rails wording: the exception class (raise_error(ActiveRecord::RecordNotFound)), the response status, and the id that was looked up. Where the response carries an app-written message, assert that instead. If a spec must keep checking the Rails text, match both forms, for example /Couldn't find Post with '?id'?=999/, and drop the old form once 4.0 is gone. If API clients parse the message, tell them about the new wording or return an app-owned message"
+      variable_name: "RECORD_NOT_FOUND_MESSAGE"
 
   low_priority:
     - name: "Spring gem in Gemfile (presence check)"
@@ -264,7 +317,7 @@ dependencies:
   activerecord-deprecated_finders:
     check: false
     gem_name: "activerecord-deprecated_finders"
-    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1"
+    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1, and the Array-returning Relation#all"
     url: "https://github.com/rails/activerecord-deprecated_finders"
 
   spring:

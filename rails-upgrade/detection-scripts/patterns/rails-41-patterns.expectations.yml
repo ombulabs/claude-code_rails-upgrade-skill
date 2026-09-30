@@ -24,3 +24,100 @@ CACHE_DIGESTS_BACKPORT:
     - "  ActionView::Digestor.digest(name: name, finder: lookup_context)"
     - "  config.action_view.cache_template_loading = true"
     - "  <% cache [@post, 'v3'] do %>"
+
+RELATION_ALL:
+  # The pattern cannot tell a constant receiver from a relation, so
+  # `Post.all` also matches. That hit is the replacement, not the problem;
+  # triage each hit by its receiver.
+  match:
+    - "    Post.where(published: true).all.each do |post|"
+    - "  @comments = @post.comments.all"
+    - "    users = User.active.all"
+    - "    records = scope.order(:created_at).all.sort_by!(&:id)"
+    - "    Post.all"
+    # Capybara without parentheses: only .all( right after the name is skipped.
+    - "    rows = page.all \".row\""
+  no_match:
+    # Finder options: a separate change, and not the zero-argument call.
+    - "    Post.where(published: true).all(limit: 5)"
+    # Capybara's page.all takes a selector argument.
+    - "    expect(page.all('.row').size).to eq 3"
+    - "    return unless items.all? { |item| item.valid? }"
+    - "    Post.all_published"
+    - "    Post.where(published: true).to_a"
+
+COUNT_MULTI_COLUMN_SELECT:
+  # A hit is only a problem when the relation is later counted with no
+  # argument. That caller is often on another line or in another file, so
+  # the pattern flags the select and the triage traces the count.
+  match:
+    - "    Post.select(\"title, version\").count"
+    - "  scope :summary, -> { select('posts.id, posts.title') }"
+    - "    Post.select(\"title\", \"version\")"
+    - "    Post.select([:title, :version])"
+    - "    Post.select(:title, :version)"
+    # A table-qualified star: 4.1 runs COUNT(posts.*).
+    - "    Post.joins(:author).select(\"posts.*\").count"
+    - "  scope :with_author, -> { joins(:author).select(\"#{table_name}.*\") }"
+    - "    Post.select(:id, \"title\")"
+    - "    Post.select(%w[id title])"
+    - "  scope :summary, -> { select \"id, title\" }"
+  no_match:
+    - "    Post.select(:title).count"
+    # A bare star becomes COUNT(*), which works on 4.1.
+    - "    Post.select(\"*\").count"
+    - "    Post.select(\"DISTINCT title\")"
+    - "    Post.select(\"COUNT(*) AS total\")"
+    - "    Post.select(\"title\").where(\"a, b\")"
+    - "    items.select { |item| item.valid? }"
+    # The lookbehind keeps the bare in-scope form while skipping longer names.
+    - "    multiselect(\"title, version\")"
+    # The ActionView select form helper, not a relation.
+    - "<%= select(\"post\", \"person_id\", Person.all.collect { |p| [p.name, p.id] }) %>"
+    - "  = f.select :category, :name"
+    - "    IO.select([sock], nil, nil, 5)"
+
+JOIN_DEPENDENCY_INTERNALS:
+  match:
+    - "    where(\"#{join.aliased_table_name}.account_id = #{join.parent_table_name}.account_id\")"
+    - "  ActiveRecord::Associations::JoinDependency::JoinAssociation.send(:prepend, SoftDeleteJoin)"
+    - "      def join_to(manager)"
+    # An alias_method_chain patch: def join_to_with_soft_delete has no word
+    # boundary after join_to, so the :join_to symbol is what catches it.
+    - "        alias_method_chain :join_to, :soft_delete"
+    - "        alias_method :join_to_without_soft_delete, :join_to"
+    # Reopening the class inside class JoinDependency never spells the full name.
+    - "      class JoinAssociation < JoinPart"
+    - "    where(\"#{join.parent_table.name}.active = 1\")"
+    - "    prefix = join.aliased_prefix"
+    - "    tracker = join.join_dependency.alias_tracker"
+  no_match:
+    # Commented-out code is excluded.
+    - "  # def join_to(manager) moved to join_constraints in 4.1"
+    # The 4.1 method name and the alias that survived are fine.
+    - "      def join_constraints(foreign_table, foreign_klass, node, join_type, tables, scope_chain, chain)"
+    - "    where(\"#{join.aliased_table_name}.deleted_at IS NULL\")"
+    - "  def join_token"
+    - "    self.parent_table_names = []"
+    # Too common outside JoinAssociation to flag.
+    - "    where(\"#{join.parent.aliased_table_name}.id IS NOT NULL\")"
+    - "    self.join_type = :inner"
+    - "  class JoinAssociationsController < ApplicationController"
+    - "    record.join_token"
+
+RECORD_NOT_FOUND_MESSAGE:
+  match:
+    - "      expect(json[\"error\"]).to eq \"Couldn't find Post with id=999\""
+    - "    assert_equal \"Couldn't find Admin::User with id=5\", error.message"
+    - "      expect(response.body).to include(\"Couldn't find all Posts with IDs (1, 2)\")"
+    # Single-quoted Ruby strings escape the apostrophe.
+    - "      expect(e.message).to eq 'Couldn\\'t find Post with id=1'"
+    - "      expect(body).to include('Couldn\\'t find all Posts with IDs (1, 2)')"
+  no_match:
+    # The 4.1 wording.
+    - "      expect(json[\"error\"]).to eq \"Couldn't find Post with 'id'=999\""
+    - "      expect(e.message).to eq 'Couldn\\'t find Post with \\'id\\'=1'"
+    - "      expect(response.body).to include(\"Couldn't find all Posts with 'id': (1, 2)\")"
+    # App-written message with spaces around the equals sign: not Rails text.
+    - "    raise ActiveRecord::RecordNotFound, \"Couldn't find Invoice with external_ref = #{id}\""
+    - "    expect { Post.find(999) }.to raise_error(ActiveRecord::RecordNotFound)"
