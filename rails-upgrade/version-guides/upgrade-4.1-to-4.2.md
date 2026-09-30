@@ -267,17 +267,21 @@ config.serve_static_files = ENV['RAILS_SERVE_STATIC_FILES'].present?
 
 ---
 
-#### Production Log Level Default Changed
+#### Production Log Level Must Be Set Explicitly
+
+**Pattern:** none (the warning fires on a missing setting, which a line regex cannot match)
 
 **What Changed:**
-The default `config.log_level` in `config/environments/production.rb` changed from `:info` to `:debug`. This makes production logs much noisier.
+The production default stays `:info` in 4.2, but booting production without a `config.log_level` line in `production.rb` now prints a deprecation warning: Rails 5 unifies the default to `:debug`. The 4.2 app template also writes `config.log_level = :debug` into `production.rb`, so accepting that file from `rake rails:update` makes production logs much noisier.
 
 **Fix:**
-If you want to keep the 4.1 behavior:
 ```ruby
-# config/environments/production.rb
+# BEFORE (config/environments/production.rb, no log_level line)
+
+# AFTER
 config.log_level = :info
 ```
+This works on 4.1 as well. When running `rake rails:update`, keep your own `log_level` line instead of the template's `:debug`.
 
 ---
 
@@ -466,7 +470,7 @@ config.serve_static_files = true
 ```
 
 ### `config/environments/production.rb`
-Rename `serve_static_assets` to `serve_static_files`. Keep log level at `:info` if you want to preserve 4.1 behavior (default is now `:debug`).
+Rename `serve_static_assets` to `serve_static_files`. The new template sets `config.log_level = :debug`; keep `:info` to preserve 4.1 behavior (see "Production Log Level Must Be Set Explicitly").
 
 ### `config/initializers/to_time_preserves_timezone.rb` (NEW)
 Forward-compat shim for Rails 5.0:
