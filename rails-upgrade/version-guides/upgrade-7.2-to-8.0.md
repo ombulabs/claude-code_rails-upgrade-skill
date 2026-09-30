@@ -613,6 +613,34 @@ The AFTER works on 7.2 too: the shorthand only sets `unsigned: true` on both ver
 
 ---
 
+#### `Benchmark.ms` Deprecated
+
+**Pattern:** `BENCHMARK_MS`
+
+**What Changed:**
+`Benchmark.ms` is an Active Support core extension, not part of Ruby's `benchmark` library. Rails 7.2 runs it with no warning. Rails 8.0 still returns the elapsed milliseconds but warns on every call:
+
+```
+DEPRECATION WARNING: `Benchmark.ms` is deprecated and will be removed in Rails 8.1 without replacement.
+```
+
+**Detection Pattern:**
+```ruby
+elapsed = Benchmark.ms { run_report }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+elapsed = Benchmark.ms { run_report }
+
+# AFTER
+elapsed = Benchmark.realtime { run_report } * 1000
+```
+The AFTER works on 7.2 too: `Benchmark.realtime` is Ruby's own method and returns seconds as a Float.
+
+---
+
 ## Solid Gems Decision Guide
 
 | Current Setup | Recommendation |
@@ -720,6 +748,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `` DEPRECATION WARNING: Setting `ENV["SCHEMA_CACHE"]` is deprecated `` on the 7.2 side | "`SCHEMA_CACHE` Environment Variable No Longer Read": set `schema_cache_path:` in `database.yml` |
 | `DEPRECATION WARNING: Mapping a route with multiple paths is deprecated` at boot | "Routes Drawn With Multiple Paths Deprecated": one route call per path |
 | `NoMethodError: undefined method 'warn_on_records_fetched_greater_than='` (or `allow_deprecated_singular_associations_name=`, `commit_transaction_on_non_local_return=`) for class ActiveRecord::Base | "Removed Active Record Config Keys Raise NoMethodError": delete the line |
+| `` DEPRECATION WARNING: `Benchmark.ms` is deprecated `` | "`Benchmark.ms` Deprecated": `Benchmark.realtime { ... } * 1000` |
 
 ---
 
