@@ -15,6 +15,17 @@ upgrade_findings:
       fix: "Post-save migrations: user.name_changed? → user.saved_change_to_name?; user.name_was → user.attribute_before_last_save(:name); user.changes → user.saved_changes; user.changed? → user.saved_changes?. Pre-save uses (e.g. before_save callbacks, validations) keep the original methods"
       variable_name: "DIRTY_TRACKING_AFTER_SAVE"
 
+    - name: "class_name option with unquoted constant"
+      kind: "breaking"
+      pattern: "(?:\\bclass_name:|:class_name\\s*=>)\\s*[A-Z][\\w:]*+(?!\\.(?:name|to_s)\\b)"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+        - "lib/"
+      explanation: "Rails 5.2 removes support for passing class objects (constants) to the :class_name option on associations; doing so now raises ArgumentError ('A class was passed to `:class_name` but we are expecting a string.') when the reflection is built, which happens when the belongs_to / has_many line runs, so the model fails to load. 5.1 only warned ('Passing a class to the `class_name` is deprecated'); 5.0 accepted it silently. Matches class_name: and :class_name => followed by a constant; Foo.name and Foo.to_s are skipped. A constant that holds a string (CLASS_NAME = 'User') is also flagged, check it by hand"
+      fix: "Quote the class name: belongs_to :owner, class_name: User → belongs_to :owner, class_name: 'User'. Same applies to has_one, has_many, and has_and_belongs_to_many"
+      variable_name: "CLASS_NAME_CONSTANT"
+
   medium_priority:
     - name: "Dynamic :controller / :action segments in routes"
       kind: "deprecation"
@@ -25,16 +36,6 @@ upgrade_findings:
       explanation: "A route whose path has a :controller or :action segment (the old catch-all :controller(/:action(/:id)) shape) emits a deprecation warning when routes load, saying it will be removed in Rails 6.0. The warning exists since 5.0 and is unchanged in 5.1 and 5.2. Matches the segment inside a quoted path; the hash keys controller: / :action => are not segments and are skipped"
       fix: "Replace dynamic segments with explicit routes: get '/admin/:controller/:action' → declare each controller/action pair explicitly with `get '/admin/users', to: 'users#index'` etc."
       variable_name: "DYNAMIC_ROUTE_SEGMENTS"
-
-    - name: "class_name option with unquoted constant"
-      kind: "breaking"
-      pattern: "class_name:\\s*[A-Z][A-Za-z0-9_:]*"
-      exclude: "class_name:\\s*['\"]"
-      search_paths:
-        - "app/models/"
-      explanation: "Rails 5.2 removes support for passing class objects (constants) to the :class_name option on associations; doing so now raises ArgumentError ('A class was passed to `:class_name` but we are expecting a string.') when the reflection is built, typically at model class load time. Finishes the deprecation cycle that began in 5.1. Background: passing the constant forces autoload of the target class at boot time and breaks Zeitwerk in 6.0+"
-      fix: "Quote the class name: belongs_to :owner, class_name: User → belongs_to :owner, class_name: 'User'. Same applies to has_one, has_many, and has_and_belongs_to_many"
-      variable_name: "CLASS_NAME_CONSTANT"
 
     - name: "error_on_ignored_order_or_limit config (renamed)"
       kind: "breaking"

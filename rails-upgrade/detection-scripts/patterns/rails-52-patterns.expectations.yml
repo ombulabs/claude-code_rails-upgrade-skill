@@ -19,3 +19,17 @@ DYNAMIC_ROUTE_SEGMENTS:
     - "  match 'posts' => 'posts#index', :controller => 'posts', :action => 'index'"
     - "  get 'steps/:action_name', to: 'wizard#show'"
     - "  get ':controller_id/show', to: 'a#b'"
+
+CLASS_NAME_CONSTANT:
+  # A constant passed to class_name raises ArgumentError in 5.2. A string,
+  # or Foo.name / Foo.to_s, is fine.
+  match:
+    - "  belongs_to :owner, class_name: User"
+    - "  has_many :items, class_name: Billing::Item, foreign_key: :order_id"
+    - "  has_many :items, :class_name => Item"
+  no_match:
+    - "  belongs_to :owner, class_name: 'User'"
+    - "  belongs_to :owner, class_name: \"User\""
+    - "  belongs_to :owner, class_name: User.name"
+    - "  has_many :items, class_name: Billing::Item.to_s"
+    - "  has_many :items, :class_name => 'Item'"

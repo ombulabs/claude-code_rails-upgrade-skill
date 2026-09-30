@@ -107,6 +107,31 @@ rails db:migrate
 
 ---
 
+#### Association class_name Must Be a String
+
+**Pattern:** `CLASS_NAME_CONSTANT`
+
+**What Changed:**
+Rails 5.1 warned when an association got a class instead of a string for `class_name:` ("Passing a class to the `class_name` is deprecated"). Rails 5.2 raises `ArgumentError` ("A class was passed to `:class_name` but we are expecting a string.") while building the reflection, so the model fails to load.
+
+**Detection Pattern:**
+```ruby
+belongs_to :owner, class_name: User
+has_many :items, :class_name => Billing::Item
+```
+
+**Fix:**
+```ruby
+# BEFORE
+belongs_to :owner, class_name: User
+
+# AFTER
+belongs_to :owner, class_name: "User"
+```
+The string form works on 5.1 too.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Encrypted Secrets → Credentials
@@ -362,6 +387,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ActionController::InvalidAuthenticityToken` on forms that worked on 5.1 | "per_form_csrf_tokens Default Changed" — fresh token per form, or disable the feature |
 | Users logged out once after deploy | "Cookie Expiry Format Changed" — expected, one re-authentication |
 | `Using a dynamic :controller segment in a route is deprecated` (or `:action`) | "Dynamic :controller and :action Route Segments" — declare each route explicitly |
+| `` ArgumentError: A class was passed to `:class_name` but we are expecting a string. `` | "Association class_name Must Be a String" — quote the class name |
 
 ---
 
