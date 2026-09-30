@@ -80,3 +80,14 @@ ACTIVE_STORAGE_VARIANT:
     # the image_processing macros work under both processors
     - "<%= image_tag user.avatar.variant(resize_to_limit: [100, 100]) %>"
     - "    @photo.image.variant(resize_to_fill: [300, 300])"
+
+SPRING:
+  match:
+    - "  gem \"spring\""
+    - "  gem 'spring', '~> 2.1'"
+  no_match:
+    # the 7.0 Gemfile template ships it commented out, the exclude drops it
+    - "  # gem \"spring\""
+    # companion gems are not spring itself
+    - "  gem \"spring-watcher-listen\""
+    - "  gem \"spring-commands-rspec\""

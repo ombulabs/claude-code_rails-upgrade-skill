@@ -425,6 +425,32 @@ The AFTER works on 6.1 too, with either processor. To keep ImageMagick after `lo
 
 ---
 
+### 🟢 LOW PRIORITY
+
+#### Spring Dropped From New Apps
+
+**Pattern:** `SPRING`
+
+**What Changed:**
+The 7.0 app template leaves `gem "spring"` commented out, so new apps no longer get it. An app that keeps Spring needs spring 4.0 or later: 4.0.0 is the first release whose README lists Rails 7.0 (3.x stops at 6.0), and it requires Rails 6.0 or later.
+
+**Detection Pattern:**
+```ruby
+gem "spring"
+```
+
+**Fix:**
+```ruby
+# BEFORE (Gemfile)
+gem "spring", "~> 2.1"
+
+# AFTER: bump it, or remove spring and bin/spring
+gem "spring", ">= 4.0"
+```
+The AFTER works on 6.1 as well, so no `NextRails.next?` branch is needed. Spring 3.0 and later raise unless `config.cache_classes = false` in each environment Spring runs.
+
+---
+
 ## Migration Steps
 
 ### Phase 1: Preparation

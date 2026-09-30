@@ -40,16 +40,6 @@ upgrade_findings:
       fix: "Migrate to Import Maps, esbuild, or rollup. Remove Webpacker."
       variable_name: "WEBPACKER"
 
-    - name: "Spring usage"
-      kind: "optional"
-      pattern: "gem ['\"]spring['\"]"
-      exclude: ""
-      search_paths:
-        - "Gemfile"
-      explanation: "Spring is no longer included by default in Rails 7.0"
-      fix: "Keep if needed, or remove for simpler boot process"
-      variable_name: "SPRING"
-
     - name: "form_with local option"
       kind: "migration"
       pattern: "form_with.*local:\\s*(true|false)"
@@ -162,6 +152,17 @@ upgrade_findings:
       explanation: "to_s(:format) is deprecated in favor of to_fs(:format)"
       fix: "Replace to_s(:format) with to_fs(:format)"
       variable_name: "TO_S_FORMAT"
+
+  low_priority:
+    - name: "Spring usage"
+      kind: "optional"
+      pattern: "gem ['\"]spring['\"]"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "Gemfile"
+      explanation: "Rails 7.0 no longer adds spring to new apps (the Gemfile template only has it commented out). An app that keeps it needs spring 4.0 or later: 4.0.0 is the first release whose README lists Rails 7.0, and spring 3.x README stops at 6.0"
+      fix: "Remove spring and bin/spring if the team does not rely on it, or bump to gem \"spring\", \">= 4.0\" (needs Rails 6.0 or later, so it runs on both sides of the dual boot)"
+      variable_name: "SPRING"
 
 dependencies:
   importmap:
