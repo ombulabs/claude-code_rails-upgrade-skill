@@ -260,25 +260,28 @@ The AFTER works on 7.0 too: 7.0 reads both the 6.1 and 7.0 formats, and 7.1 read
 
 ---
 
-#### Secret Key File Location Changed
+#### `Rails.application.secrets` Deprecated
 
 **Pattern:** `SECRETS_YML_ENC`
 
 **What Changed:**
-The location of `secrets.yml.enc` has changed.
+The secrets files do not move: 7.0 and 7.1 both read `config/secrets.yml`, and `config/secrets.yml.enc` when `config.read_encrypted_secrets = true`. 7.1 deprecates the secrets API instead. Every `Rails.application.secrets` call warns, a `secret_key_base` that comes only from secrets warns, and `bin/rails secrets:edit` / `secrets:show` warn. Rails 7.2 removes `Rails.application.secrets`.
 
 **Detection Pattern:**
-```
-config/secrets.yml.enc
+```ruby
+Rails.application.secrets.stripe_key
+config.read_encrypted_secrets = true
 ```
 
 **Fix:**
-If using encrypted secrets (not credentials), move the file:
-```bash
-mv config/secrets.yml.enc config/secrets.yml.enc.bak
-```
+```ruby
+# BEFORE (value in config/secrets.yml or secrets.yml.enc, under production:)
+Rails.application.secrets.stripe_key
 
-Note: Most applications use `credentials.yml.enc` instead, which is unaffected.
+# AFTER (value moved with bin/rails credentials:edit)
+Rails.application.credentials.stripe_key
+```
+The AFTER works on 7.0 too. `secrets.yml` is keyed by environment and `credentials.yml.enc` is not, so drop the environment level or use per-environment files (`bin/rails credentials:edit --environment production`). Once nothing reads secrets, delete `secrets.yml` / `secrets.yml.enc` and the `read_encrypted_secrets` line.
 
 ---
 
@@ -461,6 +464,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Constant not found in `lib/` | "lib/ Autoloaded by Default" — `lib/my_file.rb` must define `MyFile` |
 | Boot crashes on `legacy_connection_handling` | "legacy_connection_handling Removed" — delete every occurrence; guard with `NextRails.next?` while dual-booting |
 | `cache_format_version = 6.1` deprecation warning on every boot | "Cache Format Version 7.1" — set `cache_format_version = 7.0` |
+| `Rails.application.secrets` is deprecated warning | "`Rails.application.secrets` Deprecated" — move the values to credentials |
 
 ---
 

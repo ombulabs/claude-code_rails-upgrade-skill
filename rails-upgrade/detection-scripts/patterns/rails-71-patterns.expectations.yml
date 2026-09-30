@@ -43,3 +43,17 @@ CSP_MIDDLEWARE_CONSTANTS:
     - "  expect(response.headers[\"Content-Security-Policy\"]).to be_present"
     # the middleware class itself still exists
     - "config.middleware.use ActionDispatch::ContentSecurityPolicy::Middleware"
+
+SECRETS_YML_ENC:
+  match:
+    # every Rails.application.secrets call warns on 7.1
+    - "    api_key = Rails.application.secrets.stripe_key"
+    - "    Rails.application.secrets[:api_key]"
+    # the app reads config/secrets.yml.enc
+    - "  config.read_encrypted_secrets = true"
+    - "# keys live in config/secrets.yml.enc"
+  no_match:
+    - "  config.read_encrypted_secrets = false"
+    # the replacement API and secret_key_base itself are fine
+    - "    Rails.application.credentials.stripe_key"
+    - "    Rails.application.secret_key_base"

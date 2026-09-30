@@ -98,16 +98,16 @@ upgrade_findings:
       fix: "If tests rely on inspect output, configure config.active_record.attributes_for_inspect = :all"
       variable_name: "INSPECT_OUTPUT"
 
-    - name: "secrets.yml.enc usage"
+    - name: "Rails.application.secrets and encrypted secrets deprecated"
       kind: "deprecation"
-      pattern: "secrets\\.yml\\.enc|Rails\\.application\\.secrets"
+      pattern: "secrets\\.yml\\.enc|Rails\\.application\\.secrets\\b|read_encrypted_secrets\\s*=\\s*true"
       exclude: ""
       search_paths:
         - "config/"
         - "app/"
         - "lib/"
-      explanation: "Encrypted secrets file location changed in Rails 7.1. secrets is further deprecated."
-      fix: "Migrate to Rails.application.credentials"
+      explanation: "The secrets file location does not change: 7.0 and 7.1 both read config/secrets.yml and, with config.read_encrypted_secrets = true, config/secrets.yml.enc. What 7.1 deprecates is the whole secrets API: every Rails.application.secrets call warns (railties application.rb), a secret_key_base that only comes from secrets warns, and bin/rails secrets:edit / secrets:show warn; secrets:setup is gone. Rails 7.2 removes Rails.application.secrets (see rails-72-patterns.yml SECRETS_REMOVED). A plain config/secrets.yml read only through Rails.application.secrets is found by that call, not by the file"
+      fix: "Move each value into credentials (bin/rails credentials:edit, or per environment with --environment production) and replace Rails.application.secrets.x with Rails.application.credentials.x. secrets.yml is keyed by environment and credentials.yml.enc is not, so drop the environment level or use per-environment credential files. Credentials exist since 5.2, so the change works on both sides of the dual boot. Then delete secrets.yml / secrets.yml.enc and the read_encrypted_secrets line"
       variable_name: "SECRETS_YML_ENC"
 
     - name: "Cache format version 6.1 (load_defaults below 7.0)"
