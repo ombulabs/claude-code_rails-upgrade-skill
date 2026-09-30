@@ -89,24 +89,6 @@ head :no_content
 
 ---
 
-#### render :body Default Layout Removed
-
-**What Changed:**
-`render body:` no longer renders with a layout by default.
-
-**Detection Pattern:**
-```ruby
-render body: 'raw content'
-```
-
-**Fix:**
-If you need a layout:
-```ruby
-render body: 'raw content', layout: true
-```
-
----
-
 #### redirect_to :back Removed
 
 **Pattern:** `REDIRECT_TO_BACK`
