@@ -89,3 +89,10 @@ AS_CONFIGURABLE:
     # the replacement
     - "  class_attribute :timeout"
     - "  config_accessor :timeout"
+
+IGNORE_LEADING_BRACKETS_CONFIG:
+  match:
+    - "    config.action_dispatch.ignore_leading_brackets = true"
+    - "  Rails.application.config.action_dispatch.ignore_leading_brackets = false"
+  no_match:
+    - "    config.action_dispatch.strict_query_string_separator = true"

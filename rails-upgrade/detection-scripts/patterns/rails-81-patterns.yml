@@ -143,7 +143,7 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "config/"
-      explanation: "Rails 8.1 deprecates Rails.application.config.action_dispatch.ignore_leading_brackets. actionpack/CHANGELOG.md: 'Deprecate `Rails.application.config.action_dispatch.ignore_leading_brackets`.' The setting is paired with an 8.1 removal of the leading-bracket-skipping behavior in the parameter parser; existing config lines emit a deprecation warning"
+      explanation: "Rails 8.1 deprecates Rails.application.config.action_dispatch.ignore_leading_brackets. actionpack/CHANGELOG.md: 'Deprecate `Rails.application.config.action_dispatch.ignore_leading_brackets`.' The setting is paired with an 8.1 removal of the leading-bracket-skipping behavior in the parameter parser; existing config lines emit a deprecation warning and have no effect. On 8.0 the parser also skipped leading brackets by default under Rack 2; on 8.1 it never does, so a Rack 2 app with `[user][name]` style params changes even without this config line"
       fix: "Remove the assignment from config/application.rb / environment configs. Audit form names in views for legacy leading-bracket params (e.g. `name=\"[user][name]\"`) and rewrite to the standard `name=\"user[name]\"` shape"
       variable_name: "IGNORE_LEADING_BRACKETS_CONFIG"
 

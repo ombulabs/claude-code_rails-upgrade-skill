@@ -373,6 +373,33 @@ Recommended `.gitignore` pattern for credential keys changed.
 
 ---
 
+#### ignore_leading_brackets Deprecated
+
+**Pattern:** `IGNORE_LEADING_BRACKETS_CONFIG`
+
+**What Changed:**
+On 8.0, `config.action_dispatch.ignore_leading_brackets = true` (or the default under Rack 2) made the parameter parser read `[user][name]=a` as `{"user" => {"name" => "a"}}`. Rails 8.1 removes that behavior: the param is always `{"[user]" => {"name" => "a"}}`. Setting the config now prints a deprecation warning (removal in 8.2) and has no effect. A Rack 2 app gets the new parsing even without the config line.
+
+**Detection Pattern:**
+```ruby
+# config/application.rb
+config.action_dispatch.ignore_leading_brackets = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+config.action_dispatch.ignore_leading_brackets = true
+# <input name="[user][name]">
+
+# AFTER
+# (config line removed)
+# <input name="user[name]">
+```
+The AFTER works on 8.0 too. Search views and JavaScript for field names that start with `[`.
+
+---
+
 #### Ruby Version Requirement
 
 **Pattern:** none (the minimum Ruby does not change at this hop)
