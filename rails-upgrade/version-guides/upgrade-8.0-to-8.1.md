@@ -400,6 +400,31 @@ The AFTER works on 8.0 too. Search views and JavaScript for field names that sta
 
 ---
 
+#### to_time_preserves_timezone Deprecated
+
+**Pattern:** `TO_TIME_PRESERVES_TIMEZONE_CONFIG`
+
+**What Changed:**
+On 8.0, `config.active_support.to_time_preserves_timezone` chose what `to_time` kept: `:zone` (the 8.0 default), `:offset` (the default for `load_defaults` below 8.0) or `false` (system local time). Rails 8.1 removes the choice: `to_time` always keeps the receiver's full time zone. Setting the config prints a deprecation warning (removal in 8.2) and has no effect.
+
+**Detection Pattern:**
+```ruby
+# config/application.rb or config/initializers/new_framework_defaults_*.rb
+config.active_support.to_time_preserves_timezone = :offset
+```
+
+**Fix:**
+```ruby
+# BEFORE
+config.active_support.to_time_preserves_timezone = :offset
+
+# AFTER (while dual booting)
+config.active_support.to_time_preserves_timezone = :zone unless NextRails.next?
+```
+`:zone` gives 8.0 the 8.1 behavior, so both sides run the same `to_time`. Delete the line once 8.0 is gone.
+
+---
+
 #### Ruby Version Requirement
 
 **Pattern:** none (the minimum Ruby does not change at this hop)

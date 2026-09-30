@@ -150,10 +150,10 @@ upgrade_findings:
     - name: "to_time_preserves_timezone config"
       kind: "deprecation"
       pattern: "to_time_preserves_timezone"
-      exclude: ""
+      exclude: "^\\s*#"
       search_paths:
         - "config/"
-      explanation: "Rails 8.1 deprecates config.active_support.to_time_preserves_timezone. activesupport/CHANGELOG.md: 'Deprecate `config.active_support.to_time_preserves_timezone`.' Tied to the broader 8.1 change that #to_time always preserves the receiver timezone (the legacy 'preserve system local time' behavior is gone). The config is now a no-op deprecated shim"
+      explanation: "Rails 8.1 deprecates config.active_support.to_time_preserves_timezone. activesupport/CHANGELOG.md: 'Deprecate `config.active_support.to_time_preserves_timezone`.' Tied to the broader 8.1 change that #to_time always preserves the receiver timezone (the legacy 'preserve system local time' behavior is gone). Setting the config on 8.1 prints a deprecation warning and has no effect. On 8.0, `load_defaults` below 8.0 left it at `:offset`, so those apps also see `to_time` keep the full zone instead of only the offset after the bump"
       fix: "Remove the assignment from config/application.rb / environment configs. If app code depends on Time#to_time returning system-local time, audit those call sites; #to_time now always preserves the receiver's timezone"
       variable_name: "TO_TIME_PRESERVES_TIMEZONE_CONFIG"
 

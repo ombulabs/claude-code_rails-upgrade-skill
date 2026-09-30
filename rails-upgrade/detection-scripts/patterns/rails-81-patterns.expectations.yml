@@ -96,3 +96,12 @@ IGNORE_LEADING_BRACKETS_CONFIG:
     - "  Rails.application.config.action_dispatch.ignore_leading_brackets = false"
   no_match:
     - "    config.action_dispatch.strict_query_string_separator = true"
+
+TO_TIME_PRESERVES_TIMEZONE_CONFIG:
+  match:
+    - "    config.active_support.to_time_preserves_timezone = :offset"
+    - "    config.active_support.to_time_preserves_timezone = :zone unless NextRails.next?"
+    - "Rails.application.config.active_support.to_time_preserves_timezone = false"
+  no_match:
+    # commented-out line in a new_framework_defaults file
+    - "# Rails.application.config.active_support.to_time_preserves_timezone = :zone"
