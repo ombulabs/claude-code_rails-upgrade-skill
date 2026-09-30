@@ -59,3 +59,15 @@ SET_CALLBACK_STRING_CONDITIONS:
     - "  set_callback :save, :before, :x, if: :y?"
     - "  set_callback :save, :before, :x, :if => -> { y? }"
     - "  run_callbacks :save"
+
+RELATION_UNIQ:
+  match:
+    - "  User.where(active: true).uniq"
+    - "  scope :tagged, -> { joins(:tags).uniq }"
+    - "  Post.uniq.pluck(:author_id)"
+    - "  relation.uniq!"
+  no_match:
+    - "  ids.map(&:to_i).uniq"
+    - "  tags.pluck(:name).uniq"
+    - "  User.distinct"
+    - "  validates :email, uniqueness: true"

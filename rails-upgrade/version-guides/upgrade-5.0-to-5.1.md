@@ -220,6 +220,33 @@ The AFTER works on Rails 5.0 too.
 
 ---
 
+#### Relation#uniq Removed
+
+**Pattern:** `RELATION_UNIQ`
+
+**What Changed:**
+In Rails 5.0 `uniq` and `uniq!` on a model class or relation are deprecated aliases of `distinct` and `distinct!`, which add SQL `DISTINCT`. Rails 5.1 removes them. `Model.uniq` and `relation.uniq!` raise `NoMethodError`. `relation.uniq` now goes to the loaded records: it runs the query without `DISTINCT`, loads every row, returns an Array, and a query method chained after it (`.uniq.order(:name)`) raises `NoMethodError`. `uniq` on an association such as `post.comments.uniq` behaves as before.
+
+**Detection Pattern:**
+```ruby
+User.uniq.pluck(:city)
+scope :tagged, -> { joins(:tags).uniq }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+User.uniq.pluck(:city)
+scope :tagged, -> { joins(:tags).uniq }
+
+# AFTER
+User.distinct.pluck(:city)
+scope :tagged, -> { joins(:tags).distinct }
+```
+The AFTER works on Rails 5.0 too. The pattern also matches `Array#uniq`; leave those calls as they are.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Positional Arguments in Process Methods
@@ -430,6 +457,7 @@ bundle update rails
 3. Replace `redirect_to :back` with `redirect_back`
 4. Update controller test syntax to keyword arguments
 5. Rename `*_filter` callbacks to `*_action`
+6. Replace `uniq` on relations and model classes with `distinct`
 
 ### Phase 4: Configuration
 ```bash
@@ -474,6 +502,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | A record saves although a `before_*` callback returned `false` | "Returning false No Longer Halts Callbacks" — `throw :abort` |
 | `NoMethodError: undefined method 'use_transactional_fixtures='` | "use_transactional_fixtures Removed" — `use_transactional_tests` |
 | `NoMethodError: undefined method 'before_filter'` (or another `*_filter`) | "before_filter and the Other *_filter Methods Removed" — rename to `*_action` |
+| `NoMethodError: undefined method 'uniq'` on a model class, or a query method called on an Array after `.uniq` | "Relation#uniq Removed" — `distinct` |
 
 ---
 

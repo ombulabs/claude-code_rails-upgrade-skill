@@ -52,8 +52,8 @@ upgrade_findings:
       search_paths:
         - "app/models/"
         - "app/controllers/"
-      explanation: "Rails 5.1 removes ActiveRecord::Relation#uniq (was deprecated in 5.0). Use #distinct. NOTE: pattern will false-positive on Array#uniq — the exclude filters common array cases but verify receivers are Relations"
-      fix: "Replace .uniq / .uniq! on ActiveRecord relations with .distinct. Plain Array#uniq is unaffected — keep those as-is"
+      explanation: "Rails 5.1 removes the deprecated uniq / uniq! aliases of distinct / distinct! on relations and model classes. Model.uniq and relation.uniq! raise NoMethodError; relation.uniq now goes to the loaded records, so it runs the query without DISTINCT, loads every row and returns an Array, and a query method chained after it raises NoMethodError. uniq on an association (post.comments.uniq) behaves as before. The pattern also matches Array#uniq: the exclude skips common array chains, so check each receiver"
+      fix: "Replace .uniq / .uniq! on Active Record relations and model classes with .distinct / .distinct!, which exist in 5.0. Leave Array#uniq as it is"
       variable_name: "RELATION_UNIQ"
 
     - name: "use_transactional_fixtures removed"
