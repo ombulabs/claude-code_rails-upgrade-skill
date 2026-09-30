@@ -641,6 +641,37 @@ The AFTER works on 7.2 too: `Benchmark.realtime` is Ruby's own method and return
 
 ---
 
+#### `bin/rake stats` Deprecated
+
+**Pattern:** `RAKE_STATS`
+
+**What Changed:**
+Rails 8.0 adds a `bin/rails stats` command and keeps the `stats` rake task only as a deprecated wrapper. `bin/rake stats` still prints the report, with a warning first:
+
+```
+DEPRECATION WARNING: `bin/rake stats` has been deprecated and will be removed in Rails 8.1.
+```
+
+The same release deprecates adding directories through `STATS_DIRECTORIES` in favor of `Rails::CodeStatistics.register_directory`, which does not exist on 7.2.
+
+**Detection Pattern:**
+```yaml
+# .github/workflows/*.yml, bin/*
+- run: bin/rake stats
+```
+
+**Fix:**
+```yaml
+# BEFORE
+- run: bin/rake stats
+
+# AFTER
+- run: bin/rails stats
+```
+The AFTER works on 7.2 too: `bin/rails` hands a name it does not know to Rake, so it runs the same task.
+
+---
+
 ## Solid Gems Decision Guide
 
 | Current Setup | Recommendation |
@@ -749,6 +780,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `DEPRECATION WARNING: Mapping a route with multiple paths is deprecated` at boot | "Routes Drawn With Multiple Paths Deprecated": one route call per path |
 | `NoMethodError: undefined method 'warn_on_records_fetched_greater_than='` (or `allow_deprecated_singular_associations_name=`, `commit_transaction_on_non_local_return=`) for class ActiveRecord::Base | "Removed Active Record Config Keys Raise NoMethodError": delete the line |
 | `` DEPRECATION WARNING: `Benchmark.ms` is deprecated `` | "`Benchmark.ms` Deprecated": `Benchmark.realtime { ... } * 1000` |
+| `` DEPRECATION WARNING: `bin/rake stats` has been deprecated `` | "`bin/rake stats` Deprecated": run `bin/rails stats` |
 
 ---
 

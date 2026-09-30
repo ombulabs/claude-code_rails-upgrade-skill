@@ -165,3 +165,13 @@ BENCHMARK_MS:
     - "    elapsed = Benchmark.realtime { run } * 1000"
     - "Benchmark.msecs"
     - "MyBenchmark.ms { run }"
+
+RAKE_STATS:
+  match:
+    - "        run: bin/rake stats"
+    - "  - bundle exec rake stats"
+  no_match:
+    # the replacement
+    - "        run: bin/rails stats"
+    - "rake statsd:flush"
+    - "rake stats_report"
