@@ -191,6 +191,35 @@ The AFTER works on Rails 5.0 too.
 
 ---
 
+#### before_filter and the Other *_filter Methods Removed
+
+**Pattern:** `FILTER_METHODS`
+
+**What Changed:**
+Rails 5.0 kept `before_filter`, `skip_before_filter`, `prepend_around_filter`, `skip_filter` and the rest as deprecated aliases of the `*_action` methods. Rails 5.1 removes them from `AbstractController::Callbacks`, so a controller or mailer that calls one raises `NoMethodError` when the class loads.
+
+**Detection Pattern:**
+```ruby
+before_filter :authenticate_user!
+skip_before_filter :verify_authenticity_token
+```
+
+**Fix:**
+```ruby
+# BEFORE
+before_filter :authenticate_user!
+skip_before_filter :verify_authenticity_token
+skip_filter :require_login
+
+# AFTER
+before_action :authenticate_user!
+skip_before_action :verify_authenticity_token
+skip_before_action :require_login # or skip_after_action / skip_around_action, matching the callback
+```
+The AFTER works on Rails 5.0 too.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### Positional Arguments in Process Methods
@@ -373,6 +402,7 @@ bundle update rails
 2. Replace `render nothing:` with `head :ok`
 3. Replace `redirect_to :back` with `redirect_back`
 4. Update controller test syntax to keyword arguments
+5. Rename `*_filter` callbacks to `*_action`
 
 ### Phase 4: Configuration
 ```bash
@@ -416,6 +446,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ActionController::UnfilteredParameters: unable to convert unpermitted parameters to hash` | "raise_on_unfiltered_parameters Deprecated" — `permit(...)` before `to_h` |
 | A record saves although a `before_*` callback returned `false` | "Returning false No Longer Halts Callbacks" — `throw :abort` |
 | `NoMethodError: undefined method 'use_transactional_fixtures='` | "use_transactional_fixtures Removed" — `use_transactional_tests` |
+| `NoMethodError: undefined method 'before_filter'` (or another `*_filter`) | "before_filter and the Other *_filter Methods Removed" — rename to `*_action` |
 
 ---
 

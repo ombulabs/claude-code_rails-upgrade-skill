@@ -35,13 +35,14 @@ upgrade_findings:
 
     - name: "*_filter callback methods removed"
       kind: "breaking"
-      pattern: "\\b(before|after|around|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_filter\\b"
+      pattern: "\\b(before|after|around|skip|skip_before|skip_after|skip_around|prepend_before|prepend_after|prepend_around|append_before|append_after|append_around)_filter\\b"
       exclude: ""
       search_paths:
         - "app/controllers/"
+        - "app/mailers/"
         - "lib/"
-      explanation: "Rails 5.1 removes all `*_filter` controller callbacks (deprecated in 4.x, still warning in 5.0). Use `*_action` variants"
-      fix: "Rename: before_filter → before_action, skip_before_filter → skip_before_action, etc. Mechanical rename — behavior is identical"
+      explanation: "Rails 5.1 removes every `*_filter` callback method from AbstractController::Callbacks (deprecated in 5.0, no warning in 4.2), including the bare `skip_filter`. Controllers and mailers both include that module, so a class that calls one raises NoMethodError when it loads. Use the `*_action` variants"
+      fix: "Rename: before_filter to before_action, skip_before_filter to skip_before_action, and so on; behavior is identical and the *_action names exist in 5.0. Replace skip_filter with the skip_before_action / skip_after_action / skip_around_action that matches the callback"
       variable_name: "FILTER_METHODS"
 
     - name: "String conditions in controller filters"

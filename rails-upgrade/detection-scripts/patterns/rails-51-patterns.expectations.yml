@@ -20,3 +20,18 @@ USE_TRANSACTIONAL_FIXTURES:
     # use_transactional_tests, so spec/rails_helper.rb is fine on 5.1.
     - "  config.use_transactional_fixtures = true"
     - "  self.use_transactional_tests = true"
+
+FILTER_METHODS:
+  match:
+    - "  before_filter :authenticate_user!"
+    - "  skip_before_filter :verify_authenticity_token, only: :create"
+    - "  skip_filter :require_login"
+    - "  around_filter :wrap_in_transaction"
+    - "  prepend_before_filter :set_locale"
+    - "  append_after_filter :log"
+  no_match:
+    - "  before_action :authenticate_user!"
+    - "  skip_before_action :verify_authenticity_token"
+    - "  config.filter_parameters += [:password]"
+    - "  add_filter { |line| line }"
+    - "  before_filters = []"
