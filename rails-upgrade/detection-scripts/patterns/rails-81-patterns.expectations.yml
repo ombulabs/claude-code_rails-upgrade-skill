@@ -105,3 +105,14 @@ TO_TIME_PRESERVES_TIMEZONE_CONFIG:
   no_match:
     # commented-out line in a new_framework_defaults file
     - "# Rails.application.config.active_support.to_time_preserves_timezone = :zone"
+
+MB_CHARS:
+  match:
+    - "    name.mb_chars.upcase.to_s"
+    - "    ActiveSupport::Multibyte::Chars.new(name)"
+    - "    str.mb_chars"
+  no_match:
+    # the replacement, and lookalike names
+    - "    name.upcase"
+    - "    mb_chars_count = 1"
+    - "    obj.mb_chars_for(x)"

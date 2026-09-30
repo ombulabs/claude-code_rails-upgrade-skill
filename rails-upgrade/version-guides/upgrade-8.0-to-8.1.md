@@ -425,6 +425,35 @@ config.active_support.to_time_preserves_timezone = :zone unless NextRails.next?
 
 ---
 
+#### String#mb_chars Deprecated
+
+**Pattern:** `MB_CHARS`
+
+**What Changed:**
+Rails 8.0 offered `String#mb_chars` and `ActiveSupport::Multibyte::Chars` with no warning. Rails 8.1 prints a deprecation warning on each `mb_chars` call and each `Chars.new` (removal in 8.2). The methods still work in 8.1.
+
+**Detection Pattern:**
+```ruby
+name.mb_chars.upcase.to_s
+ActiveSupport::Multibyte::Chars.new(name)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+name.mb_chars.upcase.to_s
+name.mb_chars.decompose.to_s
+name.mb_chars.grapheme_length
+
+# AFTER
+name.upcase
+name.unicode_normalize(:nfd)
+name.grapheme_clusters.length
+```
+The AFTER works on 8.0 too. `Chars#limit` (truncate to a byte count) has no one-call String equivalent; check each use.
+
+---
+
 #### Ruby Version Requirement
 
 **Pattern:** none (the minimum Ruby does not change at this hop)
