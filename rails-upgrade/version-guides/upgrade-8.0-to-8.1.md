@@ -324,6 +324,8 @@ The AFTER works on 8.0 too. Code that reads the `config` object itself (`ReportS
 
 #### schema.rb Column Sorting Change
 
+**Pattern:** none (every app that dumps db/schema.rb gets it; there is no code to find)
+
 **What Changed:**
 Database columns in `schema.rb` are now sorted alphabetically instead of by creation order.
 
