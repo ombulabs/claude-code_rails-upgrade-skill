@@ -470,6 +470,34 @@ The AFTER works on Rails 5.0 too. If the changes were meant to be kept, `save` b
 
 ---
 
+#### Custom quoted_id Deprecated
+
+**Pattern:** `QUOTED_ID_DEPRECATION`
+
+**What Changed:**
+In Rails 5.0, `connection.quote(value)` returns `value.quoted_id` for any object that defines it, which lets a value object bound into a string condition (`where('total_cents = ?', money)`) choose its own SQL. Rails 5.1 still calls it on a non-Active Record object but logs `Defining #quoted_id is deprecated and will be ignored in Rails 5.2`. An Active Record record is now quoted by its primary key before that check, so a `quoted_id` override on a model stops being called, with no warning. Rails 5.2 ignores `quoted_id` everywhere.
+
+**Detection Pattern:**
+```ruby
+class Money
+  def quoted_id
+    cents.to_s
+  end
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Order.where('total_cents = ?', money) # relies on Money#quoted_id
+
+# AFTER
+Order.where('total_cents = ?', money.cents)
+```
+The AFTER works on Rails 5.0 too. For a value used as an attribute, move the conversion into a custom `ActiveModel::Type` (`serialize` / `cast`) registered with the attributes API, which also exists in 5.0.
+
+---
+
 ## New Features
 
 ### Encrypted Secrets

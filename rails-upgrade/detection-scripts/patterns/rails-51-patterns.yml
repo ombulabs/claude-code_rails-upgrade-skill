@@ -207,7 +207,7 @@ upgrade_findings:
       search_paths:
         - "app/models/"
         - "lib/"
-      explanation: "Rails 5.1 deprecates overriding ActiveRecord's #quoted_id. The hook is preserved at 5.1 with a deprecation warning when the user-defined method fires during quoting. Removed at 5.2 — at the 5.2 hop, defining the method no longer raises but is silently dead (see rails-52-patterns.yml QUOTED_ID_METHOD)"
+      explanation: "Rails 5.1 deprecates #quoted_id. connection.quote still calls a quoted_id defined on a non-Active Record object (a value object bound into a string condition such as where('total_cents = ?', money)), with the warning `Defining #quoted_id is deprecated and will be ignored in Rails 5.2`. An Active Record record is now quoted by its primary key before that check, so a quoted_id override on a model is no longer called at all, with no warning. Rails 5.2 ignores quoted_id everywhere (see rails-52-patterns.yml QUOTED_ID_METHOD)"
       fix: "Migrate the logic to a custom ActiveModel::Type (define #serialize / #cast) or accept the model's default quoting behavior"
       variable_name: "QUOTED_ID_DEPRECATION"
 

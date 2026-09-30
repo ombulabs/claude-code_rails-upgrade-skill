@@ -104,3 +104,11 @@ LOCK_BANG_DEPRECATION:
     # does not flag it.
     - "  account.with_lock do"
     - "  Account.lock.find(id)"
+
+QUOTED_ID_DEPRECATION:
+  match:
+    - "  def quoted_id"
+    - "  def quoted_id # :nodoc:"
+  no_match:
+    - "  def quoted_identifier"
+    - "  record.quoted_id"
