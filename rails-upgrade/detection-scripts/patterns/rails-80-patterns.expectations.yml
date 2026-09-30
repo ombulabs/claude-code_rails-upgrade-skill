@@ -80,3 +80,17 @@ RUBY_VERSION:
     - "ruby 3.4.1"
     - "3.10.0"
     - "gem \"rack\", \"3.1.8\""
+
+ENV_SCHEMA_CACHE:
+  match:
+    - "ENV[\"SCHEMA_CACHE\"] = \"tmp/schema_cache.yml\""
+    - "path = ENV['SCHEMA_CACHE']"
+    # the variable set in a CI step or script
+    - "        run: SCHEMA_CACHE=db/cache.yml bin/rails db:schema:cache:dump"
+    - "export SCHEMA_CACHE=db/cache.yml"
+  no_match:
+    # the replacement key in database.yml
+    - "  schema_cache_path: db/cache.yml"
+    - "ENV[\"SCHEMA_CACHE_PATH\"]"
+    - "MY_SCHEMA_CACHE=1"
+    - "SCHEMA_CACHE_PATH=db/cache.yml"

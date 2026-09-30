@@ -485,6 +485,39 @@ If the app still keeps secrets in `config/secrets.yml.enc`, move them to credent
 
 ---
 
+#### `SCHEMA_CACHE` Environment Variable No Longer Read
+
+**Pattern:** `ENV_SCHEMA_CACHE`
+
+**What Changed:**
+Rails 7.1 used `ENV["SCHEMA_CACHE"]` as the path for `db:schema:cache:dump` and the schema cache load. Rails 7.2 already ignores it and only warns; 8.0 removes the warning too, so the variable is ignored silently and the default `db/schema_cache.yml` (or `db/<name>_schema_cache.yml`) is used. Nothing raises: a script or CI step that sets it has been using the default path since 7.2.
+
+```
+DEPRECATION WARNING: Setting `ENV["SCHEMA_CACHE"]` is deprecated and will be removed in Rails 8.0. Configure the `:schema_cache_path` in the database configuration instead.
+```
+
+**Detection Pattern:**
+```ruby
+ENV["SCHEMA_CACHE"] = "tmp/schema_cache.yml"
+# CI step or script
+SCHEMA_CACHE=tmp/schema_cache.yml bin/rails db:schema:cache:dump
+```
+
+**Fix:**
+```yaml
+# BEFORE
+SCHEMA_CACHE=tmp/schema_cache.yml bin/rails db:schema:cache:dump
+
+# AFTER
+# config/database.yml
+production:
+  <<: *default
+  schema_cache_path: tmp/schema_cache.yml
+```
+The AFTER works on 7.2 too.
+
+---
+
 ## Solid Gems Decision Guide
 
 | Current Setup | Recommendation |
@@ -589,6 +622,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `` DEPRECATION WARNING: `to_time` will always preserve the full timezone `` (or `receiver timezone`) at boot | "to_time Preserves the Full Timezone": set `to_time_preserves_timezone = :zone`; `load_defaults 8.0` later |
 | `DEPRECATION WARNING: 'config.read_encrypted_secrets=' is deprecated` on the 7.2 side | "read_encrypted_secrets Removed": delete the line |
 | `ArgumentError: wrong number of arguments (given 0, expected 1..2)` from an `enum` line | "`enum` Keyword-Arguments Form Removed": `enum :status, { ... }, prefix: true` |
+| `` DEPRECATION WARNING: Setting `ENV["SCHEMA_CACHE"]` is deprecated `` on the 7.2 side | "`SCHEMA_CACHE` Environment Variable No Longer Read": set `schema_cache_path:` in `database.yml` |
 
 ---
 

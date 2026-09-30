@@ -119,18 +119,6 @@ upgrade_findings:
       fix: "Only if adopting Solid gems: split production into primary, cache, queue and cable entries, each non-primary one with its own migrations_paths (db/cache_migrate, db/queue_migrate, db/cable_migrate). Otherwise leave database.yml as it is"
       variable_name: "DB_POOL"
 
-    - name: "ENV[\"SCHEMA_CACHE\"] usage"
-      kind: "breaking"
-      pattern: "ENV\\[['\"]SCHEMA_CACHE['\"]\\]"
-      exclude: ""
-      search_paths:
-        - "config/"
-        - "lib/"
-        - "bin/"
-      explanation: "Rails 8.0 removes deprecated support for setting ENV['SCHEMA_CACHE']. activerecord/CHANGELOG.md: 'Remove deprecated support to setting ENV[\"SCHEMA_CACHE\"].' Apps reading or assigning this env var lose the schema-cache control hook; rake tasks or initializers that depended on it stop influencing schema cache behavior"
-      fix: "Use the schema_cache_path / cache_dump_filename API directly, or rely on the new ActiveRecord::Base.schema_cache_ignored_tables / connection_pool.schema_reflection knobs depending on the use case"
-      variable_name: "ENV_SCHEMA_CACHE"
-
     - name: "to_time_preserves_timezone default (load_defaults below 8.0)"
       kind: "deprecation"
       pattern: "load_defaults[\\s(]+[\"']?[5-7]\\.\\d+\\b"
@@ -244,6 +232,20 @@ upgrade_findings:
       explanation: "Rails 8.0 deprecates the `t.unsigned_float` and `t.unsigned_decimal` short-hand column methods. activerecord/CHANGELOG.md: 'Deprecate `unsigned_float` and `unsigned_decimal` short-hand column methods.' Background: as of MySQL 8.0.17 the UNSIGNED attribute is itself deprecated for FLOAT / DOUBLE / DECIMAL columns at the database level. Removed at 8.1 (see rails-81-patterns.yml MYSQL_UNSIGNED)"
       fix: "Replace `t.unsigned_float :amount` with `t.float :amount, unsigned: true` (column-option form on integer / bigint stays unaffected). For DECIMAL, prefer a CHECK constraint on the value range"
       variable_name: "UNSIGNED_FLOAT_DECIMAL"
+
+    - name: "ENV[\"SCHEMA_CACHE\"] usage"
+      kind: "breaking"
+      pattern: "ENV\\[['\"]SCHEMA_CACHE['\"]\\]|\\bSCHEMA_CACHE="
+      exclude: ""
+      search_paths:
+        - "config/"
+        - "lib/"
+        - "bin/"
+        - ".github/"
+        - ".circleci/"
+      explanation: "Rails 8.0 removes the last trace of ENV[\"SCHEMA_CACHE\"]. activerecord 7.1 read it as the schema cache dump path; 7.2 already ignores it and only warns (`Setting ENV[\"SCHEMA_CACHE\"] is deprecated and will be removed in Rails 8.0`); 8.0 ignores it with no warning. A script or CI step that sets it has used the default db/schema_cache.yml since 7.2"
+      fix: "Set `schema_cache_path:` on the database entry in config/database.yml and drop the SCHEMA_CACHE variable. The key works on both 7.2 and 8.0, so no NextRails.next? branch is needed"
+      variable_name: "ENV_SCHEMA_CACHE"
 
     - name: "Benchmark.ms"
       kind: "deprecation"
