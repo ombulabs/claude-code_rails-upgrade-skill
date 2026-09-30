@@ -21,6 +21,8 @@ Rails 8.0 is a major release with architectural changes:
 
 #### Sprockets → Propshaft
 
+**Pattern:** `SPROCKETS`, `ASSET_CONFIG`, `JS_INCLUDE`
+
 **What Changed:**
 Propshaft is the new default asset pipeline. Sprockets is no longer included by default.
 
@@ -115,6 +117,8 @@ production:
 
 #### assume_ssl Configuration
 
+**Pattern:** `ASSUME_SSL`
+
 **What Changed:**
 Rails 8.0 introduces `config.assume_ssl` for apps behind SSL-terminating proxies.
 
@@ -137,6 +141,8 @@ This prevents SSL redirect loops when behind a proxy.
 
 #### sqlite3_deprecated_warning Removed
 
+**Pattern:** `SQLITE3_WARNING`
+
 **What Changed:**
 The `sqlite3_deprecated_warning` configuration option is removed.
 
@@ -152,6 +158,8 @@ Remove this line from your configuration files.
 
 #### Ruby 3.2+ Strictly Required
 
+**Pattern:** `RUBY_VERSION`
+
 **What Changed:**
 Rails 8.0 requires Ruby 3.2.0 or newer.
 
@@ -164,6 +172,8 @@ rbenv local 3.3.0
 ---
 
 #### `query_constraints:` association option removed (composite foreign keys)
+
+**Pattern:** `QUERY_CONSTRAINTS_OPTION`
 
 **What Changed:**
 Rails 8.0 **removes** the `query_constraints:` option on associations (`belongs_to`/`has_many`/etc.). It was deprecated in Rails 7.2 and now raises `ActiveRecord::ConfigurationError` **at class load**, so the app fails to boot.
@@ -200,6 +210,8 @@ This is **behavior-preserving and version-agnostic**: when `foreign_key:` is giv
 
 #### Solid Cache (Optional)
 
+**Pattern:** `REDIS_CACHE`
+
 **What Changed:**
 Rails 8.0 defaults to Solid Cache for caching (database-backed).
 
@@ -232,6 +244,8 @@ config.cache_store = :solid_cache_store
 ---
 
 #### Solid Queue (Optional)
+
+**Pattern:** `SIDEKIQ_QUEUE`
 
 **What Changed:**
 Rails 8.0 defaults to Solid Queue for background jobs (database-backed).
@@ -269,6 +283,8 @@ bin/jobs
 
 #### Solid Cable (Optional)
 
+**Pattern:** `CABLE_REDIS`
+
 **What Changed:**
 Rails 8.0 defaults to Solid Cable for WebSockets (database-backed).
 
@@ -300,6 +316,8 @@ production:
 
 #### Docker/Thruster for Production
 
+**Pattern:** `THRUSTER`
+
 **What Changed:**
 Rails 8.0 apps include Dockerfile and Thruster gem.
 
@@ -319,6 +337,8 @@ Thruster provides:
 
 #### Kamal Deployment
 
+**Pattern:** `KAMAL_DEPLOY`
+
 **What Changed:**
 Rails 8.0 includes Kamal configuration for deployment.
 
@@ -331,6 +351,8 @@ Rails 8.0 includes Kamal configuration for deployment.
 ---
 
 #### to_time Preserves the Full Timezone
+
+**Pattern:** `TO_TIME_PRESERVES_TIMEZONE`, `TO_TIME_PRESERVES_TIMEZONE_ASSIGNMENT`
 
 **What Changed:**
 Rails 8.0 warns whenever `to_time_preserves_timezone` is set to anything other than `:zone`, because 8.1 makes `:zone` the only behavior. `load_defaults 8.0` sets `:zone`. `load_defaults` 5.0 to 7.2 leave it at `:offset` on 8.0 (7.2 stores the same setting as `true`), so an app still on an older `load_defaults` warns at boot:
@@ -384,6 +406,8 @@ On 8.0 `:zone` is a behavior change: `to_time` returns a Time that carries the r
 ### 🟢 LOW PRIORITY
 
 #### read_encrypted_secrets Removed
+
+**Pattern:** `READ_ENCRYPTED_SECRETS`
 
 **What Changed:**
 Rails 8.0 removes `config.read_encrypted_secrets`. The setting drove the legacy `config/secrets.yml.enc` feature, already dead since 7.2 removed `Rails.application.secrets`. The assignment does not raise on 8.0: it is stored with no effect and no warning. Only the 7.2 side of a dual boot warns, which clutters boot and `assets:precompile` logs:
