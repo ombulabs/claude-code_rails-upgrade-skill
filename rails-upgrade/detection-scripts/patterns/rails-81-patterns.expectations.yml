@@ -1,0 +1,42 @@
+# Fixture expectations for rails-81-patterns.yml.
+#
+# Keyed by variable_name. See rails-40-patterns.expectations.yml for the format.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-81-patterns.yml
+
+SEMICOLON_SEPARATOR:
+  match:
+    - "    redirect_to \"/search?q=test;page=2\""
+    - "  get \"/items?filter[state]=open;sort=name\""
+    - "    <a href=\"/feed?format=rss;lang=en\">Feed</a>"
+    - "    url = \"#{base}/export?from=#{from};to=#{to}\""
+    # interpolation and a HAML id element at the start of the line
+    - "#{base}/export?from=#{from};to=#{to}"
+    - "#feed= link_to 'Feed', '/feed?format=rss;lang=en'"
+  no_match:
+    # comments: Ruby, JS, ERB, HAML
+    - "  # the old client sent /search?q=test;page=2"
+    - "  // /search?q=test;page=2"
+    - "  <%# /search?q=test;page=2 %>"
+    - "  -# /search?q=test;page=2"
+    # an ampersand-separated query, and its HTML-escaped form
+    - "    redirect_to \"/search?q=test&page=2\""
+    - "    <a href=\"/search?q=test&amp;page=2\">Next</a>"
+    # a semicolon that is not between two key=value pairs
+    - "    params = { q: params[:q] };"
+    - "    src=\"data:image/png;base64,iVBORw0KGgo=\""
+    - "    style=\"color: red; width: 10px\""
+    # an explicit separator still works on 8.1
+    - "    params = Rack::Utils.parse_nested_query(qs, \"&;\")"
+    # minified JS
+    - "e?t=1;n()"
+    - "a?b=c==d;e=f"
+    - "x?y=f(g);h=1"
+
+STRICT_QUERY_STRING_SEPARATOR_CONFIG:
+  match:
+    - "  config.action_dispatch.strict_query_string_separator = false"
+    - "  ActionDispatch::QueryParser.strict_query_string_separator = true"
+  no_match:
+    - "  # config.action_dispatch.strict_query_string_separator = false"

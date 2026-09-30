@@ -38,13 +38,16 @@ upgrade_findings:
   medium_priority:
     - name: "Semicolon query separator"
       kind: "breaking"
-      pattern: "param.*;"
-      exclude: ""
+      pattern: "[?&][A-Za-z_][\\w\\[\\]%.-]*=([^\\s'\"&;#<>=(){}!|]|#\\{[^}\\n]*\\})*;[A-Za-z_][\\w\\[\\]%.-]*="
+      exclude: "\\A\\s*(#(?![{\\w])|//|\\*|<%#|-#)"
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 8.1 removes semicolon as query parameter separator"
-      fix: "Replace semicolons (;) with ampersands (&) in query strings"
+        - "config/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 8.0's ActionDispatch::QueryParser still split a query string, and a form-urlencoded request body, on `;` when the app ran Rack 2 (Rack's own separator then included `;`), with a deprecation warning: `/search?q=test;page=2` gave `{\"q\"=>\"test\", \"page\"=>\"2\"}`. Rails 8.1 splits on `&` only, so the same URL gives `{\"q\"=>\"test;page=2\"}`: nothing raises, `page` is just missing. An app that already ran Rack 3 on 8.0 got the new behavior at that hop, so this bites only apps that reach 8.1 from Rack 2. The pattern flags a query-string literal with a `;` between two `key=` pairs (in links, redirects, API clients and request specs). Commented lines are skipped. It cannot see URLs built at runtime or sent by outside clients. For those, search the request log for `Started` lines whose query string holds a `;` between two `key=` pairs, or the proxy's access log; the 8.0 deprecation warning is no help in production, where the generated config sets `report_deprecations = false`"
+      fix: "Replace the `;` with `&` in query strings the app builds or links to (`/search?q=test&page=2`). For URLs that outside clients send with `;`, there is no setting that restores the split: rewrite the query string in a Rack middleware before Rails parses it, or ask the clients to switch"
       variable_name: "SEMICOLON_SEPARATOR"
 
     - name: "Sidekiq adapter built-in"
@@ -152,6 +155,16 @@ upgrade_findings:
       explanation: "Rails 8.1 deprecates config.active_support.to_time_preserves_timezone. activesupport/CHANGELOG.md: 'Deprecate `config.active_support.to_time_preserves_timezone`.' Tied to the broader 8.1 change that #to_time always preserves the receiver timezone (the legacy 'preserve system local time' behavior is gone). The config is now a no-op deprecated shim"
       fix: "Remove the assignment from config/application.rb / environment configs. If app code depends on Time#to_time returning system-local time, audit those call sites; #to_time now always preserves the receiver's timezone"
       variable_name: "TO_TIME_PRESERVES_TIMEZONE_CONFIG"
+
+    - name: "strict_query_string_separator config"
+      kind: "deprecation"
+      pattern: "strict_query_string_separator"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "`config.action_dispatch.strict_query_string_separator` chose, on Rails 8.0 with Rack 2, whether a `;` still split the query string. Rails 8.1 always splits on `&` only, so the setting has no effect, and both its reader and writer emit a deprecation warning saying it will be removed in Rails 8.2"
+      fix: "Delete the line. If it was set to `false` to keep `;` working, see the \"Semicolon Query Separator Removed\" entry in the 8.0 to 8.1 guide: that behavior is gone on 8.1"
+      variable_name: "STRICT_QUERY_STRING_SEPARATOR_CONFIG"
 
     - name: "String#mb_chars / Multibyte::Chars"
       kind: "deprecation"
