@@ -333,6 +333,20 @@ ActiveRecord::Migration.check_all_pending!
 
 ---
 
+### 🟢 LOW PRIORITY
+
+#### Ruby Version Requirement
+
+**Pattern:** none (the minimum Ruby does not change at this hop)
+
+**What Changed:**
+Nothing. The `rails` 7.1 gemspec requires Ruby `>= 2.7.0`, the same as 7.0, so the Ruby that bundles 7.0 also bundles 7.1. The gemspec sets no upper bound; a Ruby released after 7.1 may need its latest patch release.
+
+**Fix:**
+None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
+
+---
+
 ## New Features
 
 ### Composite Primary Keys

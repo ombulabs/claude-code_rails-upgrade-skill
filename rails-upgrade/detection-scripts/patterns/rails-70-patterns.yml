@@ -5,12 +5,13 @@ upgrade_findings:
   high_priority:
     - name: "Ruby version requirement"
       kind: "breaking"
-      pattern: "ruby.*['\"]2\\.[0-6]"
+      pattern: "^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:=\\s*|~>\\s*(?=\\d+\\.\\d+\\.\\d))?|ruby-|ruby\\s+)?(?:1\\.\\d+|2\\.[0-6])(?:\\.\\d+)*(?![\\d.])|^\\s*ruby\\s*\\(?\\s*[\"']~>\\s*1\\.\\d+(?![\\d.])"
       exclude: ""
       search_paths:
         - "Gemfile"
         - ".ruby-version"
-      explanation: "Rails 7.0 requires Ruby 2.7.0 or newer"
+        - ".tool-versions"
+      explanation: "Rails 7.0 requires Ruby 2.7.0 or newer. Flags a Ruby below 2.7.0 in .ruby-version or .tool-versions, and a Gemfile `ruby` line that rules it out (an exact version, or a `~>` whose upper bound is below 2.7.0); a requirement that still allows 2.7.0, such as `>=`, is not flagged"
       fix: "Upgrade Ruby to 2.7.0+ (3.0+ recommended)"
       variable_name: "RUBY_VERSION"
 

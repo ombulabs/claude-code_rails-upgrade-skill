@@ -400,6 +400,18 @@ Consider [Transpec](http://yujinakayama.me/transpec/) to automate common 2 → 3
 
 ---
 
+#### Ruby Version Requirement
+
+**Pattern:** none (the minimum Ruby does not change at this hop)
+
+**What Changed:**
+Nothing. The `rails` 4.2 gemspec requires Ruby `>= 1.9.3`, the same as 4.1, so the Ruby that bundles 4.1 also bundles 4.2. The gemspec sets no upper bound; a Ruby released after 4.2 may need its latest patch release.
+
+**Fix:**
+None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
+
+---
+
 ## New Gemfile Defaults
 
 Rails 4.2 generates new applications with these additions — consider adopting them:

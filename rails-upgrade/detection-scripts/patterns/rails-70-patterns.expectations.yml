@@ -51,3 +51,22 @@ EXPLICIT_TEMPLATE_EXTENSION:
     - "    render layout: \"pdf\""
     # a bare action render is unaffected
     - "    render :show"
+
+RUBY_VERSION:
+  # Rails 7.0 requires Ruby >= 2.7.0 (rails gemspec). Lines come from the
+  # Gemfile, .ruby-version and .tool-versions.
+  match:
+    - "ruby \"2.6.10\""
+    - "ruby '~> 2.6.3'"
+    - "ruby '~> 1.9'"
+    - "2.6.10"
+    - "ruby-2.5.9"
+    - "ruby 2.6.10"
+  no_match:
+    - "ruby \"2.7.8\""
+    - "ruby \"~> 2.6\""
+    - "ruby \">= 2.5.0\""
+    - "3.0.6"
+    - "ruby 3.1.4"
+    - "2.10.0"
+    - "gem \"rack\", \"2.6.1\""

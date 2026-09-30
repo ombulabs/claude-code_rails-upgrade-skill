@@ -5,12 +5,13 @@ upgrade_findings:
   high_priority:
     - name: "Ruby version requirement"
       kind: "breaking"
-      pattern: "ruby.*['\"](2\\.|3\\.[01])"
+      pattern: "^\\s*(?:ruby\\s*\\(?\\s*[\"'](?:=\\s*|~>\\s*(?=\\d+\\.\\d+\\.\\d))?|ruby-|ruby\\s+)?(?:1\\.\\d+|2\\.\\d+|3\\.[01])(?:\\.\\d+)*(?![\\d.])|^\\s*ruby\\s*\\(?\\s*[\"']~>\\s*[12]\\.\\d+(?![\\d.])"
       exclude: ""
       search_paths:
         - "Gemfile"
         - ".ruby-version"
-      explanation: "Rails 8.0 requires Ruby 3.2.0 or newer (rails.gemspec: required_ruby_version = '>= 3.2.0'). Apps on Ruby 3.1 or older fail to bundle"
+        - ".tool-versions"
+      explanation: "Rails 8.0 requires Ruby 3.2.0 or newer (rails.gemspec: required_ruby_version = '>= 3.2.0'). Apps on Ruby 3.1 or older fail to bundle. Flags a Ruby below 3.2.0 in .ruby-version or .tool-versions, and a Gemfile `ruby` line that rules it out (an exact version, or a `~>` whose upper bound is below 3.2.0); a requirement that still allows 3.2.0, such as `>=`, is not flagged"
       fix: "Upgrade Ruby to 3.2.0+ before bumping Rails. Update Gemfile and .ruby-version, then `bundle update rails`"
       variable_name: "RUBY_VERSION"
 

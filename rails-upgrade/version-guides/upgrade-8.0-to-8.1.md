@@ -280,6 +280,18 @@ Recommended `.gitignore` pattern for credential keys changed.
 
 ---
 
+#### Ruby Version Requirement
+
+**Pattern:** none (the minimum Ruby does not change at this hop)
+
+**What Changed:**
+Nothing. The `rails` 8.1 gemspec requires Ruby `>= 3.2.0`, the same as 8.0, so the Ruby that bundles 8.0 also bundles 8.1. The gemspec sets no upper bound; a Ruby released after 8.1 may need its latest patch release.
+
+**Fix:**
+None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
+
+---
+
 ## Migration Steps
 
 ### Phase 1: Preparation

@@ -161,7 +161,19 @@ Remove this line from your configuration files.
 **Pattern:** `RUBY_VERSION`
 
 **What Changed:**
-Rails 8.0 requires Ruby 3.2.0 or newer.
+Rails 8.0 requires Ruby 3.2.0 or newer: the `rails` 8.0 gemspec sets `required_ruby_version >= 3.2.0`, while 7.2 accepts `>= 3.1.0`. Bundler refuses to install 8.0 on an older Ruby, so upgrade Ruby first, while the app is still on Rails 7.2, as its own deploy. The gemspec sets no upper bound; a Ruby released after a Rails version may need that version's latest patch release.
+
+**Detection Pattern:**
+```ruby
+# Gemfile
+ruby "3.1.6"
+
+# .ruby-version
+3.1.6
+
+# .tool-versions
+ruby 3.1.6
+```
 
 **Fix:**
 ```bash

@@ -194,6 +194,20 @@ config.action_controller.per_form_csrf_tokens = false
 
 ---
 
+### 🟢 LOW PRIORITY
+
+#### Ruby Version Requirement
+
+**Pattern:** none (the minimum Ruby does not change at this hop)
+
+**What Changed:**
+Nothing. The `rails` 5.2 gemspec requires Ruby `>= 2.2.2`, the same as 5.1, so the Ruby that bundles 5.1 also bundles 5.2. The gemspec sets no upper bound; a Ruby released after 5.2 may need its latest patch release.
+
+**Fix:**
+None needed for this hop. Upgrade Ruby as a separate step, not in the same deploy as the Rails bump.
+
+---
+
 ## New Features
 
 ### Active Storage

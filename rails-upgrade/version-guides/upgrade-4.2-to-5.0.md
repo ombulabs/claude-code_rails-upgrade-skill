@@ -27,7 +27,19 @@ Rails 5.0 is a major release with significant changes:
 **Pattern:** `RUBY_VERSION`
 
 **What Changed:**
-Rails 5.0 requires Ruby 2.2.2 or later.
+Rails 5.0 requires Ruby 2.2.2 or newer: the `rails` 5.0 gemspec sets `required_ruby_version >= 2.2.2`, while 4.2 accepts `>= 1.9.3`. Bundler refuses to install 5.0 on an older Ruby, so upgrade Ruby first, while the app is still on Rails 4.2, as its own deploy. The gemspec sets no upper bound; a Ruby released after a Rails version may need that version's latest patch release.
+
+**Detection Pattern:**
+```ruby
+# Gemfile
+ruby "2.1.10"
+
+# .ruby-version
+2.1.10
+
+# .tool-versions
+ruby 2.1.10
+```
 
 **Fix:**
 ```bash
