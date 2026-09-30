@@ -401,6 +401,30 @@ Neither a boot smoke test nor a green suite catches this one: it only manifests 
 
 ---
 
+#### Active Storage `variant(resize:)` Under vips
+
+**Pattern:** `ACTIVE_STORAGE_VARIANT`
+
+**What Changed:**
+`load_defaults 7.0` sets `config.active_storage.variant_processor = :vips`; below that the processor stays `:mini_magick`. `resize:` is not one of the image_processing macros, so under vips it is passed straight to libvips, which does not understand ImageMagick geometry strings like `"100x100>"`. Variants that worked on 6.1 then fail when they are generated.
+
+**Detection Pattern:**
+```ruby
+user.avatar.variant(resize: "100x100>")
+```
+
+**Fix:**
+```ruby
+# BEFORE
+user.avatar.variant(resize: "100x100>")
+
+# AFTER
+user.avatar.variant(resize_to_limit: [100, 100])
+```
+The AFTER works on 6.1 too, with either processor. To keep ImageMagick after `load_defaults 7.0` instead, set `config.active_storage.variant_processor = :mini_magick`.
+
+---
+
 ## Migration Steps
 
 ### Phase 1: Preparation
@@ -481,6 +505,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `method: :delete` links send GET | "Rails UJS → Turbo / Stimulus" — `button_to` or `data-turbo-method` |
 | Forms submit twice | "Rails UJS → Turbo / Stimulus" — remove rails-ujs completely |
 | JavaScript not loading | "Webpacker → Import Maps / jsbundling-rails" — `<%= javascript_importmap_tags %>` |
+| Variant images fail to generate after `load_defaults 7.0` | "Active Storage `variant(resize:)` Under vips" — use `resize_to_limit:` / `resize_to_fill:` |
 
 ---
 

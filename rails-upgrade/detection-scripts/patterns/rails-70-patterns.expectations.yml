@@ -70,3 +70,13 @@ RUBY_VERSION:
     - "ruby 3.1.4"
     - "2.10.0"
     - "gem \"rack\", \"2.6.1\""
+
+ACTIVE_STORAGE_VARIANT:
+  match:
+    # ImageMagick geometry strings passed to resize:, which libvips rejects
+    - "<%= image_tag user.avatar.variant(resize: \"100x100>\") %>"
+    - "    @photo.image.variant(resize: \"300x300\", auto_orient: true)"
+  no_match:
+    # the image_processing macros work under both processors
+    - "<%= image_tag user.avatar.variant(resize_to_limit: [100, 100]) %>"
+    - "    @photo.image.variant(resize_to_fill: [300, 300])"
