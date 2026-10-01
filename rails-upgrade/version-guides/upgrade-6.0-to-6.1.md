@@ -21,6 +21,30 @@ Rails 6.1 introduces:
 
 ### 🔴 HIGH PRIORITY
 
+#### update_attributes Removed
+
+**What Changed:**
+`update_attributes` and `update_attributes!`, deprecated aliases of `update` and `update!` in 6.0, are removed. Every call raises `NoMethodError`, including calls through `send(:update_attributes, ...)`. There is no patterns file for this hop, so search for them by hand: `grep -rnw update_attributes app lib spec test`, which also finds the `!` form.
+
+**Detection Pattern:**
+```ruby
+user.update_attributes(name: 'New Name')
+user.update_attributes!(name: 'New Name')
+```
+
+**Fix:**
+```ruby
+# BEFORE
+user.update_attributes(name: 'New Name')
+
+# AFTER
+user.update(name: 'New Name')
+```
+
+`update` exists on 6.0 as well, so the rewrite can land before the version bump with no `NextRails.next?` branch.
+
+---
+
 #### config_for Returns HashWithIndifferentAccess
 
 **What Changed:**
@@ -227,10 +251,11 @@ end
 ```
 
 ### Phase 3: Fix Breaking Changes
-1. Review `config_for` usage
-2. Check `respond_to#any` blocks
-3. Test SSL redirects if critical
-4. Update `ActiveModel::Errors` usage
+1. Replace `update_attributes` / `update_attributes!` with `update` / `update!`
+2. Review `config_for` usage
+3. Check `respond_to#any` blocks
+4. Test SSL redirects if critical
+5. Update `ActiveModel::Errors` usage
 
 ### Phase 4: Configuration
 ```bash
@@ -266,6 +291,7 @@ Error → section lookup for the most common errors encountered during this upgr
 
 | Error | See |
 |-------|-----|
+| `NoMethodError: undefined method 'update_attributes'` | "update_attributes Removed": replace with `update` |
 | API client receives `text/html` instead of `application/json` | "respond_to#any Content-Type Change" — `format.json { render json: ... }` |
 | SSL redirect loops on POST requests | "HTTPS Redirects Use 308 Status" — `config.ssl_options = { redirect: { status: 301 } }` if the proxy cannot handle 308 |
 | `NoMethodError: undefined method 'include?' for #<ActiveModel::Error>` | "ActiveModel::Errors API Change" — `errors.where(:email).map(&:message)` |

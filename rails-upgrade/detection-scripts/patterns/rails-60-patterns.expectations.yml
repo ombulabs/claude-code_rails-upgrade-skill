@@ -1,0 +1,24 @@
+# Fixture expectations for rails-60-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-60-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-60-patterns.yml
+
+UPDATE_ATTRIBUTES:
+  match:
+    - "    @user.update_attributes(user_params)"
+    - "  post.update_attributes!(title: 'New')"
+    - "    record.send(:update_attributes, attrs)"
+    - "  alias_method :save_all, :update_attributes"
+  no_match:
+    - "    @user.update(user_params)"
+    - "    @user.update_attribute(:name, 'New')"
+    - "    @user.update_attributes_from_api(payload)"
+    - "    importer.batch_update_attributes(rows)"

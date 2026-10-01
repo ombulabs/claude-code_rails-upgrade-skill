@@ -44,18 +44,18 @@ upgrade_findings:
       fix: "Remove explicit with: :exception as it's now the default"
       variable_name: "CSRF_PROTECTION"
 
+  medium_priority:
     - name: "update_attributes deprecated"
       kind: "deprecation"
-      pattern: "update_attributes[^_]"
-      exclude: "update_attribute"
+      pattern: "\\bupdate_attributes\\b"
+      exclude: ""
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "update_attributes is deprecated in Rails 6.0"
+      explanation: "update_attributes and update_attributes! are deprecated aliases of update and update! in Rails 6.0: they still work and warn on every call. Rails 6.1 removes them"
       fix: "Replace update_attributes with update"
       variable_name: "UPDATE_ATTRIBUTES"
 
-  medium_priority:
     - name: "ActionCable configuration"
       kind: "migration"
       pattern: "config.action_cable"

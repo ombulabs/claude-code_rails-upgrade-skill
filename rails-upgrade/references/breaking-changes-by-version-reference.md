@@ -27,7 +27,7 @@
 | Zeitwerk autoloader | ALL apps | Remove require_dependency, fix naming |
 | Ruby 2.5+ required | ALL apps | Upgrade Ruby first |
 | belongs_to required | Models | Add optional: true where needed |
-| update_attributes removed | ALL apps | Change to update |
+| update_attributes deprecated (removed in 6.1) | ALL apps | Change to update |
 | protect_from_forgery default | Controllers | Review CSRF settings |
 
 ---

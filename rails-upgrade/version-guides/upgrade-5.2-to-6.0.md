@@ -73,28 +73,6 @@ rbenv local 2.7.8
 
 ---
 
-#### update_attributes Removed
-
-**What Changed:**
-`update_attributes` and `update_attributes!` are removed.
-
-**Detection Pattern:**
-```ruby
-user.update_attributes(name: 'New Name')
-user.update_attributes!(name: 'New Name')
-```
-
-**Fix:**
-```ruby
-# BEFORE
-user.update_attributes(name: 'New Name')
-
-# AFTER
-user.update(name: 'New Name')
-```
-
----
-
 #### belongs_to Required by Default
 
 **What Changed:**
@@ -139,6 +117,28 @@ end
 ---
 
 ### 🟡 MEDIUM PRIORITY
+
+#### update_attributes Deprecated
+
+**What Changed:**
+`update_attributes` and `update_attributes!` become deprecated aliases of `update` and `update!`: they still work on 6.0 and emit a deprecation warning on every call. Rails 6.1 removes them, so every call raises `NoMethodError` after the next hop. Replacing them now is the same edit either way.
+
+**Detection Pattern:**
+```ruby
+user.update_attributes(name: 'New Name')
+user.update_attributes!(name: 'New Name')
+```
+
+**Fix:**
+```ruby
+# BEFORE
+user.update_attributes(name: 'New Name')
+
+# AFTER
+user.update(name: 'New Name')
+```
+
+---
 
 #### before_filter Removed
 
@@ -303,6 +303,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `Zeitwerk::NameError: expected file ... to define constant ...` | "Zeitwerk Autoloader" — rename the file or the class to match |
 | `Circular dependency detected` | "Zeitwerk Autoloader" — restructure, `require` only for real edge cases |
 | `uninitialized constant` only in tests | "Zeitwerk Autoloader" — run `bin/rails zeitwerk:check`, check `rails_helper` load order |
+| `DEPRECATION WARNING: update_attributes is deprecated and will be removed from Rails 6.1` | "update_attributes Deprecated": replace with `update` before the 6.1 hop |
 
 ---
 
