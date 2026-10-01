@@ -315,33 +315,6 @@ end
 
 ---
 
-#### Dynamic Finders Deprecated
-
-**What Changed:**
-Dynamic finders like `find_all_by_*` are deprecated.
-
-**Detection Pattern:**
-```ruby
-User.find_all_by_email(email)
-User.find_by_name_and_email(name, email)
-User.find_or_create_by_email(email)
-```
-
-**Fix:**
-```ruby
-# BEFORE
-User.find_all_by_email(email)
-User.find_by_name_and_email(name, email)
-User.find_or_create_by_email(email)
-
-# AFTER
-User.where(email: email)
-User.find_by(name: name, email: email)
-User.find_or_create_by(email: email)
-```
-
----
-
 #### Routes Require HTTP Method
 
 **What Changed:**
@@ -551,8 +524,9 @@ and `reorder(nil)` is the documented way to clear a default order, so leave them
 The hash form has the same shape of problem. Rails 3.2 had no hash support in `order` at
 all: the hash was serialized into the `ORDER BY` string, the database sorted by nothing
 usable, and rows came back in whatever order it chose. Rails 4.0 reads a hash strictly as
-`{column => direction}` and validates the value against `:asc` / `:desc`, so
-`order(events: :start)` raises. It also only accepts columns on the model's own table, so
+`{column => direction}` and raises `ArgumentError: Direction should be :asc or :desc`
+unless every value is exactly the symbol `:asc` or `:desc`. So `order(events: :start)`,
+`order(name: :DESC)`, `order(name: "desc")` and `order(:position, name: :foo)` all raise. It also only accepts columns on the model's own table, so
 a sort spanning joined tables cannot be written as a hash on 4.0 at all.
 
 **Detection Pattern:**
@@ -567,10 +541,14 @@ grep -rnE "(^|[^A-Za-z0-9_])(re)?order\(\s*\{?\s*:?\w+\s*(:|=>)\s*:\w+" app/ lib
 Reading an `order` association or column (`line_item.order`, `payment.order.total`) is far
 more common than the bug, which is why the bare-call grep requires a relation method after
 it, and why that method name must end there: without the trailing boundary,
-`line_item.order.summary` matches on `sum`. The `:asc` / `:desc` filter is applied to the
-whole line, so a line chaining a bad hash and a good one is filtered out with it; split
-such chains before trusting a clean run. Multi-line hashes cannot be grepped at all, so
-also scan `order(` by hand in query objects and reports. Two shapes stay invisible to both
+`line_item.order.summary` matches on `sum`. The hash grep is a rough first pass: its
+`:asc` / `:desc` filter drops the whole line, so a line chaining a bad hash and a good one
+is filtered out with it, and it cannot see a hash spread over several lines. The skill's
+own pattern checks each value. Run through the whole-file scanner
+(`detection-scripts/scan_patterns.rb`) it also reads a hash spread over several lines; run
+as a line-based search it sees only one-line calls, so check multi-line `order(` calls by
+hand in that case. Neither can see a hash held in a constant or built at runtime
+(`order(SORT)`), so also scan `order(` by hand in query objects and reports. Two shapes stay invisible to both
 the grep and the skill's own pattern: a receiverless `order` inside a scope
 (`scope :recent, -> { order }`), and a bare call followed by an enumerable method rather
 than a relation method (`.order.map { ... }`, `.order.sort_by { ... }`).
@@ -578,10 +556,10 @@ than a relation method (`.order.map { ... }`, `.order.sort_by { ... }`).
 **Fix:**
 ```ruby
 # BEFORE
-PersonConsentLink.where(person_id: person_id).order.last
+Membership.where(user_id: user_id).order.last
 
 # AFTER
-PersonConsentLink.where(person_id: person_id).order(:id).last
+Membership.where(user_id: user_id).order(:id).last
 ```
 
 `:id` is not an arbitrary choice for the `.order.last` shape. On 3.2, `last` with no order
@@ -591,14 +569,14 @@ so `order(:id).last` reproduces the old result exactly.
 ```ruby
 # BEFORE: raises on 4.0, sorted by nothing on 3.2
 .order(
-  { patient_groups: :id },
-  { checklist_task_items: :month }
+  { tags: :id },
+  { task_items: :month }
 )
 
 # AFTER: strings are the only form that can express a sort across joined tables
 .order(
-  "patient_groups.id",
-  "checklist_task_items.month"
+  "tags.id",
+  "task_items.month"
 )
 ```
 
@@ -612,7 +590,7 @@ review, not just a syntax fix. Check whether any test asserts on the old row ord
 whether downstream code (a CSV export, a paginated screen) depends on it.
 
 For Rails 5.2 and later, a bare string passed to `order` triggers a `Dangerous query
-method` warning; wrap it as `Arel.sql("patient_groups.id")`. `Arel.sql` exists since Rails
+method` warning; wrap it as `Arel.sql("tags.id")`. `Arel.sql` exists since Rails
 3.0, so the wrap is safe to add now.
 
 ---
@@ -899,6 +877,154 @@ By the time `after_destroy` runs, this row is gone, so the reciprocal cascade re
 
 ---
 
+#### Dynamic Finders Deprecated
+
+**What Changed:**
+Rails 4.0 keeps only `find_by_*` and `find_by_*!` in Active Record. `find_all_by_*`,
+`find_last_by_*`, `find_or_create_by_*`, `find_or_initialize_by_*` and `scoped_by_*` move
+to the `activerecord-deprecated_finders` gem, which activerecord 4.0 depends on, so they
+keep working and print a warning on every call:
+
+```
+DEPRECATION WARNING: This dynamic method is deprecated. Please use e.g. Post.where(...).all instead.
+```
+
+Rails 4.1 drops the gem and these calls raise `NoMethodError`. `find_by_*` is not part of
+this change: it works without a warning on 4.0 and later. It only warns when it is passed
+an options hash or a block.
+
+**Detection Pattern:**
+```ruby
+User.find_all_by_email(email)
+User.find_last_by_email(email)
+User.find_or_create_by_email(email)
+User.find_or_initialize_by_email(email)
+```
+
+**Fix:**
+The keyword forms `find_or_create_by(email: email)` and `find_by(email: email)` do not
+exist on Rails 3.2 (they raise `NoMethodError` there), so rewrite with calls that work on
+both versions and the change can ship before the bump:
+
+```ruby
+# BEFORE
+User.find_all_by_email(email)
+User.find_last_by_email(email)
+User.find_or_create_by_email(email)
+User.find_or_initialize_by_email(email)
+
+# AFTER (Rails 3.2 and 4.0)
+User.where(email: email).to_a
+User.where(email: email).last
+User.where(email: email).first_or_create
+User.where(email: email).first_or_initialize
+```
+
+Once the app is on 4.0, `find_or_create_by(email: email)` and
+`find_or_initialize_by(email: email)` are the shorter spellings.
+
+Keep `.to_a` where the result is read more than once: `find_all_by_*` returned an Array,
+and a bare `where` is a lazy Relation that runs a new query for each `any?`, `size` or
+`each`.
+
+An app can define its own method whose name starts with one of these prefixes. The
+detection patterns skip the `def` line but not the callers, so check for a matching `def`
+before rewriting a call.
+
+---
+
+#### `Model.scoped` Deprecated
+
+**What Changed:**
+Rails 4.0 removed `scoped` from Active Record. The `activerecord-deprecated_finders` gem,
+which activerecord 4.0 depends on, adds it back with a warning on every call, with or
+without an options hash:
+
+```
+DEPRECATION WARNING: Model.scoped is deprecated. Please use Model.all instead.
+```
+
+Rails 4.1 drops the gem and `Model.scoped`, `relation.scoped` and `association.scoped`
+all raise `NoMethodError`.
+
+**Detection Pattern:**
+```ruby
+Post.scoped
+user.posts.scoped.where(published: true)
+Post.scoped(conditions: { published: true }, include: :author, order: "created_at DESC")
+
+# receiverless, inside the model
+scope :everyone, -> { scoped }
+def self.for_region(region)
+  region ? where(region: region) : scoped
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Post.scoped
+user.posts.scoped.where(published: true)
+Post.scoped(conditions: { published: true }, include: :author, order: "created_at DESC")
+scope :everyone, -> { scoped }
+
+# AFTER (Rails 3.2 and 4.0)
+Post.where(nil)
+user.posts.where(published: true)
+Post.where(published: true).includes(:author).order("created_at DESC")
+scope :everyone, -> { where(nil) }
+```
+
+`where(nil)` returns a Relation with no conditions on both versions. `all` is the 4.0
+replacement the warning names, but on 3.2 `all` loads the records into an Array, so a
+chained scope call after it breaks before the bump. Switch to `all` once the app is on 4.0.
+
+A local variable, a `let(:scoped)`, or an app object that defines its own `scoped` method
+(a query or presenter object) looks the same to a search. Check for a `def scoped` or
+`let(:scoped)` before rewriting.
+
+---
+
+#### `update_all` With Conditions Deprecated
+
+**What Changed:**
+Rails 3.2 accepted `update_all(updates, conditions, options)`. Rails 4.0 core takes only
+`update_all(updates)`; the `activerecord-deprecated_finders` gem, which activerecord 4.0
+depends on, keeps the extra arguments working with a warning:
+
+```
+DEPRECATION WARNING: Relation#update_all with conditions is deprecated. Please use Item.where(color: 'red').update_all(...) rather than Item.update_all(..., color: 'red').
+```
+
+A `:limit` / `:order` options hash gets a second warning. Rails 4.1 drops the gem and the
+call raises `ArgumentError: wrong number of arguments`.
+
+**Detection Pattern:**
+```ruby
+User.update_all({ active: false }, { id: ids })
+User.update_all("active = 0", ["created_at < ?", cutoff])
+Product.update_all(attrs, { sku: sku }, limit: 1)
+self.class.update_all({ synced_at: now }, id: id)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+User.update_all({ active: false }, { id: ids })
+User.update_all("active = 0", ["created_at < ?", cutoff])
+Product.update_all(attrs, { sku: sku }, limit: 1)
+
+# AFTER (Rails 3.2 and 4.0)
+User.where(id: ids).update_all(active: false)
+User.where("created_at < ?", cutoff).update_all("active = 0")
+Product.where(sku: sku).limit(1).update_all(attrs)
+```
+
+A single braceless hash, `update_all(active: false, synced_at: now)`, is one argument and
+needs no change.
+
+---
+
 ### 🟢 LOW PRIORITY (but commonly encountered)
 
 #### Fixture Dates Must Be Cast to Strings
@@ -1176,7 +1302,7 @@ bundle update rails
 1. Add lambda to all scopes
 2. **Migrate all association `:conditions`, `:order`, `:extend`, `:uniq` options to lambda syntax** (this is typically the highest-volume change)
 3. Rewrite `:finder_sql` associations as scopes or methods; remove `:readonly` options
-4. Update dynamic finders to where/find_by
+4. Replace `Model.scoped` with `where(nil)` and rewrite `find_all_by_*`, `find_last_by_*`, `find_or_create_by_*`, `find_or_initialize_by_*` and `scoped_by_*` with `where` (`find_by_*` can stay). No 4.0 pattern flags `scoped_by_*` (the 4.1 patterns do), so grep for it by hand, and move `update_all` conditions into `where`
 5. Add HTTP methods to routes
 6. Migrate to Strong Parameters and remove `require 'strong_parameters'` calls
 7. Replace `rescue_action` with `rescue_from`
@@ -1236,6 +1362,9 @@ Error → section lookup for the most common errors encountered during this upgr
 | Remote form POST arrives with no session or current user | "Remote Forms Stop Embedding the CSRF Token" — pin `embed_authenticity_token_in_remote_forms` |
 | `ArgumentError: The method .order() must contain arguments.` | "`order` and `reorder` Require Arguments" — name the column, `order(:id)` for `.order.last` |
 | `ArgumentError: Direction should be :asc or :desc` | "`order` and `reorder` Require Arguments" — hash values must be `:asc` / `:desc`; use strings across joins |
+| `DEPRECATION WARNING: This dynamic method is deprecated. Please use e.g. Post.where(...).all instead.` (the suggestion is `Post.where(...).last`, `Post.find_or_create_by(name: 'foo')` or `Post.find_or_initialize_by(name: 'foo')` for the other finders) | "Dynamic Finders Deprecated": rewrite with `where`, raises on 4.1 |
+| `DEPRECATION WARNING: Model.scoped is deprecated. Please use Model.all instead.` | "`Model.scoped` Deprecated": use `where(nil)` before the bump, `all` after |
+| `DEPRECATION WARNING: Relation#update_all with conditions is deprecated.` or `Relation#update_all with :limit / :order options is deprecated.` | "`update_all` With Conditions Deprecated": move the conditions into `where` |
 | `NoMethodError: undefined method 'rescue_action'` | "`rescue_action` Removed — Use `rescue_from`" |
 | `undefined local variable or method` in partial | "Partial Magic Variables Removed" — pass `locals:` |
 | Cache misses after upgrade | "`cache_key` Timestamp Format Changed" — changed to `:nsec` |

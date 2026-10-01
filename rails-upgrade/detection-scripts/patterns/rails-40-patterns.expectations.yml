@@ -55,28 +55,51 @@ SCOPE_WITHOUT_LAMBDA:
     - "  scope :active, lambda { where(active: true) }"
 
 CLASS_SCOPED:
-  # Pattern: "\\bscoped\\b"
-  # Model.scoped and bare `scoped` (implicit self) were deprecated in 4.0,
-  # removed in 4.1. Word boundaries catch both receiver and bare forms while
-  # rejecting look-alikes, so no exclude regex is needed.
+  # Model.scoped, relation.scoped and a receiverless `scoped` inside a model
+  # warn on 4.0 (activerecord-deprecated_finders) and raise on 4.1.
   match:
-    # explicit receiver, no args
     - "  items = Model.scoped"
-    # bare implicit-self form inside a scope lambda (the previously-missed case)
-    - "  scope :foo, -> { scoped.joins(:bar) }"
-    # with-args ad-hoc scope constructor
-    - "  Model.scoped(conditions: { active: true })"
-    # a real .scoped call sharing a line with reorder must still flag
+    - "  Model.scoped(conditions: { active: true }, include: :owner)"
     - "  Model.scoped.reorder(:id)"
+    - "    user.posts.scoped.where(published: true)"
+    - "  post_ids = Post.where(id: ids).scoped.pluck(:id)"
+    - "  scope :foo, -> { scoped.joins(:bar) }"
+    - "  scope :everyone, -> { scoped }"
+    - "  scope :active, scoped.where(active: true)"
+    - "    kind.blank? ? scoped : where(kind: kind)"
+    - "    return scoped unless region.present?"
+    - "      scoped"
+    - "    else      scoped"
+    - "  subject { described_class.scoped }"
+    # receiverless scoped passed as an argument
+    - "    where(active: true).merge(scoped)"
+    - "    (scoped)"
+    - "    wrap(scoped, options)"
   no_match:
-    # unscoped is a different, non-deprecated API
     - "  Model.unscoped.where(active: true)"
-    # default_scoped is a real Rails method, not the deprecated `scoped`
     - "  Model.default_scoped"
-    # scoped_ids is an unrelated identifier
     - "  user.scoped_ids"
-    # a method name ending in _scoped is not the AR method
+    - "  Model.scoped_by_name(\"x\")"
     - "  def user_scoped"
+    - "  def scoped"
+    - "  def self.scoped(options = nil)"
+    # prose in comments and strings
+    - "  # Event.scoped(include: :venue)"
+    - "  # these associations only work when scoped to one type"
+    - "  desc \"Export rows, scoped to one account\""
+    - "  it_behaves_like \"a unique name, scoped by account_id\""
+    - "  context \"scoped to account_id\" do"
+    - "  describe \"#scoped\" do"
+    - "  -# sidebar styles (scoped to this layout)"
+    - "    // keep this handler scoped to one element"
+    - "    \"@babel/plugin-transform-block-scoped-functions\": \"^7.14.5\","
+    - "    \"make sure the query is properly scoped.\""
+    # a local variable or let named scoped
+    - "    scoped = if ids.any?"
+    - "    scoped ||= where(nil)"
+    - "    scoped&.map(&:name)"
+    - "    allow(report).to receive(:rows).and_return(scoped)"
+    - "  let(:scoped) { Widget.where(nil) }"
 
 DEFAULT_SCOPE_WITHOUT_BLOCK:
   match:
@@ -118,27 +141,60 @@ FINDER_SQL:
 
 FIND_ALL_BY:
   match:
+    - "Model.send(:find_all_by_name, v)"
     - "User.find_all_by_email(email)"
+    - "    users = account.users.find_all_by_role_and_active(\"admin\", true)"
+    # receiverless call inside a class method
+    - "    find_all_by_status(\"open\")"
+    - "  expect(Post.find_all_by_author_id(1).size).to eq(2)"
   no_match:
     - "User.where(email: email)"
+    # an app-defined method, not the Rails matcher
+    - "  def self.find_all_by_region(region)"
+    - "  def find_all_by_tag(tag)"
+    # stub symbol and spec label
+    - "    allow(User).to receive(:find_all_by_email).and_return([])"
+    - "  describe \"#find_all_by_region\" do"
 
 FIND_OR_CREATE_BY:
   match:
+    - "send(\"find_or_create_by_#{attr}\", v)"
     - "User.find_or_create_by_email(email)"
+    - "    tag = post.tags.find_or_create_by_name_and_kind(name, \"topic\")"
+    - "    Role.find_or_create_by_name!(\"admin\")"
+    # factory hook in a spec support file
+    - "  initialize_with { Category.find_or_create_by_name(name) }"
   no_match:
     - "User.find_or_create_by(email: email)"
+    - "User.where(email: email).first_or_create"
+    # an app-defined method, not the Rails matcher
+    - "    def find_or_create_by_owner(owner)"
+    - "    expect(Tag).to receive(:find_or_create_by_name).with(\"x\")"
 
 FIND_OR_INITIALIZE_BY:
   match:
     - "User.find_or_initialize_by_email(email)"
+    - "    code = Color.find_or_initialize_by_name_and_shade(\"red\", \"dark\")"
+    # receiverless call inside a class method
+    - "    find_or_initialize_by_slug(slug)"
   no_match:
     - "User.find_or_initialize_by(email: email)"
+    - "User.where(email: email).first_or_initialize"
+    # app-defined methods, not the Rails matcher
+    - "  def find_or_initialize_by_author_id(author_id)"
+    - "    def self.find_or_initialize_by_slot(slot, options = {})"
+    # stub symbol and spec label
+    - "      expect(memberships).to receive(:find_or_initialize_by_author_id).with(42)"
+    - "  describe \"#find_or_initialize_by_author_id\" do"
 
 FIND_LAST_BY:
   match:
     - "User.find_last_by_email(email)"
+    - "    visit = member.visits.find_last_by_status_and_kind(\"done\", \"exam\")"
   no_match:
     - "User.where(email: email).last"
+    - "  def self.find_last_by_date(date)"
+    - "    allow(Visit).to receive(:find_last_by_status).and_return(nil)"
 
 ASSOCIATION_READONLY:
   match:
@@ -298,10 +354,37 @@ FIXTURE_DATES:
     - "created_at: <%= 3.days.ago.to_s(:db) %>"
 
 UPDATE_ALL_TWO_ARG:
+  # The whole-file scanner (scan_patterns.rb) also reaches a first argument
+  # and conditions on separate lines; a line-based search does not. Fixtures
+  # test one line at a time.
   match:
     - "User.update_all(\"active = false\", [\"id = ?\", 1])"
+    # array first argument
+    - "User.update_all([\"count = ?\", n], [\"id = ?\", id])"
+    - "User.update_all([\"count = ?\", n], id: id)"
+    - "    User.update_all({ active: false }, { id: ids })"
+    - "    self.class.update_all({ synced_at: now }, id: id)"
+    - "    Item.update_all(\"price = 0\", \"archived = 1\")"
+    - "    Product.update_all(row.to_hash, { sku: row[:sku] }, limit: 1)"
+    - "      update_all(values, lookup_column => value)"
+    - "  model.update_all(set_sql(column), where_sql(column))"
+    - "    Item.update_all \"price = 0\", \"archived = 1\""
   no_match:
+    - "  def update_all(updates, conditions = nil)"
     - "User.where(id: 1).update_all(active: false)"
+    # one array argument
+    - "User.where(id: 1).update_all([\"count = ?, name = ?\", n, name])"
+    # one braceless hash argument
+    - "    Widget.update_all(active: false, synced_at: now)"
+    - "    admins.update_all is_owner: false"
+    - "    Widget.update_all(:active => false, :synced_at => now)"
+    # commas inside the single argument
+    - "      .update_all(assignments.join(\", \"))"
+    - "    Report.where(id: report.id).update_all(tags: [\"a\", \"b\"].to_yaml)"
+    - "    Widget.update_all(\"name = x, code = y\")"
+    # a method whose name ends in update_all
+    - "    batch_update_all(rows, { id: 1 })"
+    - "  # update_all(set, conditions) is gone in 4.1"
 
 OLD_FINDER:
   match:
@@ -521,10 +604,10 @@ REMOTE_FORM_CSRF_TOKEN:
 
 ORDER_WITHOUT_ARGUMENTS:
   # Pattern: a bare order/reorder with nothing to sort by. Requires either a
-  # relation method right after the call, or empty / nil / [] arguments, so
+  # relation method right after the call, or empty parentheses, so
   # that reading an `order` association or column does not get flagged.
   match:
-    - '        link = PersonConsentLink.where(person_id: person_id).order.last'
+    - '        link = Membership.where(user_id: user_id).order.last'
     - '    scope.reorder.to_a'
     - '    Widget.where(active: true).order.first'
     - '    Widget.order().each { |w| puts w }'
@@ -547,29 +630,62 @@ ORDER_WITHOUT_ARGUMENTS:
     - '    Widget.reorder(nil).to_a'
     # different method entirely
     - '    Widget.order_by(:id).last'
+    # a minified JavaScript line (500+ characters) with a d3-style .order() call
+    - '!function(n){var t=n.layout.stack();n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;return t.order()}(d3)'
 
 SQUEEL_ORDER_JOINED_TABLE:
-  # Pattern: a single-line order hash whose value is not :asc / :desc, with or
-  # without braces. A hash spread over several lines cannot be matched, since
-  # detection reads one line at a time.
+  # Pattern: a hash anywhere in an order / reorder argument list whose value
+  # is not exactly :asc or :desc. The whole-file scanner (scan_patterns.rb)
+  # also reaches a hash spread over several lines; a line-based search does
+  # not. Fixtures test one line at a time.
   match:
-    - '          .order(patient_groups: :id)'
-    - '          .order({ checklist_task_items: :month })'
-    - '    relation.order(:event => :start)'
-    - '    relation.order({:event => :start})'
-    # a :description column must not suppress a real finding on the same line
-    - '    relation.order(event: :start).where(:description => x)'
+    - "          .order(tags: :id)"
+    - "          .order({ task_items: :month })"
+    - "    relation.order(:event => :start)"
+    - "    relation.order({:event => :start})"
+    - "    relation.order(event: :start).where(:description => x)"
+    - "    Widget.reorder(events: :start)"
+    # 4.0 accepts only the lowercase symbols
+    - "    Widget.order(name: :DESC)"
+    - "    Widget.order(name: \"desc\")"
+    - "    Widget.order(name: :ascending)"
+    - "    Widget.order(created_at: direction)"
+    # the hash after a leading argument, or next to a valid pair
+    - "    Widget.order(:position, name: :foo)"
+    - "    Widget.order(\"x\", \"events\" => :start)"
+    - "    Widget.order(name: :asc, events: :start)"
+    - "    Widget.order({ name: :asc, events: :start })"
+    - "    Widget.order([{ name: :x }])"
+    # a leading argument with one level of parentheses
+    - "    Widget.order(Arel.sql(\"x\"), events: :start)"
+    - "    Widget.order(sort_key(:a), name: \"desc\")"
+    # a valid call earlier on the line must not hide the bad one
+    - "    Widget.order(id: :desc).order(events: :start)"
   no_match:
+    - "  # Widget.order(events: :start)"
     # legitimate direction hashes
-    - '    Widget.order(name: :asc)'
-    - '    Widget.order(id: :desc)'
-    - '    Widget.order({ id: :desc })'
-    # method names merely ending in "order"
-    - '    work_order(status: :open)'
-    - '    set_sort_order(field: :name)'
-    # string and symbol forms are unaffected
-    - '    Widget.order("events.start ASC")'
-    - '    Widget.order(:start)'
+    - "    Widget.order(name: :asc)"
+    - "    Widget.order(id: :desc)"
+    - "    Widget.order({ id: :desc })"
+    - "    Widget.order(:position, name: :desc)"
+    - "    Widget.order(name: :asc, id: :desc)"
+    # method names merely ending in \"order\", and order as a keyword key
+    - "    work_order(status: :open)"
+    - "    set_sort_order(field: :name)"
+    - "    service.call(order: :recent)"
+    - "    args = parser.order!(ARGV) {}"
+    # string, symbol, array, Arel and constant forms are unaffected
+    - "    Widget.order(\"events.start ASC\")"
+    - "    Widget.order(\"id DESC, name ASC\")"
+    - "    Widget.order(:start)"
+    - "    Widget.order([:is_primary, :name])"
+    - "    Widget.order(arel_table[:key])"
+    - "    Widget.order(updated_at.desc, :id)"
+    - "    Widget.order(Report::SORT)"
+    - "    Widget.order(ready ? \"a\" : \"b\")"
+    - "    Widget.order(:name).where(state: :open)"
+    - "    Widget.order(Arel.sql(\"x\"), name: :desc)"
+    - "    Widget.order(coalesce(a, b: :c))"
 
 BELONGS_TO_DEPENDENT:
   match:
