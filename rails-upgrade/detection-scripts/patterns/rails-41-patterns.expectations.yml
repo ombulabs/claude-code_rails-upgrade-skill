@@ -24,3 +24,53 @@ CACHE_DIGESTS_BACKPORT:
     - "  ActionView::Digestor.digest(name: name, finder: lookup_context)"
     - "  config.action_view.cache_template_loading = true"
     - "  <% cache [@post, 'v3'] do %>"
+
+ASSOCIATION_CONDITIONS:
+  match:
+    - "  has_many :active_items, class_name: \"Item\", conditions: { active: true }"
+    - "  has_one :primary_address, :class_name => \"Address\", :conditions => \"primary = 1\""
+    - "  belongs_to :author, class_name: \"User\", conditions: [\"deleted_at IS NULL\"]"
+    - "  has_and_belongs_to_many :tags, conditions: { visible: true }"
+    - "  has_many :items, conditions: proc { [\"account_id = ?\", account_id] }"
+  no_match:
+    - "  has_many :active_items, -> { where(active: true) }, class_name: \"Item\""
+    - "  has_many :items, ->(owner) { where(account_id: owner.account_id) }"
+    - "  has_many :items, before_add: :check_conditions"
+    # not an association: the validator's own :conditions option is still valid at 4.1
+    - "  validates_uniqueness_of :email, conditions: -> { where(deleted_at: nil) }"
+
+ASSOCIATION_ORDER:
+  match:
+    - "  has_many :items, :order => 'position ASC'"
+    - "  has_one :latest_comment, class_name: \"Comment\", order: \"created_at DESC\""
+    - "  has_and_belongs_to_many :tags, order: :name"
+  no_match:
+    - "  has_many :items, -> { order('position ASC') }"
+    - "  has_one :latest_comment, -> { order(created_at: :desc) }, class_name: \"Comment\""
+    # underscore before "order" (sort_order) must not trip the [^_] guard
+    - "  has_many :items, sort_order: 'asc'"
+    # an association named order is not the option
+    - "  belongs_to :order, touch: true"
+    - "  has_many :orders, dependent: :destroy"
+
+ASSOCIATION_UNIQ:
+  match:
+    - "  has_many :tags, through: :taggings, uniq: true"
+    - "  has_and_belongs_to_many :roles, :uniq => true"
+    - "  has_one :primary_tag, through: :primary_tagging, uniq: true"
+  no_match:
+    - "  has_many :tags, -> { distinct }, through: :taggings"
+    - "  has_many :tags, -> { uniq }, through: :taggings"
+    - "  has_many :unique_visits, dependent: :destroy"
+
+ASSOCIATION_READONLY:
+  match:
+    - "  has_many :tags, through: :taggings, readonly: false"
+    - "  has_many :line_items, :through => :orders, :readonly => true"
+    - "  has_and_belongs_to_many :roles, readonly: true"
+    - "  belongs_to :account, readonly: true"
+    - "  has_one :profile, :readonly => true"
+  no_match:
+    - "  has_many :tags, -> { readonly }, through: :taggings"
+    - "  has_many :tags, -> { readonly(false) }, through: :taggings"
+    - "  has_many :tags, through: :taggings"

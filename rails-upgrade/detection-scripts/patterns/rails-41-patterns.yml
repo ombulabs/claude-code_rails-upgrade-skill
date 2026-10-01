@@ -82,6 +82,46 @@ upgrade_findings:
       fix: "Gate the gem out of the 4.1 bundle rather than delete it while the current bundle is still 4.0 and depends on it: `gem 'cache_digests' unless NextRails.next?`. Then confirm no first-party code calls the gem API, because core's is not call-compatible: CacheDigests::TemplateDigestor.digest(name, format, finder, options) (positional) became ActionView::Digestor.digest(name:, finder:, dependencies:, partial:) (single options hash); cache_prefix and the swappable cache accessor are gone; the ['v3', 'key'] explicitly-versioned cache-key form is gone, leaving only skip_digest: true; view_cache_dependency survives unchanged in ActionView::Helpers::CacheHelper. Core's ERB dependency tracker also detects more dependencies than the gem's (it parses layout: keys and method chains), so fragment digests can shift — that is a cold fragment cache on first deploy, not an error. A hit in Gemfile.lock with nothing in the Gemfile means another gem pulls cache_digests in transitively — run `bundle why cache_digests` and gate or upgrade that parent gem instead. Delete cache_digests outright once the current Rails is 4.1"
       variable_name: "CACHE_DIGESTS_BACKPORT"
 
+    - name: "Association :conditions option"
+      kind: breaking
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?conditions(:|\\s*=>)"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 no longer depends on activerecord-deprecated_finders, the gem that kept :conditions working (with a deprecation warning) on 4.0. Without it, has_many / has_one / belongs_to raise `ArgumentError: Unknown key: :conditions` when the model class loads, so boot, eager loading and every test that touches the model fail. has_and_belongs_to_many does not raise: 4.1 rebuilds it as has_many :through and passes on only a fixed list of options, so :conditions is dropped with no warning and the association returns every joined row, with or without the gem. With the gem on Ruby 2.3+, a Hash-valued :conditions is lost too: the gem treats any value that responds to to_proc as a proc, Hash#to_proc exists since Ruby 2.3, and the conditions evaluate to where(nil). String, Array and proc values still apply. The pattern only sees options on the same line as the macro"
+      fix: "Move the conditions into a scope lambda: has_many :active_items, -> { where(active: true) }, class_name: 'Item'. The lambda form works on 4.0 and 4.1, so it can land before the bump, and it is the only form that filters a has_and_belongs_to_many on 4.1. A proc :conditions ran against the owner; the lambda runs against the relation and receives the owner as its argument, so has_many :items, conditions: proc { ['account_id = ?', account_id] } becomes has_many :items, ->(owner) { where(account_id: owner.account_id) }. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :conditions on has_many / has_one / belongs_to; it does not fix habtm or a Hash value on Ruby 2.3+"
+      variable_name: "ASSOCIATION_CONDITIONS"
+
+    - name: "Association :order option"
+      kind: breaking
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*[^_]:?order(:|\\s*=>)"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 no longer depends on activerecord-deprecated_finders, the gem that kept :order working (with a deprecation warning) on 4.0. Without it, has_many and belongs_to raise `ArgumentError: Unknown key: :order` when the model class loads, so boot, eager loading and every test that touches the model fail. Two shapes fail silently instead. has_one still lists :order as a valid key but no longer applies it, so it returns whichever row the database hands back first. has_and_belongs_to_many drops :order, because 4.1 rebuilds it as has_many :through and passes on only a fixed list of options; the gem does not change this. Neither raises nor warns. The pattern only sees options on the same line as the macro"
+      fix: "Move the order into a scope lambda: has_many :items, -> { order('position ASC') }; has_one :latest_comment, -> { order('created_at DESC') }, class_name: 'Comment'. The lambda form works on 4.0 and 4.1, so it can land before the bump, and it is the only form that orders a has_one or a has_and_belongs_to_many on 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :order on has_many / has_one / belongs_to; it does not help habtm"
+      variable_name: "ASSOCIATION_ORDER"
+
+    - name: "Association :uniq option"
+      kind: breaking
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?uniq(:|\\s*=>)"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 no longer depends on activerecord-deprecated_finders, the gem that kept :uniq working (with a deprecation warning) on 4.0. Without it, has_many, has_one and belongs_to raise `ArgumentError: Unknown key: :uniq` when the model class loads, so boot, eager loading and every test that touches the model fail. has_and_belongs_to_many does not raise: 4.1 rebuilds it as has_many :through and passes on only a fixed list of options, so :uniq is dropped with no warning and the query loses its DISTINCT, with or without the gem. Duplicate join rows then come back as duplicate records. The pattern only sees options on the same line as the macro"
+      fix: "Move it into a scope lambda: has_many :tags, -> { distinct }, through: :taggings. distinct exists on 4.0 (uniq is its alias there), so the rewrite can land before the bump, and the lambda form is the only one that de-duplicates a has_and_belongs_to_many on 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :uniq on has_many / has_one / belongs_to; it does not help habtm"
+      variable_name: "ASSOCIATION_UNIQ"
+
+    - name: "Association :readonly option"
+      kind: breaking
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 no longer depends on activerecord-deprecated_finders, the gem that kept :readonly working (with a deprecation warning) on 4.0. Without it, has_many (with or without :through), has_one and belongs_to raise `ArgumentError: Unknown key: :readonly` when the model class loads, so boot, eager loading and every test that touches the model fail. has_and_belongs_to_many does not raise: 4.1 rebuilds it as has_many :through and passes on only a fixed list of options, so :readonly is dropped with no warning, with or without the gem. The pattern only sees options on the same line as the macro"
+      fix: "readonly: true becomes a scope lambda: has_many :tags, -> { readonly }, through: :taggings. readonly: false can usually just be deleted: Rails 4.1 removed implicit_readonly, so records loaded through a join are no longer marked readonly and there is nothing left to undo. If the association needs to stay writable on 4.0 too, use -> { readonly(false) } instead. The lambda form works on 4.0 and 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :readonly on has_many / has_one / belongs_to; it does not help habtm"
+      variable_name: "ASSOCIATION_READONLY"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking
@@ -264,7 +304,7 @@ dependencies:
   activerecord-deprecated_finders:
     check: false
     gem_name: "activerecord-deprecated_finders"
-    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1"
+    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1. Also restores the old association finder options (:conditions, :order, :uniq, :readonly and the rest of that set) on has_many / has_one / belongs_to, with a deprecation warning. It does not restore them on has_and_belongs_to_many, which drops them silently at 4.1, and on Ruby 2.3+ it drops a Hash-valued :conditions"
     url: "https://github.com/rails/activerecord-deprecated_finders"
 
   spring:

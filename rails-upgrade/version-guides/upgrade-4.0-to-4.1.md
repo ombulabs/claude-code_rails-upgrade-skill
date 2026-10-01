@@ -207,6 +207,159 @@ Delete the gem outright once the current Rails is 4.1.
 
 ---
 
+#### Association `:conditions` Option Removed
+
+**What Changed:**
+Rails 4.1 no longer depends on `activerecord-deprecated_finders`, the gem that kept `:conditions` working (with a deprecation warning) on 4.0. Without it, `has_many`, `has_one` and `belongs_to` reject the key when the model class loads:
+
+```
+ArgumentError: Unknown key: :conditions. Valid keys are: :class_name, :anonymous_class, :foreign_key, ...
+```
+
+The app fails to boot or eager load, and every test that touches the model fails. Two shapes fail silently instead:
+
+- **`has_and_belongs_to_many`.** 4.1 rebuilds it as a `has_many :through` and passes on only a fixed list of options (`:before_add`, `:after_add`, `:before_remove`, `:after_remove`, `:autosave`, `:validate`, `:join_table`). `:conditions` is dropped with no error and no warning, so the association returns every joined row. The bridge gem does not change this.
+- **A Hash `:conditions` with the bridge gem on Ruby 2.3+.** The gem treats any value that responds to `to_proc` as a proc. `Hash#to_proc` exists since Ruby 2.3, so `conditions: { active: true }` evaluates to `where(nil)` and filters nothing. String, Array and proc values still apply.
+
+**Detection Pattern:**
+```ruby
+has_many :active_items, class_name: "Item", conditions: { active: true }
+has_one :primary_address, class_name: "Address", :conditions => "primary = 1"
+belongs_to :author, class_name: "User", conditions: ["deleted_at IS NULL"]
+has_and_belongs_to_many :tags, conditions: { visible: true }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+has_many :active_items, class_name: "Item", conditions: { active: true }
+has_and_belongs_to_many :tags, conditions: { visible: true }
+has_many :items, conditions: proc { ["account_id = ?", account_id] }
+
+# AFTER
+has_many :active_items, -> { where(active: true) }, class_name: "Item"
+has_and_belongs_to_many :tags, -> { where(visible: true) }
+has_many :items, ->(owner) { where(account_id: owner.account_id) }
+```
+
+A proc `:conditions` ran against the owner. The lambda runs against the relation and receives the owner as its argument, so owner attributes become `owner.x`. The lambda form works on 4.0 and 4.1, so the rewrite can land before the version bump.
+
+As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:conditions` on `has_many` / `has_one` / `belongs_to`. It does not fix either silent case above.
+
+---
+
+#### Association `:order` Option Removed
+
+**What Changed:**
+Rails 4.1 no longer depends on `activerecord-deprecated_finders`, the gem that kept `:order` working (with a deprecation warning) on 4.0. Without it, `has_many` and `belongs_to` reject the key when the model class loads:
+
+```
+ArgumentError: Unknown key: :order. Valid keys are: :class_name, :anonymous_class, :foreign_key, ...
+```
+
+The app fails to boot or eager load, and every test that touches the model fails. Two shapes fail silently instead:
+
+- **`has_one`.** 4.1 still lists `:order` as a valid `has_one` key but no longer applies it. There is no error, and the association returns whichever row the database hands back first, so "latest" or "primary" lookups change.
+- **`has_and_belongs_to_many`.** 4.1 rebuilds it as a `has_many :through` and passes on only a fixed list of options (`:before_add`, `:after_add`, `:before_remove`, `:after_remove`, `:autosave`, `:validate`, `:join_table`). `:order` is dropped with no error and no warning. The bridge gem does not change this.
+
+**Detection Pattern:**
+```ruby
+has_many :items, :order => "position ASC"
+has_one :latest_comment, class_name: "Comment", order: "created_at DESC"
+has_and_belongs_to_many :tags, order: :name
+```
+
+**Fix:**
+```ruby
+# BEFORE
+has_many :items, :order => "position ASC"
+has_one :latest_comment, class_name: "Comment", order: "created_at DESC"
+has_and_belongs_to_many :tags, order: :name
+
+# AFTER
+has_many :items, -> { order("position ASC") }
+has_one :latest_comment, -> { order("created_at DESC") }, class_name: "Comment"
+has_and_belongs_to_many :tags, -> { order(:name) }
+```
+
+The lambda form works on 4.0 and 4.1, so the rewrite can land before the version bump. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:order` on `has_many` / `has_one` / `belongs_to`. It does not fix `has_and_belongs_to_many`.
+
+---
+
+#### Association `:uniq` Option Removed
+
+**What Changed:**
+Rails 4.1 no longer depends on `activerecord-deprecated_finders`, the gem that kept `:uniq` working (with a deprecation warning) on 4.0. Without it, `has_many`, `has_one` and `belongs_to` reject the key when the model class loads:
+
+```
+ArgumentError: Unknown key: :uniq. Valid keys are: :class_name, :anonymous_class, :foreign_key, ...
+```
+
+The app fails to boot or eager load, and every test that touches the model fails.
+
+`has_and_belongs_to_many` fails silently instead. 4.1 rebuilds it as a `has_many :through` and passes on only a fixed list of options (`:before_add`, `:after_add`, `:before_remove`, `:after_remove`, `:autosave`, `:validate`, `:join_table`). `:uniq` is dropped with no error and no warning, the query loses its `DISTINCT`, and duplicate join rows come back as duplicate records. The bridge gem does not change this.
+
+**Detection Pattern:**
+```ruby
+has_many :tags, through: :taggings, uniq: true
+has_and_belongs_to_many :roles, :uniq => true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+has_many :tags, through: :taggings, uniq: true
+has_and_belongs_to_many :roles, :uniq => true
+
+# AFTER
+has_many :tags, -> { distinct }, through: :taggings
+has_and_belongs_to_many :roles, -> { distinct }
+```
+
+`distinct` exists on 4.0 (`uniq` is its alias there), so the rewrite can land before the version bump. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:uniq` on `has_many` / `has_one` / `belongs_to`. It does not fix `has_and_belongs_to_many`.
+
+---
+
+#### Association `:readonly` Option Removed
+
+**What Changed:**
+Rails 4.1 no longer depends on `activerecord-deprecated_finders`, the gem that kept `:readonly` working (with a deprecation warning) on 4.0. Without it, `has_many` (with or without `:through`), `has_one` and `belongs_to` reject the key when the model class loads:
+
+```
+ArgumentError: Unknown key: :readonly. Valid keys are: :class_name, :anonymous_class, :foreign_key, ...
+```
+
+The app fails to boot or eager load, and every test that touches the model fails.
+
+`has_and_belongs_to_many` fails silently instead. 4.1 rebuilds it as a `has_many :through` and passes on only a fixed list of options (`:before_add`, `:after_add`, `:before_remove`, `:after_remove`, `:autosave`, `:validate`, `:join_table`). `:readonly` is dropped with no error and no warning. The bridge gem does not change this.
+
+**Detection Pattern:**
+```ruby
+has_many :tags, through: :taggings, readonly: false
+has_many :line_items, :through => :orders, :readonly => true
+has_and_belongs_to_many :roles, readonly: true
+belongs_to :account, readonly: true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+has_many :tags, through: :taggings, readonly: false
+has_many :line_items, :through => :orders, :readonly => true
+has_and_belongs_to_many :roles, readonly: true
+belongs_to :account, readonly: true
+
+# AFTER
+has_many :tags, through: :taggings
+has_many :line_items, -> { readonly }, through: :orders
+has_and_belongs_to_many :roles, -> { readonly }
+belongs_to :account, -> { readonly }
+```
+
+`readonly: false` can usually be deleted. Rails 4.1 removed `implicit_readonly`, so records loaded through a join are no longer marked readonly and there is nothing left to undo. If the association must stay writable on 4.0 as well, write `-> { readonly(false) }` instead. The lambda form works on 4.0 and 4.1. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:readonly` on `has_many` / `has_one` / `belongs_to`. It does not fix `has_and_belongs_to_many`.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -672,6 +825,10 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
+15. Move association `:conditions` into scope lambdas, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
+16. Move association `:order` into scope lambdas, including every `has_one` and `has_and_belongs_to_many` (4.1 ignores the option there without an error).
+17. Replace association `uniq: true` with `-> { distinct }`, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
+18. Replace association `readonly: true` with `-> { readonly }` and delete redundant `readonly: false`, including on `has_and_belongs_to_many` (4.1 drops the option there without an error).
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -698,6 +855,13 @@ Error → section lookup for the most common errors encountered during this upgr
 | `I18n::InvalidLocale` on a request that worked on 4.0 | "I18n Enforces Available Locales" — add the locale to `config.i18n.available_locales` |
 | `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
+| `ArgumentError: Unknown key: :conditions` when a model loads | "Association `:conditions` Option Removed": move the conditions into a scope lambda |
+| `has_and_belongs_to_many` returns rows its `:conditions` used to filter out | "Association `:conditions` Option Removed": habtm drops the option silently at 4.1, use a scope lambda |
+| `ArgumentError: Unknown key: :order` when a model loads | "Association `:order` Option Removed": move the order into a scope lambda |
+| `has_one` or `has_and_belongs_to_many` returns rows in a different order | "Association `:order` Option Removed": 4.1 ignores `:order` there without an error, use a scope lambda |
+| `ArgumentError: Unknown key: :uniq` when a model loads | "Association `:uniq` Option Removed": use `-> { distinct }` |
+| `has_and_belongs_to_many` returns duplicate records | "Association `:uniq` Option Removed": 4.1 drops `:uniq` there without an error, use `-> { distinct }` |
+| `ArgumentError: Unknown key: :readonly` when a model loads | "Association `:readonly` Option Removed": use `-> { readonly }`, or delete `readonly: false` |
 
 ---
 
