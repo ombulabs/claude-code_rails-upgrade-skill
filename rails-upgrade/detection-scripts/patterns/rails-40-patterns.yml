@@ -39,7 +39,7 @@ upgrade_findings:
 
     - name: "Scope without lambda"
       kind: "breaking"
-      pattern: "scope\\s+:\\w+\\s*,\\s*where"
+      pattern: "^[ \\t]*scope[ \\t]*\\(?[ \\t]*(?::\\w+|\"\\w+\"|'\\w+')[ \\t]*,\\s*+(?!\\(*\\s*(?:->|lambda\\b|proc\\b|Proc\\.new\\b))"
       exclude: ""
       search_paths:
         - "app/models/"
@@ -49,7 +49,7 @@ upgrade_findings:
 
     - name: "default_scope without block"
       kind: "breaking"
-      pattern: "default_scope\\s+(where|order|:order)"
+      pattern: "^[ \\t]*default_scope(?:[ \\t]+|[ \\t]*\\(\\s*)(?!\\(*\\s*(?:\\{|do\\b|->|lambda\\b|proc\\b|Proc\\.new\\b))\\S"
       exclude: ""
       search_paths:
         - "app/models/"
@@ -63,8 +63,8 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 moved :conditions out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1. A proc-valued :conditions has a receiver subtlety covered separately by ASSOCIATION_CONDITIONS_PROC"
-      fix: "Move conditions into a scope lambda: has_many :items, -> { where(active: true) }. Works on Rails 3.2 and 4.0+"
+      explanation: "Rails 4.0 moved :conditions out of core. activerecord-deprecated_finders, a dependency of Rails 4.0 only, restores it with a deprecation warning, so on Ruby 2.2 or older it keeps working at the 4.0 hop. On Ruby 2.3 or newer the association raises ArgumentError as soon as it loads: see ASSOCIATION_OPTIONS_RUBY_23. Rails 4.1 no longer depends on the gem, so rewrite before the 4.1 hop or add the gem to the Gemfile there as a bridge. As that bridge on Ruby 2.3 or newer, the gem drops a Hash-valued :conditions without an error and the association returns every row, so rewrite Hash conditions rather than bridging them. A proc-valued :conditions has a receiver subtlety covered separately by ASSOCIATION_CONDITIONS_PROC"
+      fix: "Move conditions into a scope lambda: has_many :items, -> { where(active: true) }. Rails 3.2 association macros take only `(name, options)`, so a lambda second argument fails while the model loads (an ArgumentError or a NoMethodError, depending on the macro and on whether options follow the lambda). Branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_CONDITIONS"
 
     - name: "Association :order option"
@@ -73,18 +73,18 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 moved :order out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda before dropping the gem or moving to 4.1"
-      fix: "Move order into a scope lambda: has_many :items, -> { order('position ASC') }. Works on Rails 3.2 and 4.0+"
+      explanation: "Rails 4.0 moved :order out of core. activerecord-deprecated_finders, a dependency of Rails 4.0 only, restores it with a deprecation warning, so on Ruby 2.2 or older it keeps working at the 4.0 hop. On Ruby 2.3 or newer the association raises ArgumentError as soon as it loads: see ASSOCIATION_OPTIONS_RUBY_23. Rails 4.1 no longer depends on the gem, so rewrite before the 4.1 hop or add the gem to the Gemfile there as a bridge"
+      fix: "Move order into a scope lambda: has_many :items, -> { order('position ASC') }. Rails 3.2 association macros take only `(name, options)`, so a lambda second argument fails while the model loads (an ArgumentError or a NoMethodError, depending on the macro and on whether options follow the lambda). Branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_ORDER"
 
-    - name: "Association :extend option"
+    - name: "belongs_to / has_one :extend option"
       kind: "breaking"
-      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?extend(:|\\s*=>)"
+      pattern: "^[ \\t]*(?:belongs_to|has_one)\\b(?:[^\\n]|,[ \\t]*\\n)*?\\bextend(?::|[ \\t]*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 removed :extend from associations. Unlike :conditions / :order / :uniq / :readonly, activerecord-deprecated_finders does NOT restore :extend, so this one actually breaks at the 4.0 hop and stays breaking. Use extending() inside a scope lambda"
-      fix: "Move extend into a scope lambda: has_many :items, -> { extending SomeExtension }"
+      explanation: "Rails 4.0 keeps `:extend` only for collection associations (`has_many`, `has_and_belongs_to_many`). On `belongs_to` and `has_one` the option was dropped from the valid keys, so the declaration raises `ArgumentError: Unknown key: extend` while the model loads. Rails 3.2 accepted it on every macro and applied the module to the relation that loads the target. activerecord-deprecated_finders does not add it back. `has_many ..., extend: SomeModule` still works on 4.0 without a warning and is not flagged. The pattern also follows a declaration onto the next line after a trailing comma. Not visible to it: a helper that builds the options hash (`options[:extend] = SomeModule` before calling `belongs_to`), so grep for `[:extend]` as well"
+      fix: "Move the module into a scope lambda with `extending`: `belongs_to :account, -> { extending(AccountLookup) }, foreign_key: :owner_id`. On Rails 3.2 a lambda second argument fails while the model loads (an ArgumentError or a NoMethodError, depending on the macro and on whether options follow the lambda), so branch the declaration with `NextRails.next?` and keep the 3.2 form on the current side. Merge any `:conditions` / `:order` on the same declaration into the same lambda. One behavior difference to check: Rails 3.2 loads a singular target with `first` and Rails 4.0 with `take`, so an extension that overrides `first` stops being called"
       variable_name: "ASSOCIATION_EXTEND"
 
     - name: "Association :uniq option"
@@ -93,8 +93,8 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 moved :uniq out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Rewrite to a scope lambda with distinct before dropping the gem or moving to 4.1"
-      fix: "Move uniq into a scope lambda: has_many :items, -> { distinct }, through: :joins. Works on Rails 3.2 and 4.0+"
+      explanation: "Rails 4.0 moved :uniq out of core. activerecord-deprecated_finders, a dependency of Rails 4.0 only, restores it with a deprecation warning, so on Ruby 2.2 or older it keeps working at the 4.0 hop. On Ruby 2.3 or newer the association raises ArgumentError as soon as it loads: see ASSOCIATION_OPTIONS_RUBY_23. Rails 4.1 no longer depends on the gem, so rewrite before the 4.1 hop or add the gem to the Gemfile there as a bridge"
+      fix: "Move uniq into a scope lambda: has_many :items, -> { distinct }, through: :joins. Rails 3.2 association macros take only `(name, options)`, so a lambda second argument fails while the model loads (an ArgumentError or a NoMethodError, depending on the macro and on whether options follow the lambda). Branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_UNIQ"
 
     - name: "Association :finder_sql option"
@@ -107,14 +107,26 @@ upgrade_findings:
       fix: "Defer to dual-boot and branch the association definition with `NextRails.next?`. Common 3.2 use case is `finder_sql: \"SELECT id FROM x WHERE id IS NULL\"` as a deliberate always-empty stub for `accepts_nested_attributes_for`; preserve that intent in the dual-boot branch. FK gotcha: the scope-form replacement (`has_many :foo, -> { none }, class_name: \"Foo\"`) restores Rails' default FK predicate. Rails 4 computes `<owner_class_name>_id` as the FK column on the associated table — for self-referential associations or any case where the implied FK column does not exist, accessing the association raises an unknown-column SQL error even when the scope returns no rows. Pin `foreign_key:` and `primary_key:` to existing columns on both sides; for an always-empty stub used purely by `accepts_nested_attributes_for`, `foreign_key: :id, primary_key: :id` is a safe default"
       variable_name: "FINDER_SQL"
 
+    - name: "Deprecated association options on Ruby 2.3+ (Hash#to_proc)"
+      kind: "breaking"
+      pattern: "^[ \\t]*(?:ruby[ \\t]*\\(?[ \\t]*['\"]?(?:[~>=]+[ \\t]*)?)?(?:ruby-)?(?:2\\.(?:[3-9]|[1-9]\\d)|[3-9])(?:\\.\\d+)*\\b"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+        - ".ruby-version"
+        - ".tool-versions"
+      explanation: "On Ruby 2.3 or newer, every association that still uses an option restored by activerecord-deprecated_finders (`:conditions`, `:order`, `:include`, `:readonly`, `:uniq`, `:select`, `:limit`, `:offset`, `:group`, `:having`) raises `ArgumentError: wrong number of arguments (given 0, expected 1)` on Rails 4.0 as soon as the association is loaded, joined or eager loaded. The declaration itself loads with only the deprecation warning, so boot passes and the error shows up in requests and specs. Cause: Ruby 2.3 added `Hash#to_proc`, and Rails 4.0's `Relation#merge!` checks `respond_to?(:to_proc)` before `is_a?(Hash)`, so the options hash the gem merges into the association scope is run as a proc with no argument. Rails 4.1.15 moved the Hash check first; 4.1.0 through 4.1.14 keep the 4.0 order. On Ruby 2.2 and older the options work with a warning, as ASSOCIATION_CONDITIONS and its neighbours describe. This entry flags a Ruby 2.3+ version in the Gemfile, .ruby-version or .tool-versions (`ruby 2.4.10`), including a requirement such as `~> 2.3.0` or `>= 2.3.1` (read by its lowest version, so `~> 2.2` is not flagged even though it allows 2.3); the association sites themselves are the ASSOCIATION_CONDITIONS, ASSOCIATION_ORDER, ASSOCIATION_UNIQ and ASSOCIATION_READONLY hits (plus any `:include`, `:select` or `:limit` options, which no entry flags). Those patterns read one line, so a declaration whose options sit on a continuation line is missed: on Ruby 2.3+ also search app/models by hand for the option names, e.g. `grep -rnE '(conditions|order|include|readonly|uniq|select|limit|offset|group|having)(:|[[:space:]]*=>)' app/models`, and read each association declaration it lands in. If the app runs Ruby 2.2 or older on both sides, dismiss this finding"
+      fix: "Two ways. (1) Rewrite each association to a scope lambda on the next side, behind `NextRails.next?` (the lambda argument raises on Rails 3.2), so no deprecated option is left. (2) Keep the options through the 4.0 window with an initializer loaded only on the next side that restores the Ruby 2.2 behavior. It needs two patches, because patching `merge!` alone makes a Hash-valued `:conditions` disappear without an error (the gem also runs a Hash `:conditions` through `to_proc`, which then returns nil): `if NextRails.next?` then, inside `ActiveSupport.on_load(:active_record) do ... end` (the gem defines DeprecatedOptionsProc only once ActiveRecord::Base loads), `ActiveRecord::Relation.class_eval do; def merge!(other); if other.is_a?(Hash); ActiveRecord::Relation::HashMerger.new(self, other).merge; elsif !other.is_a?(ActiveRecord::Relation) && other.respond_to?(:to_proc); instance_exec(&other); else; ActiveRecord::Relation::Merger.new(self, other).merge; end; end; end` and `ActiveRecord::Associations::Builder::DeprecatedOptionsProc.class_eval do; def to_proc; options = self.options; proc do |owner|; if options[:where].is_a?(Proc); context = owner || self; where(context.instance_eval(&options[:where])).merge!(options.except(:where)); else; merge(options); end; end; end; end`. Add a spec per association kind that loads it and checks the rows, since the silent drop is the failure to guard against. Delete the initializer once the associations are rewritten, and finish the rewrite before the 4.1 hop: 4.1.0 through 4.1.14 keep the same `merge!` order, and from 4.1.15 a Hash-valued `:conditions` kept through the gem is dropped without an error"
+      variable_name: "ASSOCIATION_OPTIONS_RUBY_23"
+
     - name: "Association :readonly option on through"
       kind: "deprecation"
       pattern: "(has_many|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.0 moved :readonly out of core, but activerecord-deprecated_finders (a default dependency of Rails 4.0, removed in 4.1) restores it with a deprecation warning, so it keeps working at the 4.0 hop. Move it to a scope lambda before dropping the gem or moving to 4.1"
-      fix: "Move readonly into a scope lambda: has_many :items, -> { readonly }, through: :joins. Works on Rails 3.2 and 4.0+"
+      explanation: "Rails 4.0 moved :readonly out of core. activerecord-deprecated_finders, a dependency of Rails 4.0 only, restores it with a deprecation warning, so on Ruby 2.2 or older it keeps working at the 4.0 hop. On Ruby 2.3 or newer the association raises ArgumentError as soon as it loads: see ASSOCIATION_OPTIONS_RUBY_23. Rails 4.1 no longer depends on the gem, so rewrite before the 4.1 hop or add the gem to the Gemfile there as a bridge"
+      fix: "Move readonly into a scope lambda: has_many :items, -> { readonly }, through: :joins. Rails 3.2 association macros take only `(name, options)`, so a lambda second argument fails while the model loads (an ArgumentError or a NoMethodError, depending on the macro and on whether options follow the lambda). Branch the declaration with `NextRails.next?` or rewrite after the bump; the lambda form cannot ship on the current side alone"
       variable_name: "ASSOCIATION_READONLY"
 
     - name: "Ruby 1.8 version requirement"
@@ -222,14 +234,15 @@ upgrade_findings:
       fix: "Keep terser on the next side but stop its railtie from auto-loading on Sprockets 2.x: `gem \"terser\", require: false` (require: false is mandatory or boot dies with the LoadError). Add `gem \"uglifier\", \">= 1.3.0\"` on the next side too, only so the `:uglifier` symbol resolves in environment configs, then register Terser as the real compressor at compile time via a rake task hooked on assets:environment. The current (Rails 3.2) side keeps plain `gem \"terser\"` (its railtie is harmless there). Full recipe with Gemfile, env-config, and rake-task examples: rails-upgrade/references/js-compressor-sprockets-mismatch-reference.md"
       variable_name: "JS_COMPRESSOR_GEM_MISMATCH"
 
-    - name: "validates_format_of with multiline anchors (^...$)"
+    - name: "Format validation regex with multiline anchors (^...$)"
       kind: "breaking"
-      pattern: "validates_format_of.*\\bwith(?::|\\s*=>)\\s*/[^/]*[\\^$]"
-      exclude: ""
+      pattern: "^[ \\t]*(?:[\\w:]+\\.)?validates(?:_format_of)?\\b(?:[^\\n]|[,{][ \\t]*\\n)*?\\b(?:with|without|format)(?::|[ \\t]*=>)[ \\t]*(?:/\\^|/(?:[^/\\\\\\n]|\\\\.)*(?<!\\\\)\\$/|%r\\{\\^|%r\\{(?:[^}\\\\\\n]|\\\\.)*(?<!\\\\)\\$\\})"
+      exclude: "^[^#\\n]*\\bmultiline(?::|\\s*=>)\\s*true\\b"
       search_paths:
-        - "app/models/"
-      explanation: "Rails 4 raises `ArgumentError: The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or forgot to add the :multiline => true option?` whenever a `validates_format_of` regex source STARTS with `^` or ENDS with `$` (unescaped). New in 4.0 — Rails 3.2 does not perform this check. The validator runs check_options_validity at model class-load, so the error is boot-fatal. Matches both the 1.9 hash syntax `with: /.../` and the Ruby-1.8 hash-rocket `:with => /.../` still common in Rails 3.2-era code. Detection caveat: this grep flags any `^` or `$` inside the `with:` regex, but Rails only raises on a leading `^` or trailing `$`. A `^` inside a character class (e.g. `/[^@]+/`) or a `$` mid-pattern is a FALSE POSITIVE — confirm the anchor sits at the start/end before fixing. Out of scope for the primary regex: the block-options form `validates :col, format: { with: /^.../ }`, method-call regex args (`with: regex_for(:x)`), and positional / `without:` regexes — see fix for a secondary grep"
-      fix: "Replace a leading `^` with `\\A` and a trailing `$` with `\\z` (absolute start/end of string). Ruby's regex engine accepts both forms on every Rails version, so apply the rewrite directly — it is backwards-compatible and needs no version gate. Secondary grep for the block-options form: `grep -rnE \"validates\\s+:\\w+.*format:.*?/[^/]*[\\^$]\" app/ --include=\"*.rb\"`. For method-call regex args, fix at the helper method's return value — one fix covers every caller"
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.0 raises `ArgumentError: The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or forgot to add the :multiline => true option?` when a format validator's `with:` or `without:` regex starts with `^` or ends with an unescaped `$`, unless `multiline: true` is passed. The check runs when the validator is declared, so the error fires while the class loads. Rails 3.2 has no such check. The pattern follows the same rule: it flags a regex literal (`/.../` or `%r{...}`) that starts with `^` or ends with `$`, given to `validates_format_of` or to `validates ..., format:` (both `format: /.../` and `format: { with: /.../ }`), including a call whose options continue on the next line after a trailing comma or an opening `{`. A `^` inside a character class (`/\\A[^@]+\\z/`) or a `$` in the middle of the regex does not raise and is not flagged. A regex held in a constant or returned by a method is not visible here: VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND covers `Regexp.new` constants, and any other `with: SOME_CONSTANT` needs a look at the constant by hand. Known gaps: a `%r` regex with a delimiter other than `{}`, or a `%r{...}` that contains a `}` before the trailing `$`, is missed, so also skim format validators that use `%r` by hand. `multiline: true` on a later line than the regex does not suppress the hit, so dismiss those by reading the call"
+      fix: "Replace a leading `^` with `\\A` and a trailing `$` with `\\z`. Ruby accepts both on every version, so the change can ship before the bump with no `NextRails.next?` branch. `\\z` is stricter than `$`: `$` also matches before a trailing newline, so a value ending in a newline that passed on 3.2 now fails validation. When the attribute really holds several lines and each line must match, keep the anchors and add `multiline: true` instead; Rails 3.2 accepts and ignores the option"
       variable_name: "VALIDATES_FORMAT_OF_ANCHORS"
 
     - name: "Regex constant built via Regexp.new with multiline anchors"
@@ -371,15 +384,16 @@ upgrade_findings:
       fix: "Move plugin code to lib/ or convert to a gem"
       variable_name: "VENDOR_PLUGINS"
 
-    - name: "cache_timestamp_format or external cache_key storage"
+    - name: "cache_key timestamp format changed to :nsec"
       kind: "breaking"
-      pattern: "cache_timestamp_format|cache_key"
-      exclude: ""
+      pattern: "\\bcache_timestamp_format\\b|(?<!model_name|def self)\\.cache_key(?![\\w?!(])|(?<![\\w.:@$])(?<!def )cache_key(?![\\w?!:(]|[ \\t]*(?:(?:\\|\\||&&|[-+*\\/|&])?=(?![=~>])|<<|\\())"
+      exclude: "^[^#\\n]*(?:Rails\\.cache\\.\\w+[ \\t]*\\(|(?<![\\w.])cache[ \\t(])"
       search_paths:
-        - "app/models/"
+        - "app/"
+        - "lib/"
         - "config/"
-      explanation: "Rails 4.0 changed cache_timestamp_format from :number to :nsec — stored cache keys may no longer match"
-      fix: "Invalidate stored cache keys after upgrading, or set self.cache_timestamp_format = :number to preserve old format"
+      explanation: "Rails 4.0 changes the default `ActiveRecord::Base.cache_timestamp_format` from `:number` to `:nsec`, so `record.cache_key` for a record with `updated_at` gains nine digits of fractional seconds (`accounts/1-20140102030405` on 3.2, `accounts/1-20140102030405678901000` on 4.0). Nothing raises. Every cache entry keyed on a record (`cache @record`, `Rails.cache.fetch([record, ...])`) misses once after the deploy and is rebuilt, and code that stored a record's `cache_key` outside the cache (a database column, an ETag a client kept, a key handed to another service) or compares it to a saved string no longer matches. The pattern flags an explicit `cache_timestamp_format` setting and `cache_key` used as a value, with a receiver (`record.cache_key`) or without one inside the model (`update_column(:etag, cache_key)`). It skips `model_name.cache_key`, which has no timestamp, calls that pass an argument (`cache_key(:totals)`) and `def cache_key`, which are the app's own methods, assignments and appends (`<<`) to a local variable named `cache_key`, and lines that only hand the key to `Rails.cache` or the `cache` view helper, which just go cold once. A local variable named `cache_key` used as a value outside such a call is still flagged; dismiss it by reading the line. Fragment caching that uses a record implicitly is not flagged: it only goes cold once"
+      fix: "For each flagged `.cache_key`, check whether the value is stored or compared outside the cache. If it is, or if a cold cache after the deploy is a load problem, keep the 3.2 format: `config.active_record.cache_timestamp_format = :number` in config/application.rb. The setting exists from Rails 3.2.13, so on 3.2.13 or newer it can go in before the bump with no branch. On 3.2.0 through 3.2.12 the setter does not exist and the current side fails to boot with NoMethodError, so set it on the next side only: `config.active_record.cache_timestamp_format = :number if NextRails.next?`; remove it later when a one-time cache flush is acceptable. If nothing stores the keys and a cold cache is fine, no change is needed"
       variable_name: "CACHE_KEY_FORMAT"
 
     - name: "ActiveSupport::BufferedLogger"
@@ -476,8 +490,8 @@ upgrade_findings:
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "At the 3.2 → 4.0 hop this keeps working, with a deprecation warning, because activerecord-deprecated_finders is a default dependency of Rails 4.0 (removed in 4.1). That gem restores the `:conditions` option and instance_evals a proc value against the owner, so the Rails 3.2 receiver semantics are preserved on 4.0. The hazard is the eventual rewrite, not the bump: the native Rails 4 replacement is a scope lambda that is instance_exec'd against the relation (`klass.unscoped`) with the owner passed as the lambda argument, so `self` is the relation, not the owner. A careless rewrite to a bare `-> { where(x: x) }` resolves `x` against the relation instead of the owner — a silent shift"
-      fix: "Two options. (1) Defer: rely on the bundled activerecord-deprecated_finders through the 4.0 window; the proc keeps working and only warns. (2) Rewrite for forward compatibility (required before dropping the gem or moving to 4.1): convert to a scope lambda whose parameter is the owner. Example: `belongs_to :foo, conditions: proc { where(clinic_id: clinic_id) }` becomes `belongs_to :foo, ->(owner) { where(clinic_id: owner.clinic_id) }`. Bare attribute references and `self.x` that targeted the owner become `owner.x`; local variables and constants stay as-is. The lambda form works on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
+      explanation: "At the 3.2 → 4.0 hop on Ruby 2.2 or older this keeps working, with a deprecation warning, because activerecord-deprecated_finders is a dependency of Rails 4.0 (not of 4.1). On Ruby 2.3 or newer it raises ArgumentError when the association loads: see ASSOCIATION_OPTIONS_RUBY_23. That gem restores the `:conditions` option and instance_evals a proc value against the owner, so the Rails 3.2 receiver semantics are preserved on 4.0. The hazard is the eventual rewrite, not the bump: the native Rails 4 replacement is a scope lambda that is instance_exec'd against the relation (`klass.unscoped`) with the owner passed as the lambda argument, so `self` is the relation, not the owner. A careless rewrite to a bare `-> { where(x: x) }` resolves `x` against the relation instead of the owner, a silent shift"
+      fix: "Two options. (1) Defer: rely on the bundled activerecord-deprecated_finders through the 4.0 window; on Ruby 2.2 or older the proc keeps working and only warns, and on Ruby 2.3 or newer it needs the initializer described in ASSOCIATION_OPTIONS_RUBY_23. (2) Rewrite (required before the 4.1 hop unless the gem is added there as a bridge): convert to a scope lambda whose parameter is the owner. Example: `belongs_to :membership, conditions: proc { { account_id: account_id } }` becomes `belongs_to :membership, ->(owner) { where(account_id: owner.account_id) }`. Bare attribute references and `self.x` that targeted the owner become `owner.x`; local variables and constants stay as-is. On Rails 3.2 a lambda second argument fails while the model loads (an ArgumentError or a NoMethodError, depending on the macro and on whether options follow the lambda), so the rewrite is not backwards-compatible: branch the declaration with `NextRails.next?` or rewrite after the bump"
       variable_name: "ASSOCIATION_CONDITIONS_PROC"
 
     - name: "order / reorder hash whose value is not :asc or :desc"
@@ -631,7 +645,7 @@ dependencies:
   activerecord_deprecated_finders:
     check: false
     gem_name: "activerecord-deprecated_finders"
-    message: "Default dependency of Rails 4.0 (removed in 4.1), so these keep working with a deprecation warning on 4.0. Restores dynamic finders (find_all_by_* etc.) and old-style association options (:conditions including a proc, :order, :include, :uniq, :readonly — not :extend). Temporary bridge: migrate off then drop the gem before 4.1"
+    message: "Dependency of Rails 4.0 only. Restores, with a deprecation warning, dynamic finders (find_all_by_* etc.), find(:all, ...) option hashes and the old association options :conditions (including a proc), :order, :include, :uniq and :readonly; it does not restore :extend on belongs_to / has_one. Rails 4.1 no longer depends on it, and an app still using these APIs there adds it to the Gemfile with `require: 'active_record/deprecated_finders'`; the gem declares support for Active Record below 5. On Ruby 2.3 or newer the association options need care: on 4.0 they raise ArgumentError when the association loads (see ASSOCIATION_OPTIONS_RUBY_23), on 4.1.0 through 4.1.14 `Relation#merge!` keeps the 4.0 order, so the same error is expected there, and from 4.1.15 (which checks for a Hash first) a Hash-valued :conditions is dropped without an error. Rewrite the association options rather than relying on the gem for them"
     url: "https://github.com/rails/activerecord-deprecated_finders"
 
   actionpack_action_caching:

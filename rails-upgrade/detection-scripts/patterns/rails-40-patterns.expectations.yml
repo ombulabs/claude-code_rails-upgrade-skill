@@ -41,18 +41,40 @@ REQUIRE_STRONG_PARAMS:
     - "require 'strong_password'"
 
 SCOPE_WITHOUT_LAMBDA:
-  # Pattern: "scope\\s+:\\w+\\s*,\\s*where"
-  # Rails 4.0 requires every scope to wrap its query in a callable (lambda).
+  # A scope body that is not callable: Rails 4.0 warns when the model loads.
+  # The line must start with `scope` (so comments do not flag), and anything
+  # after the comma other than a lambda or proc flags, including a body that
+  # starts on the next line.
   match:
-    # bare where() right after the scope name — the breaking form
+    # bare where() right after the scope name
     - "  scope :active, where(active: true)"
     # extra whitespace around the name and comma must still flag
     - "  scope :recent , where('created_at > ?', 1.week.ago)"
+    # parenthesized call form
+    - "  scope(:active, where(active: true))"
+    # any relation method, not only where
+    - "  scope :ordered, order(:position)"
+    - "  scope :visible, scoped.where(hidden: false)"
+    - "  scope :popular, with_votes.select('items.*, COUNT(votes.id) AS vote_count')"
+    # a relation wrapped in parentheses is still not callable
+    - "  scope :sorted, (joins(:category).order(:position))"
+    # body on the next line: the scope line itself is flagged
+    - "  scope :with_votes,"
+    # string scope name
+    - "  scope 'active', where(active: true)"
   no_match:
-    # already wrapped in a stabby lambda — the correct Rails 4 form
+    # already wrapped in a stabby lambda, the Rails 4 form
     - "  scope :active, -> { where(active: true) }"
-    # wrapped in an explicit lambda — also correct, must not flag
+    - "  scope :by_month, ->(month) { where(month: month) }"
+    # wrapped in an explicit lambda or proc
     - "  scope :active, lambda { where(active: true) }"
+    - "  scope :by_month, proc { |month| where(month: month) }"
+    - "  scope :by_month, Proc.new { |month| where(month: month) }"
+    # a proc wrapped in parentheses is callable, no warning on 4.0
+    - "  scope :by_month, (proc { |month| where(month: month) })"
+    - "  scope(:active, -> { where(active: true) })"
+    # commented-out scope
+    - "  # scope :active, where(active: true)"
 
 CLASS_SCOPED:
   # Model.scoped, relation.scoped and a receiverless `scoped` inside a model
@@ -105,8 +127,25 @@ DEFAULT_SCOPE_WITHOUT_BLOCK:
   match:
     - "  default_scope where(active: true)"
     - "  default_scope :order => 'created_at'"
+    - "  default_scope order: 'created_at ASC'"
+    # parenthesized call form
+    - "  default_scope(where(active: true))"
+    # any relation method, not only where / order
+    - "  default_scope select([arel_table[:id], arel_table[:name]])"
+    - "  default_scope includes(:account)"
   no_match:
     - "  default_scope { where(active: true) }"
+    - "  default_scope  {where(active: true)}"
+    - "  default_scope do"
+    # a lambda or proc argument is callable, no warning on 4.0
+    - "  default_scope -> { where(active: true) }"
+    - "  default_scope(-> { where(active: true) })"
+    - "  default_scope lambda { where(active: true) }"
+    # a class-method override is a different shape
+    - "  def self.default_scope"
+    # comments and look-alike names
+    - "  # default_scope where(active: true)"
+    - "  default_scopes.any?"
 
 ASSOCIATION_CONDITIONS:
   match:
@@ -122,10 +161,22 @@ ASSOCIATION_ORDER:
     - "  has_many :items, :sort_order => 'asc'"
 
 ASSOCIATION_EXTEND:
+  # Only belongs_to and has_one lose :extend at 4.0; collections keep it.
   match:
-    - "  has_many :items, :extend => ItemsExtension"
+    - "  belongs_to :account, extend: AccountLookup"
+    - "  has_one :profile, :extend => ProfileMethods"
+    - "  belongs_to :owner, foreign_key: :owner_id, class_name: 'User', extend: OwnerMethods"
+    # (a declaration that continues after a trailing comma is matched across
+    # lines by the scanner, which this per-line fixture cannot show)
   no_match:
+    # collection associations still accept :extend on 4.0
+    - "  has_many :items, :extend => ItemsExtension"
+    - "  has_and_belongs_to_many :tags, extend: TagMethods"
     - "  has_many :items, -> { extending ItemsExtension }"
+    - "  belongs_to :account, -> { extending(AccountLookup) }"
+    # a has_one that only mentions an extension in its class name
+    - "  has_one :extended_profile, class_name: 'ProfileExtension'"
+    - "  # belongs_to :account, extend: AccountLookup"
 
 ASSOCIATION_UNIQ:
   match:
@@ -138,6 +189,27 @@ FINDER_SQL:
     - "  has_many :items, :finder_sql => 'SELECT * FROM items'"
   no_match:
     - "  has_many :items, -> { where(active: true) }"
+
+ASSOCIATION_OPTIONS_RUBY_23:
+  # Flags a Ruby 2.3+ version in the Gemfile or .ruby-version.
+  match:
+    - "ruby 2.4.10"
+    - "ruby '2.3.8'"
+    - 'ruby "2.4.10"'
+    - "2.3.8"
+    - "ruby-2.3.1"
+    - "ruby '~> 2.3.0'"
+    - "ruby '>= 2.3.1'"
+    - "2.4"
+    - "ruby-2.3"
+  no_match:
+    - "ruby '2.2.10'"
+    - "2.1.10"
+    - "ruby-2.0.0-p648"
+    - "ruby '~> 2.2.0'"
+    - "2.2"
+    - "gem 'rake', '2.3.1'"
+    - "# ruby '2.3.8'"
 
 FIND_ALL_BY:
   match:
@@ -298,9 +370,34 @@ ACTIVE_RESOURCE:
 
 CACHE_KEY_FORMAT:
   match:
-    - "self.cache_timestamp_format = :number"
-    - "  def cache_key; \"#{id}-#{updated_at}\"; end"
+    - "  self.cache_timestamp_format = :number"
+    - "    config.active_record.cache_timestamp_format = :number"
+    # a record's cache_key stored or compared outside the cache
+    - "    update_column(:etag, record.cache_key)"
+    - "    stale = stored_key != @account.cache_key"
+    # receiverless inside the model, used as a value
+    - "    update_column(:etag, cache_key)"
+    - "    self.etag = cache_key"
+    - "    Sync.push(key: cache_key)"
   no_match:
+    - "  def self.cache_key"
+    # the app's own cache_key method taking an argument, or defining one
+    - "    Rails.cache.fetch(cache_key(:totals)) do"
+    - "    Rails.cache.fetch(report.cache_key(:monthly_totals))"
+    - "  def cache_key(name)"
+    - "  def cache_key"
+    # a local variable with the same name, assigned or handed to the cache
+    - "    cache_key = \"settings_for_#{id}\""
+    - "    cache_key ||= compute_key"
+    - "    cache_key << record.id.to_s"
+    - "    settings = Rails.cache.fetch(cache_key, expires_in: 12.hours) do"
+    - "  = cache cache_key do"
+    # look-alike names and a symbol
+    - "    return unless account_cache_key.present?"
+    - "    @cache_key = build_key"
+    - "    options = { cache_key: 1 }"
+    # model_name.cache_key has no timestamp
+    - "    \"#{self.class.model_name.cache_key}/#{id}\""
     - "  def display_name; name; end"
 
 BUFFERED_LOGGER:
@@ -458,24 +555,47 @@ ROUTES_TOP_LEVEL_MODULE_AUTOLOAD:
     - "  constraints Constraints::Admin do"
 
 VALIDATES_FORMAT_OF_ANCHORS:
-  # Pattern: "validates_format_of.*with:\\s*/[^/]*[\\^$]"
-  # Flags a leading ^ / trailing $ in a validates_format_of `with:` regex.
+  # Flags a format-validator regex literal that starts with ^ or ends with an
+  # unescaped $, the same rule Rails 4.0 applies before raising.
+  # A call whose options continue after a trailing comma or an opening `{`
+  # (`format: {` at the end of the line, `with:` on the next) is matched across
+  # lines by scan_patterns.rb; this per-line fixture cannot show it.
   match:
-    # leading ^ and trailing $ — the boot-fatal form on Rails 4
+    # leading ^ and trailing $
     - '  validates_format_of :email, with: /^[a-z]+$/'
-    # trailing $ only still flags
+    # trailing $ only, and a leading ^ only with a flag after the regex
     - '  validates_format_of :name, with: /foo$/'
-    # Ruby-1.8 hash-rocket syntax common in 3.2-era code
+    - '  validates_format_of :name, with: /^foo/i'
+    # hash-rocket syntax common in 3.2-era code
     - '  validates_format_of :email, :with => /^[a-z]+$/'
-  no_match:
-    # already rewritten to \A / \z — the correct Rails 4 form
-    - '  validates_format_of :email, with: /\A[a-z]+\z/'
-    # hash-rocket form, already rewritten — must not flag
-    - '  validates_format_of :email, :with => /\Afoo\z/'
-    # block-options form is out of scope for the primary regex
+    # without: is checked the same way
+    - '  validates_format_of :code, without: /^tmp/'
+    # the validates form, with a hash or a bare regex
     - '  validates :email, format: { with: /^x$/ }'
-    # without: is a different option, out of scope
-    - '  validates_format_of :x, without: /^foo$/'
+    - '  validates :zip, presence: true, format: { with: /\d{5}$/, allow_blank: true }'
+    - '  validates :code, format: /^[A-Z]{3}$/'
+    # %r{} literal
+    - '  validates_format_of :path, with: %r{^[a-z/]+$}'
+    # explicit receiver
+    - '  model_class.validates_format_of :slug, with: /^[a-z-]+$/'
+  no_match:
+    # already rewritten to \A / \z
+    - '  validates_format_of :email, with: /\A[a-z]+\z/'
+    - '  validates_format_of :email, :with => /\Afoo\z/'
+    # ^ inside a character class and $ in the middle do not raise
+    - '  validates_format_of :email, with: /\A[^@\s]+@[^@\s]+\z/'
+    - '  validates :email, format: { with: /\A[^@]+\z/ }'
+    - '  validates_format_of :ratio, with: /\Aa$b\z/'
+    # an escaped \$ at the end is a literal dollar sign
+    - '  validates_format_of :price, with: /\A\d+\$/'
+    # multiline: true turns the check off
+    - '  validates_format_of :body, with: /^foo$/, multiline: true'
+    # a constant is out of reach of a line regex
+    - '  validates_format_of :key, with: KEY_FORMAT'
+    # commented out
+    - '  # validates_format_of :name, with: /^foo$/'
+    # validates_with is a different API
+    - '  validates_with SlugValidator, with: /^x/'
 
 VALIDATES_FORMAT_OF_ANCHORS_CONSTANT_BOUND:
   # Pattern: "Regexp\\.new\\(.*[\\^$]"
@@ -591,7 +711,7 @@ REMOTE_FORM_CSRF_TOKEN:
     - '  <%= form_tag(search_path, remote: true) do %>'
     - '= form_for @person, :remote => true, html: { class: "opt-in-form" } do |f|'
     - '= simple_form_for @user, remote: true do |f|'
-    - '= form_for [clinic, patient], url: settings_path, remote: true do |f|'
+    - '= form_for [account, project], url: settings_path, remote: true do |f|'
   no_match:
     # remote link_to: UJS builds the form and its token itself
     - '= link_to "Delete", user_path(user), remote: true, method: :delete'

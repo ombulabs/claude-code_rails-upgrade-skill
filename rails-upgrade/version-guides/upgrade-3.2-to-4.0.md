@@ -119,19 +119,25 @@ ActiveRecord scopes must use a lambda. Additionally, association options like `:
 **Detection Pattern:**
 ```ruby
 scope :active, where(active: true)
+scope(:ordered, order(:position))
+scope :visible, scoped.where(hidden: false)
 default_scope where(deleted_at: nil)
 default_scope :order => 'created_at ASC'
 ```
+
+Any body that is not a lambda or proc counts, whatever relation method it starts with, with or without parentheses around the arguments. A proc in parentheses (`scope :by_month, (proc { |m| where(month: m) })`) is already callable and needs no change.
 
 **Fix:**
 ```ruby
 # BEFORE
 scope :active, where(active: true)
+scope(:ordered, order(:position))
 default_scope where(deleted_at: nil)
 default_scope :order => 'created_at ASC'
 
 # AFTER
 scope :active, -> { where(active: true) }
+scope(:ordered, -> { order(:position) })
 default_scope { where(deleted_at: nil) }
 default_scope { order('created_at ASC') }
 ```
@@ -163,40 +169,50 @@ has_one :spouse, -> { where(relationship: 'Spouse') }, class_name: 'Contact'
 has_many :items, -> { where('access_type != "public"') }
 ```
 
+The AFTER forms do not run on Rails 3.2: its association macros take only `(name, options)`, so a lambda
+second argument fails while the model loads: an `ArgumentError` or a `NoMethodError`, depending on the
+macro and on whether options follow the lambda.
+During dual boot, put the lambda form behind `NextRails.next?` and keep the 3.2 form on the other branch,
+or apply the rewrite after the bump. This holds for every association lambda in this section.
+
 ##### Association `:conditions` with proc → lambda with owner parameter
 
 When conditions reference the owning object (common in multi-key associations), the proc must become a lambda that receives the owner as a parameter.
 
 **Detection Pattern:**
 ```ruby
-belongs_to :clinic_patient_link, primary_key: :person_id, foreign_key: :person_id,
-  conditions: clinic_id_conditions_proc, extend: MultiKeyAssociation::BelongsTo
-has_many :actions, primary_key: :patient_id, foreign_key: :patient_id,
+belongs_to :membership, primary_key: :user_id, foreign_key: :user_id,
+  conditions: proc { { account_id: account_id } }, extend: MembershipLookup
+has_many :events, primary_key: :user_id, foreign_key: :user_id,
   conditions: proc { ["created_at BETWEEN ? AND ?", start_at, end_at] }
-has_one :active_visit, class_name: "Visit",
+has_one :latest_order, class_name: "Order",
   conditions: proc { ["created_at >= ?", some_date] }, order: 'created_at DESC'
 ```
 
 **Fix:**
 ```ruby
 # BEFORE
-belongs_to :clinic_patient_link, primary_key: :person_id, foreign_key: :person_id,
-  conditions: clinic_id_conditions_proc, extend: MultiKeyAssociation::BelongsTo
+belongs_to :membership, primary_key: :user_id, foreign_key: :user_id,
+  conditions: proc { { account_id: account_id } }, extend: MembershipLookup
 
-# AFTER — this pattern is rare and complex; verify manually
-belongs_to :clinic_patient_link, ->(object) {
-  where(clinic_id_conditions_proc.call(object)).extending(MultiKeyAssociation::BelongsTo)
-}, primary_key: :person_id, foreign_key: :person_id
+# AFTER: rare and easy to get wrong, verify each one by hand
+belongs_to :membership, ->(owner) {
+  where(account_id: owner.account_id).extending(MembershipLookup)
+}, primary_key: :user_id, foreign_key: :user_id
 
 # BEFORE
-has_one :active_visit, class_name: "Visit",
+has_one :latest_order, class_name: "Order",
   conditions: proc { ["created_at >= ?", some_date] }, order: 'created_at DESC'
 
 # AFTER
-has_one :active_visit, ->(owner) {
+has_one :latest_order, ->(owner) {
   where("created_at >= ?", owner.some_date).order('created_at DESC')
-}, class_name: "Visit"
+}, class_name: "Order"
 ```
+
+On 3.2 the proc runs with `self` set to the owner, so bare names like `account_id` read the
+owner's attributes. Inside the Rails 4 lambda `self` is the relation, so each of them has
+to become `owner.account_id`.
 
 ##### Association `:order` → lambda with `order()`
 
@@ -218,24 +234,34 @@ has_many :items, -> { order('position ASC') }
 has_one :user, -> { order('id DESC') }
 ```
 
-##### Association `:extend` → `extending` inside lambda
+##### `belongs_to` / `has_one` `:extend` → `extending` inside lambda
+
+Rails 4.0 keeps `:extend` on `has_many` and `has_and_belongs_to_many`, where it still
+works with no warning. On `belongs_to` and `has_one` it is gone, and the declaration
+raises `ArgumentError: Unknown key: extend` while the model loads.
+activerecord-deprecated_finders does not bring it back.
 
 **Detection Pattern:**
 ```ruby
-has_many :items, :extend => SomeExtension
 belongs_to :item, foreign_key: :content_id, extend: ContentExtension
+has_one :profile, :extend => ProfileMethods
 ```
 
 **Fix:**
 ```ruby
 # BEFORE
-has_many :items, :extend => SomeExtension
 belongs_to :item, foreign_key: :content_id, extend: ContentExtension
 
 # AFTER
-has_many :items, -> { extending SomeExtension }
-belongs_to :item, -> { extending ContentExtension }, foreign_key: :content_id
+if NextRails.next?
+  belongs_to :item, -> { extending(ContentExtension) }, foreign_key: :content_id
+else
+  belongs_to :item, foreign_key: :content_id, extend: ContentExtension
+end
 ```
+
+The branch is needed because Rails 3.2 does not accept a scope lambda as the second
+argument of an association macro: the declaration fails while the model loads. `has_many :items, extend: SomeExtension` can stay as it is.
 
 ##### Combined `:conditions` + `:order` + `:extend` → single lambda
 
@@ -244,12 +270,12 @@ When multiple options need to move into the lambda, combine them:
 **Fix:**
 ```ruby
 # BEFORE
-has_many :flu_shots, class_name: 'Immunization',
-  conditions: { immunization_type_id: 4 }, order: 'estimated_date DESC'
+has_many :featured_posts, class_name: 'Post',
+  conditions: { category_id: 4 }, order: 'published_at DESC'
 
 # AFTER
-has_many :flu_shots, -> { where(immunization_type_id: 4).order('estimated_date DESC') },
-  class_name: 'Immunization'
+has_many :featured_posts, -> { where(category_id: 4).order('published_at DESC') },
+  class_name: 'Post'
 ```
 
 ##### `has_many :through` with `:uniq` → lambda
@@ -397,6 +423,128 @@ If the block holds `shallow: true` resources under a `path:` other than `"/"`, c
 member routes in `rake routes` on both versions before relying on one fix for both. Keep the
 Symbol only if the new segment is the URL you want, and treat that as a URL change for every
 client. Adding `as:` in its place also renames the route helpers.
+
+---
+
+#### Format Validators Reject Multiline Anchors
+
+**What Changed:**
+Rails 4.0 checks every format validator's `with:` and `without:` regex when the validator
+is declared. A regex that starts with `^` or ends with an unescaped `$` raises unless the
+validator passes `multiline: true`:
+
+```
+ArgumentError: The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \A and \z, or forgot to add the :multiline => true option?
+```
+
+The check runs while the class loads, so one such validator stops boot. Rails 3.2 has no
+check. Only the start and end of the regex count: a `^` inside a character class
+(`/\A[^@]+\z/`) or a `$` in the middle is fine.
+
+**Detection Pattern:**
+```ruby
+validates_format_of :slug, with: /^[a-z-]+$/
+validates :code, format: { with: /^[A-Z]{3}$/ }
+validates :code, format: /^[A-Z]{3}$/
+```
+
+A regex stored in a constant (`with: SLUG_FORMAT`) or built with `Regexp.new` raises the
+same way, so look up the constant behind every `with:` that is not a literal.
+
+**Fix:**
+```ruby
+# BEFORE
+validates_format_of :slug, with: /^[a-z-]+$/
+
+# AFTER
+validates_format_of :slug, with: /\A[a-z-]+\z/
+```
+
+Ruby accepts `\A` and `\z` on every version, so the rewrite needs no `NextRails.next?`
+branch. `\z` is stricter than `$`: `$` also matched before a trailing newline, so a value
+ending in a newline that passed on 3.2 now fails validation. If the attribute holds
+several lines and each line must match, keep the anchors and add `multiline: true`
+instead; Rails 3.2 ignores the option.
+
+---
+
+#### Deprecated Association Options Raise on Ruby 2.3+
+
+**What Changed:**
+On Rails 4.0, activerecord-deprecated_finders keeps the old association options
+(`:conditions`, `:order`, `:include`, `:readonly`, `:uniq`, `:select`, `:limit`,
+`:offset`, `:group`, `:having`) working with a deprecation warning. On Ruby 2.3 or newer
+it does not: loading, joining or eager loading any association that uses one raises
+
+```
+ArgumentError: wrong number of arguments (given 0, expected 1)
+```
+
+with a backtrace through `spawn_methods.rb` and the gem's `association_builder.rb`. Ruby
+2.3 added `Hash#to_proc`, and Rails 4.0's `Relation#merge!` asks `respond_to?(:to_proc)`
+before `is_a?(Hash)`, so the options hash the gem merges into the association scope is run
+as a proc with no argument. Rails 4.1.15 moved the Hash check first; 4.1.0 through 4.1.14
+keep the 4.0 order. The declaration itself
+loads with only the warning, so the app boots and the error appears in requests and specs.
+On Ruby 2.2 or older none of this applies.
+
+**Detection Pattern:**
+```bash
+# Ruby 2.3 or newer on the app
+cat .ruby-version; grep -n "^ruby" Gemfile
+# associations still using a deprecated option
+grep -rnE "(has_many|has_one|belongs_to|has_and_belongs_to_many).*(conditions|order|include|readonly|uniq|select|limit)(:|\s*=>)" app/models/
+```
+
+**Fix:**
+The durable fix is the rewrite in "Scopes and Association Options Require Lambda": once
+no association uses a deprecated option, the error cannot happen. Because the lambda
+argument raises on Rails 3.2, put the rewritten declaration behind `NextRails.next?`.
+
+To bump first and rewrite later, load an initializer on the next side only that restores
+the Ruby 2.2 behavior. It needs both patches. With the `merge!` patch alone, a Hash-valued
+`:conditions` stops raising and is silently dropped, because the gem also calls `to_proc`
+on it and gets nil back, so the association returns every row.
+
+```ruby
+# config/initializers/deprecated_association_options_ruby23.rb
+if NextRails.next?
+  # The gem defines DeprecatedOptionsProc only once ActiveRecord::Base loads.
+  ActiveSupport.on_load(:active_record) do
+    ActiveRecord::Relation.class_eval do
+      def merge!(other) # :nodoc:
+        if other.is_a?(Hash)
+          ActiveRecord::Relation::HashMerger.new(self, other).merge
+        elsif !other.is_a?(ActiveRecord::Relation) && other.respond_to?(:to_proc)
+          instance_exec(&other)
+        else
+          ActiveRecord::Relation::Merger.new(self, other).merge
+        end
+      end
+    end
+
+    ActiveRecord::Associations::Builder::DeprecatedOptionsProc.class_eval do
+      def to_proc
+        options = self.options
+        proc do |owner|
+          if options[:where].is_a?(Proc)
+            context = owner || self
+            where(context.instance_eval(&options[:where])).merge!(options.except(:where))
+          else
+            merge(options)
+          end
+        end
+      end
+    end
+  end
+end
+```
+
+Add a spec that loads one association of each kind and checks the rows it returns, since
+a silently dropped condition is the failure to guard against. Delete the initializer when
+the rewrite is done, and finish the rewrite before the 4.1 hop: 4.1.0 through 4.1.14 keep
+the same `merge!` order, and from 4.1.15 a Hash-valued `:conditions` kept through the gem
+is dropped without an error.
 
 ---
 
@@ -689,29 +837,46 @@ Results need manual review — only partials rendered without `collection:`, `ob
 #### `cache_key` Timestamp Format Changed
 
 **What Changed:**
-The `cache_timestamp_format` changed from `:number` to `:nsec`, producing longer, more precise cache keys. This can break code that compares or stores cache keys as strings.
+The default `ActiveRecord::Base.cache_timestamp_format` changed from `:number` to `:nsec`,
+so the key of any record with `updated_at` gains nine digits of fractional seconds:
 
-```yaml
-Rails 3.2: self.cache_timestamp_format = :number
-  "orders/33-2024030519440"
-
-Rails 4.0: self.cache_timestamp_format = :nsec
-  "orders/34-20240305194606468282921"
+```ruby
+account.cache_key
+# Rails 3.2 => "accounts/1-20140102030405"
+# Rails 4.0 => "accounts/1-20140102030405678901000"
 ```
+
+Nothing raises. Every cache entry keyed on a record misses once after the deploy and is
+rebuilt, which can be a load spike on a large app. Code that stores a record's
+`cache_key` outside the cache (a database column, an ETag a client kept, a key handed to
+another service) or compares it to a saved string stops matching.
 
 **Detection Pattern:**
 ```ruby
-# Code that stores or compares cache_key strings
-cache_key
+# a record key used as a value, and any existing setting
+record.cache_key
+update_column(:etag, cache_key)   # inside the model
 cache_timestamp_format
 ```
 
-**Fix:**
-If your code stores cache keys externally (e.g., in Redis, a database, or a background job), those stored keys will no longer match after the upgrade. Either:
-1. Invalidate/regenerate stored cache keys after upgrading
-2. Or set `self.cache_timestamp_format = :number` on affected models to preserve the old format
+`model_name.cache_key` has no timestamp and is not affected. A method of the app's own
+that takes an argument (`cache_key(:totals)`) is not the Active Record method.
 
-**Skill behavior:** When this change is detected, ask the user which approach they prefer — the right choice depends on whether external systems rely on the cache key format.
+**Fix:**
+To keep the 3.2 keys, set the format explicitly. The setting exists from Rails 3.2.13, so on
+3.2.13 or newer it can ship before the bump. On 3.2.0 through 3.2.12 the setter does not exist
+and boot fails with `NoMethodError`, so add `if NextRails.next?` to the line:
+
+```ruby
+# config/application.rb
+config.active_record.cache_timestamp_format = :number
+```
+
+Remove it later, when a one-time cache flush is acceptable. If nothing stores the keys and
+a cold cache after the deploy is fine, no change is needed.
+
+**Skill behavior:** When this change is detected, ask the user which approach they prefer.
+The right choice depends on whether anything outside the cache relies on the key format.
 
 ---
 
@@ -1357,8 +1522,12 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ActiveModel::ForbiddenAttributesError` | "Strong Parameters (Replaces attr_accessible)" — use `user_params` not `params[:user]` |
 | Scope returns wrong results or errors | "Scopes", under "Scopes and Association Options Require Lambda" — add lambda |
 | `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`", under "Scopes and Association Options Require Lambda" — move to lambda |
+| `ArgumentError: Unknown key: extend` | "`belongs_to` / `has_one` `:extend` → `extending` inside lambda", under "Scopes and Association Options Require Lambda": move the module into `extending` |
+| `ArgumentError: wrong number of arguments (given 0, expected 1)` from `spawn_methods.rb` when an association loads | "Deprecated Association Options Raise on Ruby 2.3+": rewrite to a scope lambda or add the two-patch initializer |
 | `No route matches` | "Routes Require HTTP Method" — add HTTP method |
 | A scoped route 404s and `rake routes` shows an extra segment | "A Symbol Passed to Route `scope` Becomes a Path Segment" — drop the Symbol, keep `path:` |
+
+| `ArgumentError: The provided regular expression is using multiline anchors (^ or $)` | "Format Validators Reject Multiline Anchors": use `\A` and `\z` |
 | Remote form POST arrives with no session or current user | "Remote Forms Stop Embedding the CSRF Token" — pin `embed_authenticity_token_in_remote_forms` |
 | `ArgumentError: The method .order() must contain arguments.` | "`order` and `reorder` Require Arguments" — name the column, `order(:id)` for `.order.last` |
 | `ArgumentError: Direction should be :asc or :desc` | "`order` and `reorder` Require Arguments" — hash values must be `:asc` / `:desc`; use strings across joins |
