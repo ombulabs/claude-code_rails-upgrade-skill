@@ -110,7 +110,7 @@ Priority is about **urgency during an upgrade**, not editorial weight.
 
 **Judge `kind` at the target hop, not the API's historical timeline.** Each `rails-XY-patterns.yml` file is a statement *about that hop* — what changes when the user upgrades INTO that version. A removal that was first deprecated in an earlier Rails minor is `breaking` in the file for the version where it actually raises, not `deprecation` because of its history. The same API can legitimately be `deprecation` in `rails-31-patterns.yml` and `breaking` in `rails-40-patterns.yml`. Apply the rule to all four kinds: `kind` reflects what the change *is at this hop*, not what it *was* earlier or *will become* later.
 
-Concrete example: `SCOPE_WITHOUT_LAMBDA` was deprecated in Rails 3.1 and raises in 4.0 — it is `breaking` in `rails-40-patterns.yml`.
+Concrete example: `SCOPE_WITHOUT_LAMBDA` (`scope :active, where(...)`) only emits a deprecation warning on Rails 4.0 and raises on 4.1 when the scope is called, so it is `deprecation` in `rails-40-patterns.yml` and `breaking` in `rails-41-patterns.yml`.
 
 The four values:
 

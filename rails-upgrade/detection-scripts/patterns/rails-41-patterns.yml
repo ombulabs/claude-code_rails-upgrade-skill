@@ -122,6 +122,47 @@ upgrade_findings:
       fix: "readonly: true becomes a scope lambda: has_many :tags, -> { readonly }, through: :taggings. readonly: false can usually just be deleted: Rails 4.1 removed implicit_readonly, so records loaded through a join are no longer marked readonly and there is nothing left to undo. If the association needs to stay writable on 4.0 too, use -> { readonly(false) } instead. The lambda form works on 4.0 and 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :readonly on has_many / has_one / belongs_to; it does not help habtm"
       variable_name: "ASSOCIATION_READONLY"
 
+    - name: "scope with a non-callable body"
+      kind: breaking
+      pattern: "^[ \\t]*scope(?:\\s+|\\s*\\(\\s*):\\w+\\s*,(?!\\s*\\(?\\s*(?:->|lambda\\b|Proc\\.|proc\\b|method\\s*\\(|[A-Z]\\w*(?:::[A-Z]\\w*)*[ \\t]*(?:$(?!\\s*\\.)|[)#])|['\"]))"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 removed support for a scope body that is not callable, such as `scope :active, where(active: true)`. Rails 4.0 accepted it with a deprecation warning. Rails 4.1 still defines the scope without complaint, but every call runs `body.call`, so the first use raises `NoMethodError: undefined method 'call'` on the stored relation. The error shows up when the scope runs, not when the model loads, so a boot check passes. The hash form (`scope :active, conditions: { active: true }`) fails the same way unless activerecord-deprecated_finders is in the bundle; that gem only rescues the hash form, not a relation body"
+      fix: "Wrap the body in a lambda: `scope :active, -> { where(active: true) }`. Rewrite a hash body as query methods inside the lambda: `scope :recent, -> { order('created_at DESC') }`. The lambda form works on Rails 4.0 too, so the change can land before the version bump with no NextRails.next? branch"
+      variable_name: "SCOPE_WITHOUT_LAMBDA"
+
+    - name: "default_scope without a block"
+      kind: breaking
+      pattern: "^[ \\t]*default_scope\\b(?!\\s*\\(?\\s*(?:\\{|->|lambda\\b|proc\\b|Proc\\.|do\\b))[ \\t]*\\(?[ \\t]*[^\\s#]"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 raises `ArgumentError: Support for calling #default_scope without a block is removed` when `default_scope` gets a relation or a hash instead of a block or lambda, such as `default_scope where(deleted_at: nil)` or `default_scope order: 'name'`. Rails 4.0 accepted both with a deprecation warning. The raise happens while the class body runs, so the model fails to load. activerecord-deprecated_finders keeps the hash form working with a warning, but not a relation argument"
+      fix: "Pass a block: `default_scope { where(deleted_at: nil) }`, and rewrite a hash as query methods: `default_scope { order(:name) }`. The block form works on Rails 4.0 too, so the change can land before the version bump with no NextRails.next? branch. A `def self.default_scope` class method override is not affected"
+      variable_name: "DEFAULT_SCOPE_WITHOUT_BLOCK"
+
+    - name: "scope named after an Active Record class method"
+      kind: breaking
+      pattern: "^\\s*scope(?:\\s+|\\s*\\(\\s*):(none|all|first|last|take|create|new|select|group|order|limit|offset|where|find|count|sum|average|minimum|maximum|distinct|joins|includes|references|private|public|protected|allocate|name|parent|superclass)(?:[\\s,)]|$)"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+        - "lib/"
+      explanation: "Rails 4.1 raises ArgumentError while the class body runs when a scope name matches a class method Active Record already defines: `You tried to define a scope named \"none\" on the model \"Post\", but Active Record already defined a class method with the same name.` Rails 4.0 let the scope replace the method with no warning. The model fails to load, so with eager loading the app does not boot. Rails 4.1 also rejects eight names outright, whatever the model defines: private, public, protected, allocate, new, name, parent and superclass, so `scope :public, -> { where(public: true) }` raises too. The pattern lists those eight plus the common query, finder and calculation names; any other name that matches an Active Record class method raises the same way"
+      fix: "Rename the scope, or delete it when the built-in method already does the job. A hand-written `scope :none, -> { where('1 = 0') }` is covered by `Model.none`, available since Rails 4.0, which returns an empty chainable relation without querying the database. A scope defined in a concern raises in every model that includes the concern, so fix it once in the concern. The rename works on Rails 4.0 as well, so it needs no NextRails.next? branch"
+      variable_name: "SCOPE_NAME_COLLISION"
+
+    - name: "Association :finder_sql / :counter_sql option"
+      kind: breaking
+      pattern: "\\b:?(finder_sql|counter_sql)(:|\\s*=>)"
+      exclude: "^\\s*#"
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 removed the `:finder_sql` and `:counter_sql` association options, which 4.0 accepted with a deprecation warning. On `has_many` they are now unknown keys: `ArgumentError: Unknown key: :finder_sql` while the class body runs, so the model fails to load. On `has_and_belongs_to_many` 4.1 passes only a fixed list of options to the `has_many :through` it builds, so the option is dropped with no error and the association runs the normal join-table query instead of the custom SQL. activerecord-deprecated_finders does not restore either option"
+      fix: "Replace the SQL with a scope on the association: `has_many :comments, -> { where(approved: true) }`, or `->(owner) { ... }` when the SQL used the owner's attributes. The scope is added to the normal foreign-key condition, while finder_sql replaced the whole query, so set `foreign_key:` / `primary_key:` when the SQL did not join on the default key. SQL that does not fit a scope becomes a method that calls `find_by_sql`. Drop `:counter_sql`; `count` / `size` then count through the rewritten association. The scope form also works on Rails 4.0, so the rewrite can land before the version bump"
+      variable_name: "FINDER_SQL"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking

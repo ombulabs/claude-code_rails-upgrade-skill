@@ -112,7 +112,7 @@ require 'strong_parameters' unless NextRails.next?
 #### Scopes and Association Options Require Lambda
 
 **What Changed:**
-ActiveRecord scopes must use a lambda. Additionally, association options like `:conditions`, `:order`, `:extend`, `:uniq`, and `:finder_sql` that were previously passed as hash options must now be expressed as lambda arguments. This is one of the most impactful changes in a typical Rails 3.2 → 4.0 upgrade.
+Rails 4.0 deprecates a scope body that is not callable (`scope :active, where(active: true)`). It is still accepted with a deprecation warning, but the stored relation is returned as-is, so conditions chained before the scope are dropped (`Model.where(x: 1).active` runs only the scope's own conditions). Rails 4.1 removes support, and calling such a scope raises `NoMethodError`. Additionally, association options like `:conditions`, `:order`, `:extend`, `:uniq`, and `:finder_sql` that were previously passed as hash options must now be expressed as lambda arguments. This is one of the most impactful changes in a typical Rails 3.2 → 4.0 upgrade.
 
 ##### Scopes
 

@@ -360,6 +360,144 @@ belongs_to :account, -> { readonly }
 
 ---
 
+#### Scopes With a Non-Callable Body Removed
+
+**What Changed:**
+Rails 4.0 accepted `scope :name, <relation>` with a deprecation warning. Rails 4.1 removes that support: `scope` still defines the method, but every call runs `body.call`, so the first use of the scope raises on the stored relation:
+
+```
+NoMethodError: undefined method `call'
+```
+
+The error appears when the scope runs, not when the model loads, so the app boots and only the code paths that use the scope fail. The hash form (`scope :active, conditions: { ... }`) fails the same way unless `activerecord-deprecated_finders` is in the bundle. That gem rescues only the hash form, not a relation body.
+
+**Detection Pattern:**
+```ruby
+scope :active, where(active: true)
+scope :recent, order('created_at DESC')
+scope :published, :conditions => { published: true }
+scope(:visible, where(hidden: false))
+```
+
+**Fix:**
+```ruby
+# BEFORE
+scope :active, where(active: true)
+scope :published, :conditions => { published: true }
+
+# AFTER
+scope :active, -> { where(active: true) }
+scope :published, -> { where(published: true) }
+```
+
+The lambda form works on Rails 4.0 too, so this can land before the version bump without a `NextRails.next?` branch.
+
+---
+
+#### `default_scope` Without a Block Raises
+
+**What Changed:**
+Rails 4.0 accepted `default_scope` with a relation or a hash argument and a deprecation warning. Rails 4.1 raises while the class body runs, so the model fails to load:
+
+```
+ArgumentError: Support for calling #default_scope without a block is removed.
+```
+
+`activerecord-deprecated_finders` keeps the hash form (`default_scope order: 'name'`) working with a warning. It does not rescue a relation argument. Overriding `def self.default_scope` as a class method is not affected.
+
+**Detection Pattern:**
+```ruby
+default_scope where(deleted_at: nil)
+default_scope order('created_at DESC')
+default_scope :order => 'name'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+default_scope where(deleted_at: nil)
+default_scope :order => 'name'
+
+# AFTER
+default_scope { where(deleted_at: nil) }
+default_scope { order(:name) }
+```
+
+The block form works on Rails 4.0 too, so this can land before the version bump without a `NextRails.next?` branch.
+
+---
+
+#### Scope Names That Collide with Active Record Class Methods Raise
+
+**What Changed:**
+Rails 4.1 checks each scope name against the class methods Active Record already defines and raises while the class body runs:
+
+```
+ArgumentError: You tried to define a scope named "none" on the model "Post", but Active Record already defined a class method with the same name.
+```
+
+Rails 4.0 let the scope replace the method with no warning. The model now fails to load, so with eager loading the app does not boot. Eight names are rejected on every model, whatever it defines: `private`, `public`, `protected`, `allocate`, `new`, `name`, `parent` and `superclass`. A `scope :public, -> { where(public: true) }` for a boolean `public` column is an easy one to miss. One case to look for: a hand-written `none` scope from before `Model.none` was added in Rails 4.0.
+
+**Detection Pattern:**
+```ruby
+scope :none, -> { where('1 = 0') }
+scope :all, -> { where(archived: false) }
+scope :count, -> { select('COUNT(*)') }
+scope :public, -> { where(public: true) }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+scope :none, -> { where('1 = 0') }
+scope :all, -> { where(archived: false) }
+
+# AFTER
+# delete the `none` scope: Post.none is built in and runs no query
+scope :unarchived, -> { where(archived: false) }
+```
+
+Rename every caller along with the scope. A scope defined in a concern raises in every model that includes it, so fix it once in the concern. The rename works on Rails 4.0 too, so it needs no `NextRails.next?` branch.
+
+---
+
+#### Association `:finder_sql` and `:counter_sql` Removed
+
+**What Changed:**
+Rails 4.0 accepted `:finder_sql` and `:counter_sql` on collection associations with a deprecation warning. Rails 4.1 removes both. On `has_many` they are now unknown keys, and the model fails to load:
+
+```
+ArgumentError: Unknown key: :finder_sql. Valid keys are: :class_name, ...
+```
+
+On `has_and_belongs_to_many` there is no error. Rails 4.1 builds the association as a `has_many :through` and passes only a fixed list of options to it, so `:finder_sql` is dropped and the association runs the normal join-table query instead of the custom SQL. `activerecord-deprecated_finders` does not restore either option.
+
+**Detection Pattern:**
+```ruby
+has_many :comments, :finder_sql => 'SELECT * FROM comments WHERE approved = 1'
+has_many :tags, counter_sql: 'SELECT COUNT(*) FROM tags'
+has_and_belongs_to_many :groups, :finder_sql => '...'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+has_many :approved_comments, class_name: 'Comment',
+  finder_sql: proc { "SELECT * FROM comments WHERE post_id = #{id} AND approved = 1" }
+
+# AFTER
+has_many :approved_comments, -> { where(approved: true) }, class_name: 'Comment'
+
+# SQL that does not fit a scope becomes a method
+def approved_comments
+  Comment.find_by_sql(["SELECT * FROM comments WHERE post_id = ? AND approved = 1", id])
+end
+```
+
+The scope is added to the normal foreign-key condition, while `:finder_sql` replaced the whole query. Set `foreign_key:` / `primary_key:` when the SQL did not join on the default key. Drop `:counter_sql`: `count` and `size` then count through the rewritten association. The scope form also works on Rails 4.0, so the rewrite can land before the version bump.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -830,6 +968,11 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 17. Replace association `uniq: true` with `-> { distinct }`, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
 18. Replace association `readonly: true` with `-> { readonly }` and delete redundant `readonly: false`, including on `has_and_belongs_to_many` (4.1 drops the option there without an error).
 
+15. Wrap every non-callable `scope` body in a lambda (`scope :active, -> { where(active: true) }`).
+16. Pass a block to every `default_scope` that takes a relation or a hash (`default_scope { where(deleted_at: nil) }`).
+17. Rename any scope whose name matches an Active Record class method (`none`, `all`, `count`, ...), or delete it if the built-in does the same job.
+18. Replace `:finder_sql` / `:counter_sql` association options with a scope or a `find_by_sql` method.
+
 ### Phase 6: Testing
 - Run full test suite.
 - Run `bin/rake -T` — it loads every rake task and catches constant collisions the suite and a boot smoke test both miss.
@@ -862,6 +1005,12 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ArgumentError: Unknown key: :uniq` when a model loads | "Association `:uniq` Option Removed": use `-> { distinct }` |
 | `has_and_belongs_to_many` returns duplicate records | "Association `:uniq` Option Removed": 4.1 drops `:uniq` there without an error, use `-> { distinct }` |
 | `ArgumentError: Unknown key: :readonly` when a model loads | "Association `:readonly` Option Removed": use `-> { readonly }`, or delete `readonly: false` |
+
+| `NoMethodError: undefined method 'call'` when a scope runs | "Scopes With a Non-Callable Body Removed": wrap the body in `-> { ... }` |
+| `ArgumentError: Support for calling #default_scope without a block is removed` when a model loads | "`default_scope` Without a Block Raises": wrap the argument in a block |
+| `ArgumentError: You tried to define a scope named ... but Active Record already defined a class method with the same name` | "Scope Names That Collide with Active Record Class Methods Raise": rename or delete the scope |
+| `ArgumentError: Unknown key: :finder_sql` (or `:counter_sql`) when a model loads | "Association `:finder_sql` and `:counter_sql` Removed": move the SQL into a scope |
+| A `has_and_belongs_to_many` with `:finder_sql` returns different rows | "Association `:finder_sql` and `:counter_sql` Removed": the option is silently dropped, move the SQL into a scope |
 
 ---
 
