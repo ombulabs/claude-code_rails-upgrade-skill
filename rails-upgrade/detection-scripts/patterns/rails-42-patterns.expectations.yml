@@ -1,0 +1,51 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+AREL_ATTRIBUTE_AS_VALUE:
+  # A key whose value sits on the next line (owner_id:\n  Owner.arel_table[:id])
+  # is matched by the scanner because \s* crosses the newline; fixtures are
+  # single lines, so that case was checked with pattern_lab.rb scan.
+  match:
+    - "Post.where(owner_id: Owner.arel_table[:id])"
+    - "Post.where(:owner_id => Owner.arel_table[:id])"
+    - "  where(\"owner_id\" => Admin::Owner.arel_table[:id])"
+    - "  scope :mine, -> { where(owner_id: arel_table[:id]) }"
+    - "Post.joins(:owner).where(owners: { id: Post.arel_table[:owner_id] })"
+    - "Post.find_by(owner_id: Owner.arel_table[\"id\"])"
+    - "  where(owner_id: self.class.arel_table[:id])"
+    - "  where(owner_id: klass.arel_table[:id])"
+    - "Post.where(owner_id: ::Owner.arel_table[:id])"
+    - "Post.where(\"owner_id\": Owner.arel_table[:id])"
+    - "Post.where('owner_id' => Owner.arel_table[:id])"
+    # accepted false positive: any hash literal with an arel_table value is
+    # flagged, including one not passed to where (a sort-column map)
+    - "SORTS = { name: arel_table[:name] }"
+  no_match:
+    # the fix: an Arel predicate, not a hash value
+    - "Post.where(Post.arel_table[:owner_id].eq(Owner.arel_table[:id]))"
+    - "Post.where(owner_id: Owner.arel_table[:id].eq(1))"
+    - "Post.order(Post.arel_table[:created_at].desc)"
+    - "Post.select(Post.arel_table[:id])"
+    - "Owner.project(Owner.arel_table[:id])"
+    - "Foo::Bar.arel_table[:id]"
+    - "x = cond ? a : Owner.arel_table[:id]"
+    - "Post.where(owner_id: owner.id)"
+    # a dotted "table.column" key is not in columns_hash, so 4.2.3+ never
+    # binds it and the column comparison still works
+    - "Post.where(\"posts.owner_id\" => Owner.arel_table[:id])"
+    - "  # Post.where(owner_id: Owner.arel_table[:id])"
+    # known gaps, stated in the explanation: a hoisted table or attribute and
+    # an attribute passed to a scope argument
+    - "owner_id = Owner.arel_table[:id]"
+    - "Post.where(owner_id: owners[:id])"
+    - "Post.for_owner(Owner.arel_table[:id])"

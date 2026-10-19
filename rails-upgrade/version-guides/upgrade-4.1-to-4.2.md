@@ -169,6 +169,34 @@ assert_select "a[href='/foo']"
 
 ---
 
+#### Arel Attribute as a Hash-Condition Value Is Cast
+
+**Pattern:** `AREL_ATTRIBUTE_AS_VALUE`
+
+**What Changed:**
+From Rails 4.2.3 on, `where` turns any hash value without a special handler into a bind value cast through the column type (`PredicateBuilder.can_be_bound?` in `create_binds`). An Arel attribute is such a value. So `where(owner_id: Owner.arel_table[:id])`, which compared two columns through 4.1, now casts the attribute: an integer column gets `"posts"."owner_id" = NULL` and the query silently returns no rows, with nothing raised. A string column gets the attribute serialized as YAML, and the sqlite3 adapter raises `TypeError: can't cast Arel::Attributes::Attribute to string` when the query runs. Rails 4.2.0 to 4.2.2 still passed the attribute through, but `gem 'rails', '~> 4.2.0'` installs 4.2.11.3, and Rails 5.0 keeps the 4.2.3 behavior.
+
+**Detection Pattern:**
+```ruby
+Post.where(owner_id: Owner.arel_table[:id])
+where(:owner_id => self.class.arel_table[:id])
+```
+
+`AREL_ATTRIBUTE_AS_VALUE` flags a symbol or quoted hash key (`key:` or `=>`) whose value is `X.arel_table[...]` or a bare `arel_table[...]`, on any receiver. It skips a dotted `"posts.owner_id" =>` key, which 4.2.3 does not bind. It also flags a hash that never reaches `where` (a sort-column map, an `update_all` hash), so check where each hit goes. It does not see an attribute held in a variable first (`t = Owner.arel_table` then `where(owner_id: t[:id])`) or one passed to a scope that builds the hash itself (`for_owner(Owner.arel_table[:id])`); search for `arel_table` by hand when the app uses Arel tables that way.
+
+**Fix:**
+```ruby
+# BEFORE (column-to-column on 4.1, owner_id = NULL on 4.2.3+)
+Post.joins(:owner).where(owner_id: Owner.arel_table[:id])
+
+# AFTER (same SQL on 4.1 and 4.2, no conditional needed)
+Post.joins(:owner).where(Post.arel_table[:owner_id].eq(Owner.arel_table[:id]))
+```
+
+Pin each site with a test that checks the query returns rows (or the generated SQL) before the bump.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -532,14 +560,15 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 ### Phase 5: Fix Breaking Changes
 1. Replace `.deliver` / `.deliver!` with `.deliver_now` / `.deliver_now!` (or `.deliver_later` for async)
 2. Replace `.find(obj)` / `.exists?(obj)` with `.find(obj.id)` / `.exists?(obj.id)`
-3. Replace `assert_tag` with `assert_select`
-4. Update `Procfile` with `-b 0.0.0.0` if external access needed
-5. Review HTML sanitizer output in tests
-6. Add `config.active_record.raise_in_transactional_callbacks = true`
-7. Add `config.active_support.test_order = :random`
-8. Rename `serve_static_assets` → `serve_static_files`
-9. Consider replacing Timecop with `travel_to` (optional)
-10. Consider dropping Foreigner for native FKs (optional)
+3. Replace Arel attributes used as hash-condition values with `.eq` predicates
+4. Replace `assert_tag` with `assert_select`
+5. Update `Procfile` with `-b 0.0.0.0` if external access needed
+6. Review HTML sanitizer output in tests
+7. Add `config.active_record.raise_in_transactional_callbacks = true`
+8. Add `config.active_support.test_order = :random`
+9. Rename `serve_static_assets` → `serve_static_files`
+10. Consider replacing Timecop with `travel_to` (optional)
+11. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -548,6 +577,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 - Test forms with HTML-sanitized content
 - Test any code that caches `form_authenticity_token`
 - Test serialized attributes that may receive `nil`
+- Test queries that compare two columns through `arel_table`
 
 ---
 
@@ -563,6 +593,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
+| A `where` that compared two columns returns no rows; SQL shows `= NULL` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
+| `TypeError: can't cast Arel::Attributes::Attribute to string` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
 
 ---
 
