@@ -215,6 +215,50 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
+#### `ConnectionAdapters::Column` Class-Level Cast Helpers Removed
+
+**Pattern:** `COLUMN_CAST_CLASS_METHODS`
+
+**What Changed:**
+Rails 4.2 moved type casting into `ActiveRecord::Type` and dropped the `class << self` block of `ActiveRecord::ConnectionAdapters::Column`. On 4.1 these are public class methods: `value_to_boolean`, `value_to_integer`, `value_to_decimal`, `value_to_date`, `string_to_time`, `string_to_dummy_time`, `binary_to_string`. Seven more are protected on 4.1 and reachable only through `send`: `new_date`, `new_time`, `fast_string_to_date`, `fast_string_to_time`, `fallback_string_to_date`, `fallback_string_to_time`, `microseconds`. The `PostgreSQLColumn::Cast` helpers (`string_to_hstore`, `string_to_json`, `string_to_array`, `hstore_to_string` and the rest) and the `Cast` module itself go too. Every caller raises `NoMethodError` on 4.2, except `try`, which returns `nil` without a word. 4.1 emits no deprecation warning first. The usual caller is `value_to_boolean`, used to cast checkbox and flag params.
+
+**Detection Pattern:**
+The `COLUMN_CAST_CLASS_METHODS` pattern flags these calls on `Column` (the full constant path, a bare `Column` after `include ActiveRecord::ConnectionAdapters`, `Mysql2Adapter::Column`), `PostgreSQLColumn` and `SQLite3Column`, called directly or through `send`, `__send__`, `public_send`, `try` or `method`. App classes such as `ReportColumn` are skipped. It misses calls through `column.class` or `self.class` and bare calls inside a `Column` subclass.
+
+**Fix:**
+Replace each call with app-owned code. It runs on 4.1 and 4.2 alike, so no `NextRails.next?` branch is needed. Do not reach for `ActiveRecord::Type::Boolean` (absent on 4.1, renamed methods on 5.0, and on 4.2 it logs a deprecation for any value outside its true and false lists) or `Column::TRUE_VALUES` (removed in 5.0).
+
+```ruby
+# BEFORE
+archived = ActiveRecord::ConnectionAdapters::Column.value_to_boolean(params[:archived])
+
+# AFTER (same results as the 4.1 helper)
+require "set"
+
+module BooleanCast
+  # A Set, like 4.1: it compares with eql?, so 1.0 and BigDecimal("1") stay false
+  TRUE_VALUES = [true, 1, "1", "t", "T", "true", "TRUE", "on", "ON"].to_set.freeze
+
+  def self.call(value)
+    return nil if value.is_a?(String) && value.empty?
+    TRUE_VALUES.include?(value)
+  end
+end
+
+archived = BooleanCast.call(params[:archived])
+```
+
+For the other helpers:
+- `value_to_integer(v)`: map `true` / `false` to `1` / `0`, otherwise `v.to_i`.
+- `value_to_decimal(v)`: `v.respond_to?(:to_d) ? v.to_d : v.to_s.to_d` after `require "bigdecimal/util"`.
+- `value_to_date`, `string_to_time`, `string_to_dummy_time` and the protected helpers they call: copy the method bodies from activerecord 4.1.16 `connection_adapters/column.rb` into an app module, together with the `Format::ISO_DATE` / `ISO_DATETIME` regexes (removed in 5.0), and spell `Base.default_timezone` as `ActiveRecord::Base.default_timezone`. `ActiveSupport::TimeZone#parse` is not a drop-in: it raises `ArgumentError` for `"2014-13-01 10:00"`, rolls `"2014-02-30"` over to March 2, fills in today for `"10:20"`, and turns `"2014-01-01T23:00:00-05:00"` into January 2 where `value_to_date` returned January 1. On those inputs the helpers returned `nil` or the written date.
+- `binary_to_string(v)` on the base `Column` returns its argument: drop the call.
+- A call on an adapter subclass (`SQLite3Column.binary_to_string`, `PostgreSQLColumn.string_to_time`, the MySQL `Column.string_to_time`, the `PostgreSQLColumn::Cast` helpers): copy that subclass override instead. SQLite3 forces `ASCII-8BIT`, and PostgreSQL maps `"infinity"` to `Float::INFINITY`.
+
+Pin the replacement with a spec that covers every input the old helper saw.
+
+---
+
 #### `config.active_support.test_order` Required
 
 **Pattern:** `TEST_ORDER`
@@ -538,8 +582,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 6. Add `config.active_record.raise_in_transactional_callbacks = true`
 7. Add `config.active_support.test_order = :random`
 8. Rename `serve_static_assets` → `serve_static_files`
-9. Consider replacing Timecop with `travel_to` (optional)
-10. Consider dropping Foreigner for native FKs (optional)
+9. Replace `ConnectionAdapters::Column.value_to_boolean` and the other removed class-level cast helpers with app-owned casts
+10. Consider replacing Timecop with `travel_to` (optional)
+11. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -563,6 +608,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
+| `NoMethodError: undefined method 'value_to_boolean' for ActiveRecord::ConnectionAdapters::Column:Class` (or `string_to_time`, `value_to_decimal`, ...) | "`ConnectionAdapters::Column` Class-Level Cast Helpers Removed": app-owned cast |
 
 ---
 
