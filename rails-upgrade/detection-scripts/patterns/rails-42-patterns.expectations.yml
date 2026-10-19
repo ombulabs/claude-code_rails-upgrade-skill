@@ -6,15 +6,16 @@
 #   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
 #
 # A line is "flagged" when the entry's `pattern` regex matches it AND the
-# entry's `exclude` regex (when present) does not — a per-line grep + grep -v.
+# entry's `exclude` regex (when present) does not, like a per-line grep + grep -v.
 #
 # Run with:
 #   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
 
 MAPPER_NORMALIZE_CONDITIONS:
-  # The nested reopen (`class Mapper` on one line, `class Mapping` on the
-  # next) spans two lines, so it cannot be a fixture here; it is proved with
-  # pattern_lab.rb scan against a multi-line initializer.
+  # The usual nested reopen (`module Routing`, `class Mapper`, `class Mapping`
+  # on separate lines) spans lines, so it cannot be a fixture here. It was
+  # checked with a whole-file scan of a multi-line initializer, LF and CRLF.
+  # The one-line `;` forms below exercise the same branch.
   match:
     - "      def normalize_conditions!"
     - "        alias_method :normalize_conditions_without_auth!, :normalize_conditions!"
@@ -24,6 +25,9 @@ MAPPER_NORMALIZE_CONDITIONS:
     - "ActionDispatch::Routing::Mapper::Mapping.send(:prepend, RouteAuthOptions)"
     - "ActionDispatch::Routing::Mapper::Mapping.class_eval do"
     - "class ActionDispatch::Routing::Mapper::Mapping"
+    - "::ActionDispatch::Routing::Mapper::Mapping.class_eval do"
+    - "class ActionDispatch::Routing::Mapper; class Mapping"
+    - "module ActionDispatch; module Routing; class Mapper; class Mapping"
   no_match:
     - "      def normalize_conditions_without_auth!"
     - "  def normalize_conditions(params)"
@@ -33,4 +37,7 @@ MAPPER_NORMALIZE_CONDITIONS:
     - "ActionDispatch::Routing::Mapper.new(set)"
     - "ActionDispatch::Routing::Mapper::Mappings"
     - "Geo::TileMapper::Mapping.new(tile)"
+    # an app-owned Mapper::Mapping outside ActionDispatch::Routing
+    - "Importers::Mapper::Mapping.new(row)"
+    - "class Mapper; class Mapping < Struct.new(:a); end; end"
     - "  default_controller_and_action_name = 'home#index'"
