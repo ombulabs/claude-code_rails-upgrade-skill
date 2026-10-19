@@ -302,6 +302,34 @@ Rails form helpers handle masking automatically. If you build forms outside Rail
 
 ---
 
+#### `Column#type_cast` Removed
+
+**Pattern:** `COLUMN_TYPE_CAST_INSTANCE`
+
+**What Changed:**
+Rails 4.2 removes the public instance method `ActiveRecord::ConnectionAdapters::Column#type_cast(value)`. A 4.2 column hands casting to its `cast_type` and exposes it as `type_cast_from_database` and `type_cast_from_user` (both new in 4.2). `Type::Value#type_cast` is private, so `column.type_cast(value)` raises `NoMethodError`. The usual caller casts a param or a calculation result through `Model.columns_hash[name].type_cast(value)`.
+
+The two-argument `connection.type_cast(value, column)` quoting method is a different API, still present on 4.2, and the pattern skips it. The removed class-level helpers (`Column.value_to_boolean` and friends) are a separate change.
+
+**Detection Pattern:** the `COLUMN_TYPE_CAST_INSTANCE` regex flags one-argument `.type_cast` calls and `send` / `try(:type_cast, value)`. The `try` form does not raise on 4.2: Active Support `try` checks `respond_to?` and returns `nil`, so the cast silently becomes `nil`. Any other object with a public one-argument `type_cast` is flagged too, so check that the receiver is a column.
+
+**Fix:**
+First check whether the cast does anything. `minimum` and `maximum` already cast through the column on 4.1 and 4.2, so a cast of their result can simply go. Otherwise branch on the version:
+
+```ruby
+# BEFORE
+column = Order.columns_hash["total"]
+column.type_cast(params[:total])
+
+# AFTER (works on 4.1 and 4.2)
+column = Order.columns_hash["total"]
+NextRails.next? ? column.type_cast_from_database(params[:total]) : column.type_cast(params[:total])
+```
+
+`type_cast_from_database` gives the 4.1 result for string, integer, decimal, boolean and datetime inputs, with one difference: a string column now returns a String for any value (`5` becomes `"5"`). `type_cast_from_user` is what an attribute writer uses, but it differs more: a blank string cast through an integer column gives `nil` instead of `0`. Rails 5.0 replaces both with `Order.type_for_attribute("total").cast(value)`.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Rack Server Bind Host Changed
@@ -540,6 +568,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
 10. Consider dropping Foreigner for native FKs (optional)
+11. Replace one-argument `column.type_cast(value)` with `type_cast_from_database` behind `NextRails.next?`
 
 ### Phase 6: Testing
 - Run full test suite
@@ -563,6 +592,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
+| ``NoMethodError: undefined method `type_cast' for #<ActiveRecord::ConnectionAdapters::...Column>`` | "`Column#type_cast` Removed", use `type_cast_from_database` |
 
 ---
 
