@@ -77,6 +77,18 @@ upgrade_findings:
       fix: "Set config.active_job.queue_adapter = :sidekiq (or :resque, :delayed_job, :que, etc.) in config/application.rb or per-environment, and ensure the adapter gem is in the Gemfile. For dev/test without a backend, :inline or :async is acceptable"
       variable_name: "ACTIVE_JOB_ADAPTER"
 
+    - name: "Column#type_cast instance calls"
+      kind: "breaking"
+      pattern: "(?<!def self)\\.type_cast(?:\\((?!(?:[^()]|\\([^()]*\\))*,)|[ \\t]+(?=[\\w@:\"'\\[])(?![^\\n,#]*,))|\\b(?:send|try|public_send)\\([ \\t]*:type_cast[ \\t]*,(?![^(),\\n]*,)"
+      exclude: "\\A[ \\t]*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+      explanation: "Rails 4.2.0 removed the instance method ActiveRecord::ConnectionAdapters::Column#type_cast(value) (defined in column.rb through activerecord 4.1.16). A 4.2 column delegates casting to its cast_type through type_cast_from_database and type_cast_from_user, and Type::Value#type_cast is private, so column.type_cast(value) raises NoMethodError. Typical callers cast a param or a calculation result through Model.columns_hash[name].type_cast(value) or column_for_attribute(name).type_cast(value). One-argument calls are flagged, with or without parentheses, plus send/try(:type_cast, value). The two-argument connection.type_cast(value, column) quoting method still exists on 4.2 and is skipped when its comma is at the top level of the call or inside one level of nested parentheses (deeper nesting is flagged, and a comma inside a top-level string argument hides a real call). Any other object with a public one-argument type_cast is flagged too, so check that the receiver is a column. The removed class-level helpers (Column.value_to_boolean and friends) are a separate change"
+      fix: "First check whether the cast does anything: minimum and maximum already cast their result through the column on 4.1 and 4.2, so the cast can simply go. Otherwise branch on the Rails version: NextRails.next? ? column.type_cast_from_database(value) : column.type_cast(value). type_cast_from_database gives the 4.1 result for string, integer, decimal, boolean and datetime inputs, with one difference: a string column now returns a String for any value (5 becomes \"5\"). type_cast_from_user is what an attribute writer uses, but it differs more: a blank string cast through an integer column gives nil instead of 0. Rails 5.0 replaces both with Model.type_for_attribute(name).cast(value)"
+      variable_name: "COLUMN_TYPE_CAST_INSTANCE"
+
   medium_priority:
     - name: "find/exists? with possible AR object argument"
       kind: "deprecation"
