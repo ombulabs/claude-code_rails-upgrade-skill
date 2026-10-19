@@ -169,6 +169,64 @@ assert_select "a[href='/foo']"
 
 ---
 
+#### Routing `Mapper::Mapping` Patches Stop Running
+
+**Pattern:** `MAPPER_NORMALIZE_CONDITIONS`
+
+**What Changed:**
+Rails 4.2 rewrote the private `ActionDispatch::Routing::Mapper::Mapping`. On 4.0 and 4.1, `normalize_conditions!` builds each route's `required_defaults`: every option that is not a `Regexp`, a path segment or an ignored option. Apps patch it to keep custom route options (authorization metadata, for instance) out of `required_defaults`, so `url_for(controller: ..., action: ...)` without the named helper still finds the route. On 4.2:
+- `normalize_conditions!`, `normalize_requirements!` and `default_controller_and_action` are gone. `required_defaults` is built in a new private `constraints(options, path_params)`.
+- `normalize_defaults!`, `normalize_options!` and `normalize_path!` now take arguments.
+
+What the app sees depends on how the patch hooks in:
+- `alias_method` / `alias_method_chain` on a removed method: `NameError: undefined method 'normalize_conditions!'` at boot.
+- Reopen or `prepend` overriding a removed method: the override never runs, the custom option is required again, and `url_for` raises `ActionController::UrlGenerationError`. Nothing fails at boot.
+- A zero-argument override of `normalize_defaults!`: `ArgumentError: wrong number of arguments (given 1, expected 0)` when routes are drawn.
+
+**Detection Pattern:**
+`MAPPER_NORMALIZE_CONDITIONS` flags the removed method names and any reopen of `Mapper::Mapping` in `app/`, `lib/` and `config/`.
+
+**Fix:**
+Prefer dropping the patch. Options passed under `defaults:` land in `params` but never become required defaults, on 4.1 and 4.2 alike:
+```ruby
+# BEFORE (needs the Mapping patch so url_for ignores :authorize)
+get "/posts/:id" => "posts#show", as: :post, authorize: :admin
+
+# AFTER (no patch; scope defaults: { authorize: :admin } works the same way)
+get "/posts/:id" => "posts#show", as: :post, defaults: { authorize: :admin }
+```
+
+If the patch must stay, hook the method each side has. Hooking `constraints` on 4.1 raises `ArgumentError` when routes are drawn, so pick it with `NextRails.next?`:
+```ruby
+# config/initializers/route_options.rb
+module RouteOptionsOutOfRequiredDefaults
+  CUSTOM_ROUTE_OPTIONS = [:authorize]
+
+  if NextRails.next?
+    private
+
+    def constraints(options, path_params)
+      result = super
+      @conditions[:required_defaults] -= CUSTOM_ROUTE_OPTIONS
+      result
+    end
+  else
+    private
+
+    def normalize_conditions!
+      super
+      @conditions[:required_defaults] -= CUSTOM_ROUTE_OPTIONS
+    end
+  end
+end
+
+ActionDispatch::Routing::Mapper::Mapping.send(:prepend, RouteOptionsOutOfRequiredDefaults)
+```
+
+Rails 5.0 changes `constraints` again (it returns the options grouped by kind and no longer writes `@conditions`), so a 4.2 hook breaks at the next hop. Move to `defaults:` before then.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -540,6 +598,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
 10. Consider dropping Foreigner for native FKs (optional)
+11. Move custom route options under `defaults:` and drop any `Mapper::Mapping` patch (`normalize_conditions!` and friends)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -563,6 +622,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
+| `NameError: undefined method 'normalize_conditions!'` at boot, or `UrlGenerationError` from `url_for` on a route with a custom option | "Routing `Mapper::Mapping` Patches Stop Running" — move the option under `defaults:` |
 
 ---
 
