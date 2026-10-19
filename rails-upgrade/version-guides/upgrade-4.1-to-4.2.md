@@ -169,6 +169,72 @@ assert_select "a[href='/foo']"
 
 ---
 
+#### `@attributes` Is an `AttributeSet`, Not a Hash
+
+**Pattern:** `ATTRIBUTES_IVAR_REPLACE`
+
+**What Changed:**
+Through 4.1 a record kept its raw column values in `@attributes`, a plain Hash. Rails 4.2.0 replaces it with `ActiveRecord::AttributeSet`, which keeps `[]`, `key?`, `keys` and `to_hash` but drops the rest of the Hash API (`[]=`, `fetch`, `merge!`, `delete`, `each` and so on). Code that reaches into the instance variable breaks:
+
+- Swapping in a Hash (`instance_variable_set(:@attributes, attributes.merge(extra))` or `@attributes = ...`, usually in `after_initialize` to make extra non-column keys readable) fails on the first attribute read with `NoMethodError: undefined method 'fetch_value' for ...:Hash`.
+- Writes (`@attributes['x'] = v`, `merge!`, `update`, `store`, `delete`) and Hash reads such as `fetch` raise `NoMethodError` on `ActiveRecord::AttributeSet`.
+- `@attributes['x']` still works but returns an `ActiveRecord::Attribute` object instead of the value, so a comparison or presence check on it is silently wrong.
+
+The pattern flags every direct `@attributes` reference in `app/models/` and `config/initializers/`. A plain Ruby class with its own `@attributes` Hash (a form object or a tableless model in `app/models/`) is unaffected: check that each hit is inside an ActiveRecord model or a patch to one. `lib/` is not scanned.
+
+**Fix:**
+Use the public attribute API, which behaves the same on 4.1 and 4.2, so no `NextRails.next?` branch is needed:
+```ruby
+# BEFORE
+def legacy_title
+  @attributes["title"]
+end
+
+def title=(value)
+  @attributes["title"] = value.upcase
+end
+
+# AFTER
+def legacy_title
+  read_attribute_before_type_cast(:title)  # or read_attribute(:title) for the cast value
+end
+
+def title=(value)
+  write_attribute(:title, value.upcase)
+end
+```
+
+For extra non-column values, keep them out of `@attributes`:
+```ruby
+# BEFORE
+after_initialize do
+  instance_variable_set(:@attributes, attributes.merge("extra" => compute_extra))
+end
+
+# AFTER
+after_initialize :load_extra
+attr_accessor :extra
+
+def reload(*)
+  super.tap { load_extra }
+end
+
+# only if callers expect the value in attributes (serializers, audit gems)
+def attributes
+  super.merge("extra" => extra)
+end
+
+private
+
+def load_extra
+  self.extra = compute_extra
+end
+```
+
+Do not call `attribute_will_change!` for the extra name: on 4.2 the partial `UPDATE` then includes it and fails with `no such column`. If saving must react to a change in the extra value, track that change yourself.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -540,6 +606,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
 10. Consider dropping Foreigner for native FKs (optional)
+11. Replace direct `@attributes` access in models with `read_attribute` / `write_attribute`
 
 ### Phase 6: Testing
 - Run full test suite
@@ -562,6 +629,9 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `NoMethodError: undefined method 'fetch_value' for ...:Hash` on an attribute read | "`@attributes` Is an `AttributeSet`, Not a Hash": stop replacing `@attributes` |
+| `NoMethodError: undefined method '[]='` (or `merge!`, `fetch`, `delete`) for `#<ActiveRecord::AttributeSet>` | "`@attributes` Is an `AttributeSet`, Not a Hash": `write_attribute` / `read_attribute` |
+| `@attributes['x']` returns an `ActiveRecord::Attribute` instead of the value | "`@attributes` Is an `AttributeSet`, Not a Hash": `read_attribute_before_type_cast` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
 ---

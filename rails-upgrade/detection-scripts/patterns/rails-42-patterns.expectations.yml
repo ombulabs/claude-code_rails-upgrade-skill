@@ -1,0 +1,42 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not, a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+ATTRIBUTES_IVAR_REPLACE:
+  match:
+    # swapping in a Hash, the usual after_initialize shape
+    - "    instance_variable_set(:@attributes, attributes.merge(extra))"
+    - "    instance_variable_set(\"@attributes\", attrs)"
+    - "    @attributes = attributes.merge(\"extra\" => 1)"
+    - "    @attributes ||= {}"
+    # writing into it
+    - "    @attributes[\"title\"] = value.upcase"
+    - "    @attributes.merge!(extra)"
+    - "    @attributes.delete(\"legacy\")"
+    # reading from it: Hash methods are gone, [] returns an Attribute object
+    - "    raw = @attributes[\"price\"]"
+    - "    @attributes.fetch(\"price\")"
+    - "    instance_variable_get(:@attributes)[\"title\"]"
+  no_match:
+    # other instance variables whose name starts with @attributes
+    - "    @attributes_cache.delete(name)"
+    - "    @attributes2 = 1"
+    - "    @custom_attributes = {}"
+    # class variable
+    - "    @@attributes = []"
+    # comment
+    - "    # @attributes = attributes.merge(extra)"
+    # the public API, which works on both versions
+    - "    self.attributes = params"
+    - "    attributes.merge(extra)"
+    - "    write_attribute(:title, value)"
+    - "    read_attribute_before_type_cast(:price)"
