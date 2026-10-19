@@ -34,6 +34,17 @@ COLUMN_CAST_CLASS_METHODS:
     - "ActiveRecord::ConnectionAdapters::Column.send :new_time, *parts"
     - "Column.__send__(:new_date, 2014, 1, 1)"
     - "ActiveRecord::ConnectionAdapters::Column.public_send(:value_to_boolean, v)"
+    - "Column.send(:fallback_string_to_time, s)"
+    - "Column.send(:microseconds, h)"
+    # try returns nil on 4.2 instead of raising
+    - "ActiveRecord::ConnectionAdapters::Column.try(:value_to_boolean, params[:x])"
+    - "flags.map(&ActiveRecord::ConnectionAdapters::Column.method(:value_to_boolean))"
+    - "ActiveRecord::ConnectionAdapters::SQLite3Column.binary_to_string(blob)"
+    - "ActiveRecord::ConnectionAdapters::Mysql2Adapter::Column.string_to_time(s)"
+    # PostgreSQLColumn::Cast helpers and the module itself
+    - "ActiveRecord::ConnectionAdapters::PostgreSQLColumn.string_to_hstore(s)"
+    - "ActiveRecord::ConnectionAdapters::PostgreSQLColumn.string_to_array(s, oid)"
+    - "include ActiveRecord::ConnectionAdapters::PostgreSQLColumn::Cast"
   no_match:
     - "# ActiveRecord::ConnectionAdapters::Column.value_to_boolean(v)"
     # app-owned helper with the same name
@@ -42,7 +53,11 @@ COLUMN_CAST_CLASS_METHODS:
     - "record.send(:value_to_boolean, v)"
     - "column.value_to_boolean(v)"
     - "ActiveRecord::ConnectionAdapters::Column.value_to_boolean_strict(v)"
-    - "ReportColumns.value_to_date(x)"
+    # app classes whose name ends in Column
+    - "ReportColumn.value_to_date(x)"
+    - "GridColumn.value_to_boolean(v)"
+    - "MyColumn.string_to_hstore(s)"
+    - "PostgreSQLColumn::CastHelper"
     # still present on 4.2 (TRUE_VALUES goes away in 5.0, not here)
     - "ActiveRecord::ConnectionAdapters::Column::TRUE_VALUES.include?(v)"
     - "ActiveRecord::Type::Boolean.new.type_cast_from_user(v)"
@@ -50,6 +65,8 @@ COLUMN_CAST_CLASS_METHODS:
     - "if ActiveRecord::ConnectionAdapters::Column.respond_to?(:value_to_boolean)"
     # protected on 4.1 too: a direct call already raised before the bump
     - "Column.new_date(2014, 1, 1)"
+    - "Column.public_send(:new_date, 2014, 1, 1)"
+    - "Column.try(:new_date, 2014, 1, 1)"
     - "Column.send(:name)"
     # separate 4.2 changes, not this pattern
     - "Model.columns_hash[\"x\"].type_cast(v)"
