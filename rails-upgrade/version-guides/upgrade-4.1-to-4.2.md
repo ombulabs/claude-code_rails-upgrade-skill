@@ -215,6 +215,31 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
+#### `Column#default` Returns the Raw Database String
+
+**Pattern:** `COLUMN_DEFAULT_RAW`
+
+**What Changed:**
+Through 4.1, `Column#initialize` typed the default with `extract_default`, so `Model.columns_hash["ttl"].default` was an `Integer` and a boolean column's default was `true` / `false`. From 4.2.0 the column keeps the string the adapter read from the schema and casting moved to the attribute types, so `.default` returns `"604800"` or `"f"`. Nothing warns. Arithmetic on it raises (`Time.now - default` gives `TypeError: can't convert String into an exact number`), comparisons with numbers or booleans quietly return false, and a boolean column whose default is false now reads as a truthy `"f"` on SQLite. `Model.column_defaults` is unaffected: it returns typed values on 4.0, 4.1 and 4.2.
+
+**Detection Pattern:**
+The `COLUMN_DEFAULT_RAW` pattern flags `.default` read off `columns_hash[...]`, `columns_hash.fetch(...)`, `column_for_attribute(...)`, a one-line `columns.find` / `detect` block, and a variable named `column`. A block variable with another name (`columns.each { |c| c.default }`) is not flagged, so also review loops over `columns`.
+
+**Fix:**
+```ruby
+# BEFORE (typed on 4.1, a String on 4.2)
+expires_at = created_at + self.class.columns_hash["ttl"].default
+active = Thing.columns_hash["active"].default
+
+# AFTER (typed on 4.0, 4.1 and 4.2, no conditional needed)
+expires_at = created_at + self.class.column_defaults["ttl"]
+active = Thing.column_defaults["active"]
+```
+
+For a column read from `connection.columns(table)`, which no model types, cast the string yourself.
+
+---
+
 #### `config.active_support.test_order` Required
 
 **Pattern:** `TEST_ORDER`
@@ -540,6 +565,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
 10. Consider dropping Foreigner for native FKs (optional)
+11. Replace `columns_hash[...].default` reads with `column_defaults[...]`
 
 ### Phase 6: Testing
 - Run full test suite
@@ -562,6 +588,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `TypeError` or a wrong branch where code reads `columns_hash[...].default` (now a String such as `"604800"` or `"f"`) | "`Column#default` Returns the Raw Database String", read `column_defaults[...]` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
 ---

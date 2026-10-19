@@ -119,6 +119,17 @@ upgrade_findings:
       fix: "Review code that assigns nil to serialized attributes with custom coders. Check for tests that relied on the coder's nil representation (e.g., 'null' for JSON)"
       variable_name: "SERIALIZED_CUSTOM_CODER"
 
+    - name: "Column default read through the column object"
+      kind: "breaking"
+      pattern: "(?:\\bcolumns_hash(?:\\[[^\\]\\n]+\\]|\\.fetch\\([^)\\n]*\\))|\\bcolumn_for_attribute\\([^)\\n]*\\)|\\bcolumns(?:\\([^)\\n]*\\))?\\.(?:find|detect)\\b[^\\n]*?|\\bcolumn)\\.default\\b(?![?!])"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 typed a column's default when it built the column (Column#initialize called extract_default), so Model.columns_hash[\"active\"].default returned false for a boolean column and an Integer for an integer column. From 4.2.0 Column#default is the raw string the adapter read from the schema (\"f\", \"604800\", \"0\"), with no warning. Arithmetic on it raises (Time.now - default: TypeError: can't convert String into an exact number), comparisons with an Integer or a boolean silently fail, and a boolean false default (\"f\" on SQLite) is now truthy. Matches columns_hash[...].default, columns_hash.fetch(...).default, column_for_attribute(...).default, columns.find / detect {...}.default on one line, and column.default. Missed: other variable names (c.default inside columns.each), and a find block that spans lines"
+      fix: "Read Model.column_defaults[\"name\"] instead. It returns the typed default on 4.0, 4.1 and 4.2 (on 4.2 it is built from the attribute types), so no version conditional is needed. For a column object from connection.columns(table), which is not tied to a model, keep the raw string and cast it yourself"
+      variable_name: "COLUMN_DEFAULT_RAW"
+
     - name: "serve_static_assets config"
       kind: "deprecation"
       pattern: "serve_static_assets"
