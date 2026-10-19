@@ -1079,6 +1079,47 @@ The pattern matches `Couldn't` and `Couldn\'t`, so single-quoted strings are fla
 
 ---
 
+#### Automatic `inverse_of` Brings Back the Bidirectional `dependent: :destroy` Loop
+
+**What Changed:**
+Rails 4.1 detects `inverse_of` automatically (`automatic_inverse_of` in `activerecord-4.1.x/lib/active_record/reflection.rb`) for a `has_one` / `has_many` / `belongs_to` pair whose names match and that has no scope, `foreign_key:`, `polymorphic:`, `through:` or `inverse_of: false`. Rails 4.0 never set an inverse unless the app declared one.
+
+That breaks the 4.0 workaround for a reciprocal `dependent: :destroy` pair (3.2 to 4.0 guide, "Bidirectional `dependent: :destroy` Now Recurses Forever") when it was applied without the instance flag:
+
+```ruby
+class Attachment < ActiveRecord::Base
+  belongs_to :document, dependent: :destroy
+end
+
+class Document < ActiveRecord::Base
+  has_one :attachment
+  after_destroy :destroy_attachment
+
+  def destroy_attachment
+    attachment.destroy if attachment   # terminates on 4.0, SystemStackError on 4.1
+  end
+end
+```
+
+On 4.0 the second pass re-reads `attachment.document` from the database and gets `nil`. On 4.1 the detected inverse hands back the same in-memory `Document`, its callbacks run again, and `destroy` raises `SystemStackError`. Run on activerecord 4.0.13 and 4.1.16 with SQLite, this shape terminates on 4.0 and recurses on 4.1 from either side; it terminates on both with the flag below or with `inverse_of: false` on both associations. It keeps recursing on 4.2 (which moves the `belongs_to` cascade back to `after_destroy`) and stops only on 5.0.
+
+**Detection Pattern:**
+No 4.1 pattern. The 4.0 pattern `BELONGS_TO_DEPENDENT` flags the `belongs_to ..., dependent: :destroy` side; for each hit, check whether the target model cascades back from an `after_destroy` without a guard.
+
+**Fix:**
+```ruby
+# AFTER: works on 3.2 through 5.0, with or without an inverse
+def destroy_attachment
+  return if @_destroying_attachment
+  @_destroying_attachment = true
+  attachment.destroy if attachment
+end
+```
+
+`inverse_of: false` on both associations also stops the loop, but it gives up the in-memory inverse for every other caller, so prefer the flag.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Spring Preloader (New Default)
@@ -1360,6 +1401,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 30. Move `update_all(updates, conditions)` conditions into a `where` chain.
 31. Move finder options on `count` / `sum` / `maximum` / ... (`conditions:`, `joins:`, `group:`) onto chained scopes.
 32. Replace `count(:col, distinct: true)` with `distinct.count(:col)`.
+33. Add an instance-flag guard to any `after_destroy` that destroys a record whose `belongs_to` cascades back with `dependent: :destroy` (4.1 detects the inverse automatically and the unguarded callback recurses).
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -1411,6 +1453,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ArgumentError: You tried to define a scope named ... but Active Record already defined a class method with the same name` | "Scope Names That Collide with Active Record Class Methods Raise": rename or delete the scope |
 | `ArgumentError: Unknown key: :finder_sql` (or `:counter_sql`) when a model loads | "Association `:finder_sql` and `:counter_sql` Removed": move the SQL into a scope |
 | A `has_and_belongs_to_many` with `:finder_sql` returns different rows | "Association `:finder_sql` and `:counter_sql` Removed": the option is silently dropped, move the SQL into a scope |
+| `SystemStackError: stack level too deep` from `destroy` on a model whose `belongs_to` has `dependent: :destroy` | "Automatic `inverse_of` Brings Back the Bidirectional `dependent: :destroy` Loop": add the instance-flag guard |
 
 ---
 

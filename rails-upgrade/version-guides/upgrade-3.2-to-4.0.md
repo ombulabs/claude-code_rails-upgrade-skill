@@ -1259,7 +1259,13 @@ The consequence is that any **two models that each declare `dependent: :destroy`
 
 This is silent on upgrade. There is no deprecation warning, the app boots normally, and it only fires on the delete path — which is exactly the path a lot of suites cover thinly, so it tends to survive to production.
 
-Fixed in Rails 5.0 by [rails/rails#18548](https://github.com/rails/rails/pull/18548), which guards `ActiveRecord::Callbacks#destroy` against re-entrant callbacks. Not backported to 4.x.
+A pair that declares `inverse_of:` explicitly already recursed on 3.2, because the `belongs_to` side gets the in-memory record back instead of re-reading it. The 4.0 change is that the pair now recurses without any `inverse_of:`.
+
+The loop does not simply go away on later 4.x versions. Running a reciprocal `has_one` / `belongs_to` pair on each version gives:
+
+- **4.1**: still recurses. 4.1 also starts detecting `inverse_of` automatically for a simple pair like this one, which breaks the plain `after_destroy` fix shown below (see the 4.0 to 4.1 guide).
+- **4.2**: activerecord 4.2.0 moves the `belongs_to` cascade back to `after_destroy` (CHANGELOG: "Move 'dependent: :destroy' handling for `belongs_to` from `before_destroy` to `after_destroy` callback chain", rails/rails#12380). The pair terminates again only when both sides declare `inverse_of: false`; with the inverse that 4.2 detects automatically it still raises `SystemStackError`.
+- **5.0**: [rails/rails#18548](https://github.com/rails/rails/pull/18548) makes `ActiveRecord::Callbacks#destroy` return early when it is called again on the same object while its callbacks run (`@_destroy_callback_already_called`). The pair terminates with or without an inverse. Not backported to 4.x.
 
 **Detection Pattern:**
 ```ruby
@@ -1281,10 +1287,10 @@ model.reflect_on_all_associations.select { |r| r.options[:dependent] == :destroy
 ```
 
 **Fix:**
-Move the cascade the application does *not* drive to an explicit `after_destroy`, which restores the 3.2 ordering. Cut the edge only if nothing relies on that direction — dropping `dependent:` outright stops the loop but silently orphans rows.
+Move the cascade the application does *not* drive to an explicit `after_destroy` that guards itself with an instance flag. Cut the edge only if nothing relies on that direction: dropping `dependent:` outright stops the loop but silently orphans rows.
 
 ```ruby
-# BEFORE — both sides cascade, recurses on 4.0
+# BEFORE: both sides cascade, recurses on 4.0
 class Attachment < ActiveRecord::Base
   belongs_to :document, dependent: :destroy   # the direction the app drives
 end
@@ -1293,7 +1299,7 @@ class Document < ActiveRecord::Base
   has_one :attachment, dependent: :destroy    # the reciprocal that closes the cycle
 end
 
-# AFTER — same two deletions, one of them reordered
+# AFTER: same two deletions, one of them reordered and guarded
 class Attachment < ActiveRecord::Base
   belongs_to :document, dependent: :destroy
 end
@@ -1306,22 +1312,18 @@ class Document < ActiveRecord::Base
   private
 
   def destroy_attachment
+    return if @_destroying_attachment
+    @_destroying_attachment = true
     attachment.destroy if attachment
   end
 end
 ```
 
-By the time `after_destroy` runs, this row is gone, so the reciprocal cascade re-reads and resolves to `nil`, stopping after one bounce. Three caveats worth knowing:
+The flag is what makes this safe on every version the app will pass through. Without it, the `after_destroy` alone stops the loop only when `attachment.document` is re-read from the database and comes back `nil`. With an inverse, `attachment.document` is the same in-memory `Document`, its callbacks run again, and the loop survives. That happens on 3.2 and 4.0 when the pair declares `inverse_of:`, and on 4.1 and 4.2 even without one, because those versions detect the inverse automatically. Run on activerecord 3.2.22.5, 4.0.13, 4.1.16, 4.2.0, 4.2.11.3, 5.0.0 and 5.0.7.2, the flag version terminated and deleted both rows with the inverse automatic, explicit or disabled; the version without the flag raised `SystemStackError` on 4.1 and 4.2 unless both sides declared `inverse_of: false`. `inverse_of: false` on its own, without moving the cascade to `after_destroy`, does not help on 4.0 or 4.1, where the `belongs_to` cascade is still a `before_destroy`.
 
-- That termination depends on the reciprocal association being re-read from the database. If the pair declares `inverse_of:` (available in 4.0; only the automatic detection arrived in 4.1), or the target is already loaded in memory, `attachment.document` returns the in-memory destroyed `Document` instead of `nil`, its `before_destroy` fires again, and the loop survives the fix — 4.0 has no re-entrancy guard (Rails 5.0 added `@_destroy_callback_already_called`). Verify the pair does not declare `inverse_of:` on the reciprocal edge, or make the callback itself re-entrant:
-  ```ruby
-  def destroy_attachment
-    return if @_destroying_attachment
-    @_destroying_attachment = true
-    attachment.destroy if attachment
-  end
-  ```
-  A `destroyed?` / `frozen?` check is not enough here: neither flag is set until the destroy completes, so the second pass through the callback still sees a live-looking record.
+A `destroyed?` check is no substitute for the flag. On the record itself it is already `true` inside `after_destroy`, so `return if destroyed?` skips the cleanup every time and orphans the attachment. On the target, `attachment.destroyed?` is still `false` while the attachment's own `before_destroy` callbacks run, so on 4.0 and 4.1 with an inverse the loop goes on.
+
+Once the app is on Rails 5.0, the re-entrancy guard in `ActiveRecord::Callbacks#destroy` covers this, and both sides can go back to `dependent: :destroy`. Two more caveats:
 
 - If the model soft-deletes, "gone" means excluded by the default scope rather than deleted. That still terminates, but confirm it for your soft-delete implementation rather than assuming.
 - The cleanup can no longer veto the destroy. As a `before_destroy` a failed cascade halted the whole operation and `destroy` returned `false`; from `after_destroy` the row is already deleted, so a failure leaves an orphan and `destroy` still reports success. Raise from the callback if you need the old all-or-nothing behavior.
@@ -1835,6 +1837,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `eager_load is set to nil` | "`config.eager_load` Required in All Environments" — set in all environments |
 | `NameError: uninitialized constant ActiveSupport::BufferedLogger` | "`ActiveSupport::BufferedLogger` Renamed" — renamed to `ActiveSupport::Logger` |
 | `ActiveRecord::ImmutableRelation` | "`ActiveRecord::ImmutableRelation` Error" — use `.distinct.count` |
+| `SystemStackError: stack level too deep` from `destroy`, or a delete request that hangs | "Bidirectional `dependent: :destroy` Now Recurses Forever": guarded `after_destroy` on one side |
 | Controller specs don't see custom headers | "Test Request Headers API Changed" — use `request.headers.merge!` |
 | Images, icons or fonts 404 in production, fine in tests | "Precompile No Longer Writes Non-Digest Asset Copies": replace literal `/assets/` paths with asset helpers |
 | `Sass::SyntaxError` from `assets:precompile` in a `.min.css` file | "Sass CSS Compressor Now Parses Minified Stylesheets": restore the newline guard |
