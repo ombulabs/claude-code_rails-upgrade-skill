@@ -169,6 +169,57 @@ assert_select "a[href='/foo']"
 
 ---
 
+#### `polymorphic_url` Overrides No Longer Cover Paths
+
+**Pattern:** `POLYMORPHIC_URL_OVERRIDE`
+
+**What Changed:**
+Through Rails 4.1 every record-based route goes through `polymorphic_url`: `polymorphic_path` and `edit_`/`new_polymorphic_path` call it with `routing_type: :path`, and `url_for(record)` calls `polymorphic_url` in controllers (`redirect_to record`) and `polymorphic_path` in views (`link_to name, record`, `form_for record`). An app override of `polymorphic_url` (adding a locale, rewriting a prefix) therefore reached all of them.
+
+Rails 4.2 rewrote this. `polymorphic_path` builds the route itself, and `url_for` with a single record, class or symbol calls the named route helper (`post_path`, `post_url`) directly, skipping both polymorphic methods. On 4.2 the override still reaches only `polymorphic_url`, `edit_`/`new_polymorphic_url` and `url_for([...])` in controllers. Nothing raises: paths, `link_to` targets, form actions and `redirect_to record` just lose what the override added.
+
+**Detection Pattern:**
+`POLYMORPHIC_URL_OVERRIDE` flags `def` / `def self.` / `define_method` of `polymorphic_url` and `alias`, `alias_method` and `alias_method_chain` calls that name it, also when the arguments wrap after a comma. Commented-out lines are skipped.
+
+**Fix:**
+If the override only adds URL params, move them to `default_url_options`, which every route helper reads on both versions, and delete the override. This also adds the param to named helpers such as `post_path`, which the override never reached:
+
+```ruby
+# BEFORE (app/helpers/application_helper.rb)
+def polymorphic_url(record_or_hash_or_array, options = {})
+  super(record_or_hash_or_array, options.reverse_merge(locale: I18n.locale))
+end
+
+# AFTER (app/controllers/application_controller.rb)
+def default_url_options(options = {})
+  { locale: I18n.locale }.merge(options)
+end
+```
+
+If the override does more than add params, keep it and give `polymorphic_path` the same override on 4.2 only (on 4.1 the path already goes through `polymorphic_url`, so patching both would apply it twice). Then change the single-record `url_for` / `redirect_to` / `link_to` call sites that need it to the array form, which goes through the polymorphic methods on both versions:
+
+```ruby
+# AFTER (app/helpers/application_helper.rb)
+def polymorphic_url(record_or_hash_or_array, options = {})
+  rewrite_url(super)
+end
+
+if NextRails.next?
+  def polymorphic_path(record_or_hash_or_array, options = {})
+    rewrite_url(super)
+  end
+end
+
+# BEFORE
+link_to post.title, post
+# AFTER
+link_to post.title, [post]
+```
+
+Pin it with a test over `polymorphic_url`, `polymorphic_path`, `edit_polymorphic_path`, `url_for(record)` and `url_for([parent, child])` that passes on both bundles.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -540,6 +591,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
 10. Consider dropping Foreigner for native FKs (optional)
+11. Move `polymorphic_url` overrides to `default_url_options`, or extend them to `polymorphic_path`
 
 ### Phase 6: Testing
 - Run full test suite
@@ -562,6 +614,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| Paths, `link_to record` and form actions lose a locale or prefix that full URLs still have | "`polymorphic_url` Overrides No Longer Cover Paths": override `polymorphic_path` too, or use `default_url_options` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
 ---

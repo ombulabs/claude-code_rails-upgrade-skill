@@ -1,0 +1,42 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not — a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+POLYMORPHIC_URL_OVERRIDE:
+  match:
+    - "  def polymorphic_url(record_or_hash_or_array, options = {})"
+    - "def polymorphic_url(*args)"
+    - "  def self.polymorphic_url(record, options = {})"
+    - "  alias_method :polymorphic_url_without_locale, :polymorphic_url"
+    - "  alias_method :polymorphic_url, :localized_polymorphic_url"
+    - "  alias polymorphic_url_without_locale polymorphic_url"
+    - "  alias_method_chain :polymorphic_url, :locale"
+    - "  alias_method(:original_polymorphic_url, :polymorphic_url)"
+    - "  alias_method \"polymorphic_url_without_locale\", \"polymorphic_url\""
+    - "  define_method(:polymorphic_url) do |record, options = {}|"
+    - "  define_method :polymorphic_url do |*args|"
+  no_match:
+    # calls, not overrides
+    - "  url = polymorphic_url(record)"
+    - "  redirect_to polymorphic_url([:admin, post])"
+    - "  def url; polymorphic_url(self); end"
+    - "  delegate :polymorphic_url, to: :view"
+    # other methods whose name contains polymorphic_url
+    - "  def polymorphic_path(record, options = {})"
+    - "  def edit_polymorphic_url(record, options = {})"
+    - "  def polymorphic_url_for(record)"
+    - "  alias_method :my_url, :edit_polymorphic_url"
+    - "  alias_method_chain :polymorphic_path, :locale"
+    - "  alias_attribute :polymorphic_url, :link"
+    # commented out, or only named in a trailing comment
+    - "  # def polymorphic_url(record, options = {})"
+    - "  alias_method :foo, :bar # polymorphic_url"

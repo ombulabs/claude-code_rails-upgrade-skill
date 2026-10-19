@@ -77,6 +77,18 @@ upgrade_findings:
       fix: "Set config.active_job.queue_adapter = :sidekiq (or :resque, :delayed_job, :que, etc.) in config/application.rb or per-environment, and ensure the adapter gem is in the Gemfile. For dev/test without a backend, :inline or :async is acceptable"
       variable_name: "ACTIVE_JOB_ADAPTER"
 
+    - name: "Override of polymorphic_url expected to cover paths"
+      kind: "breaking"
+      pattern: "(?<![\\w.])def\\s+(?:self\\.)?polymorphic_url(?![\\w?!])|\\balias(?:_method(?:_chain)?)?[\\s(](?:[^\\n#]|,[ \\t]*\\n)*?(?<!\\w)polymorphic_url(?![\\w?!])|\\bdefine_method\\s*\\(?\\s*:?[\"']?polymorphic_url(?![\\w?!])"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+      explanation: "Through Rails 4.1 every record-based route goes through polymorphic_url: polymorphic_path and edit_/new_polymorphic_path call it with routing_type: :path, and url_for(record) calls polymorphic_url in controllers (redirect_to record) and polymorphic_path in views (link_to name, record and form_for record). So an app override of polymorphic_url (adding a locale, rewriting a prefix) reached all of them. Rails 4.2 rewrote polymorphic_path to build the route itself, and url_for with a single record, class or symbol now calls the named route helper (post_path) directly. On 4.2 the override still reaches only polymorphic_url, edit_/new_polymorphic_url and controller url_for([a, b]). Nothing raises; paths, link_to targets, form actions and redirect_to record just lose what the override added. Flags def / def self. / define_method of polymorphic_url and alias, alias_method and alias_method_chain calls that name it (arguments may wrap after a comma); commented-out lines are skipped. Plain calls and overrides of edit_polymorphic_url or polymorphic_path are not flagged"
+      fix: "If the override only adds URL params (a locale), move them to default_url_options, which every route helper reads on both versions, and delete the override. Otherwise give polymorphic_path the same override on 4.2 only (wrap the def in if NextRails.next?; on 4.1 the path already goes through polymorphic_url, so patching both would apply it twice), and change single-record url_for / redirect_to / link_to call sites that need the override to the array form ([record]), which goes through the polymorphic methods on both versions. Pin it with a test over polymorphic_url, polymorphic_path, edit_polymorphic_path, url_for(record) and url_for([parent, child]) on both bundles"
+      variable_name: "POLYMORPHIC_URL_OVERRIDE"
+
   medium_priority:
     - name: "find/exists? with possible AR object argument"
       kind: "deprecation"
