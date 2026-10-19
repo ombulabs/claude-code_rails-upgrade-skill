@@ -174,17 +174,19 @@ assert_select "a[href='/foo']"
 **Pattern:** `COLUMN_NEW_SQL_TYPE_ARG`
 
 **What Changed:**
-`ActiveRecord::ConnectionAdapters::Column#initialize` changes from `(name, default, sql_type = nil, null = true)` to `(name, default, cast_type, sql_type = nil, null = true)`, and the column hands every cast (`type_cast_from_user`, `type_cast_from_database`, ...) to `cast_type`. The MySQL adapter's `Column` subclass changes the same way. Code that builds fake columns, such as the tableless-model recipe or a virtual typed field appended to a real model's `columns`, still loads, but the SQL type string now lands in `cast_type`, so the first assignment raises (`type_cast_from_database` instead on some shapes and 4.2.x releases):
+`ActiveRecord::ConnectionAdapters::Column#initialize` changes from `(name, default, sql_type = nil, null = true)` to `(name, default, cast_type, sql_type = nil, null = true)`, and the column hands `type`, `limit`, `precision`, `scale` and every cast (`type_cast_from_user`, `type_cast_from_database`, ...) to `cast_type`. `AbstractMysqlAdapter::Column` takes the same arguments (4.2 drops the `Mysql2Adapter::Column` and `MysqlAdapter::Column` subclasses, so those names resolve to it). Code that builds fake columns, such as the tableless-model recipe or a virtual typed field appended to a real model's `columns`, still loads, but the SQL type string now lands in `cast_type`, so the first assignment, read or column lookup raises:
 
 ```
 NoMethodError: undefined method `type_cast_from_user' for "boolean":String
 ```
 
+(or `type_cast_from_database`, `type`, `limit`, depending on what touches the column first).
+
 **Detection Pattern:**
-The `COLUMN_NEW_SQL_TYPE_ARG` pattern flags every `ConnectionAdapters::Column.new` call outside comments. A bare `Column.new` inside a reopened `ConnectionAdapters` module is missed.
+The `COLUMN_NEW_SQL_TYPE_ARG` pattern flags every `ConnectionAdapters::Column.new` call outside comments. It misses a bare `Column.new` reached through a reopened or included `ConnectionAdapters` module or a constant alias, so also search the tableless models for `Column.new` by hand.
 
 **Fix:**
-Look the cast type up from the connection on 4.2 and keep the old call on 4.1. `lookup_cast_type` does not exist on 4.1, so the branch is needed while both versions boot:
+Build the cast type yourself on 4.2 and keep the old call on 4.1. `ActiveRecord::Type` does not exist on 4.1, so the branch is needed while both versions boot. Do not use `connection.lookup_cast_type`: it needs a database connection at class load, and on PostgreSQL it runs `SELECT 'string'::regtype`, which raises for `string`.
 
 ```ruby
 # BEFORE
@@ -193,9 +195,15 @@ def self.column(name, sql_type = nil, default = nil, null = true)
 end
 
 # AFTER
+VIRTUAL_CAST_TYPES = {
+  "boolean" => "Boolean", "integer" => "Integer", "date" => "Date",
+  "datetime" => "DateTime", "decimal" => "Decimal", "float" => "Float",
+  "string" => "Value", "text" => "Value", "" => "Value"
+}.freeze
+
 def self.column(name, sql_type = nil, default = nil, null = true)
   columns << if NextRails.next?
-    cast_type = connection.lookup_cast_type(sql_type.to_s)
+    cast_type = ActiveRecord::Type.const_get(VIRTUAL_CAST_TYPES.fetch(sql_type.to_s)).new
     ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, cast_type, sql_type.to_s, null)
   else
     ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
@@ -203,8 +211,9 @@ def self.column(name, sql_type = nil, default = nil, null = true)
 end
 ```
 
-After the upgrade, drop the `else` branch. `lookup_cast_type` uses the adapter's type map: `boolean`, `integer` and `date` get their cast types, and a name the map does not know (`string` on SQLite) gets `ActiveRecord::Type::Value`, which casts nothing, the same as 4.1 did for that field. A table-backed model can instead declare the field with the 4.2 class method `attribute :flag, ActiveRecord::Type::Boolean.new` (absent on 4.0 and 4.1). On 4.2.0 a set `attribute` with no table column still goes into the INSERT; 4.2.1 and later leave it out. The long-term replacement is the Rails 5.0 attributes API.
+`string`, `text` and untyped fields map to `ActiveRecord::Type::Value`, which casts nothing, as 4.1 did for them (`Type::String` would call `to_s` on an Array kept in the field). An undeclared type raises `KeyError` at class load instead of failing later. After the upgrade, drop the `else` branch.
 
+A table-backed model can instead declare the field with the 4.2 class method `attribute :flag, ActiveRecord::Type::Boolean.new` (absent on 4.0 and 4.1). A set `attribute` with no table column still goes into the INSERT on 4.2.0, and on later 4.2 releases when `partial_writes` is off. The long-term replacement is the Rails 5.0 attributes API.
 ---
 
 ### 🟡 MEDIUM PRIORITY
@@ -576,9 +585,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 6. Add `config.active_record.raise_in_transactional_callbacks = true`
 7. Add `config.active_support.test_order = :random`
 8. Rename `serve_static_assets` → `serve_static_files`
-9. Consider replacing Timecop with `travel_to` (optional)
-10. Consider dropping Foreigner for native FKs (optional)
-11. Pass a cast type to fake `ConnectionAdapters::Column.new` calls (tableless models, virtual typed fields)
+9. Pass a cast type to fake `ConnectionAdapters::Column.new` calls (tableless models, virtual typed fields)
+10. Consider replacing Timecop with `travel_to` (optional)
+11. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -599,7 +608,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'deliver' for #<Mail::Message>` | "ActionMailer `#deliver` / `#deliver!` Deprecated" — `deliver_now` / `deliver_later` |
 | `undefined method 'respond_with' for ApplicationController` | "`respond_with` / Class-Level `respond_to` Extracted" — `gem 'responders', '~> 2.0'` |
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
-| `NoMethodError: undefined method 'type_cast_from_user' for "boolean":String` | "`ConnectionAdapters::Column.new` Takes a Cast Type Third": pass a cast type on 4.2 |
+| `NoMethodError: undefined method 'type_cast_from_user'` (or `type_cast_from_database`, `type`, `limit`) for a SQL type String such as `"boolean"` | "`ConnectionAdapters::Column.new` Takes a Cast Type Third": pass a cast type on 4.2 |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |

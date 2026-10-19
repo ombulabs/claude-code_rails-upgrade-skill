@@ -18,7 +18,7 @@ COLUMN_NEW_SQL_TYPE_ARG:
     # a virtual typed field appended to a real model's columns
     - "cols << ::ActiveRecord::ConnectionAdapters::Column.new(\"flag\", nil, \"boolean\")"
     - "ConnectionAdapters::Column.new(name, nil, type)"
-    # the MySQL adapter Column subclasses take cast_type third on 4.2 too
+    # AbstractMysqlAdapter::Column takes cast_type third on 4.2; 4.2 drops Mysql2Adapter::Column, so the name resolves to it
     - "  col = ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::Column.new(\"x\", nil, \"tinyint(1)\")"
     - "  ActiveRecord::ConnectionAdapters::Mysql2Adapter::Column.new \"x\", nil, \"int(11)\""
   no_match:
