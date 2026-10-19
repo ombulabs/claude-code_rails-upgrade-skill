@@ -22,17 +22,25 @@ COLUMN_TYPE_CAST_INSTANCE:
     - "  @column.type_cast value"
     - "  columns_hash[key].try(:type_cast, value)"
     - "  column.send(:type_cast, value)"
+    - "  col.try!(:type_cast, value)"
+    - "  col.__send__(:type_cast, value)"
   no_match:
     # two-argument connection quoting method, still public on 4.2
     - "  connection.type_cast(value, column)"
     - "  ActiveRecord::Base.connection.type_cast(quote(value), column)"
     - "  conn.type_cast value, column"
     - "  conn.send(:type_cast, value, column)"
+    - "  conn.send(:type_cast, quote(value), column)"
+    # zero-argument call followed by a modifier, not a one-argument call
+    - "  x = col.type_cast if foo"
     # definitions, not calls
     - "  def type_cast(value)"
     - "  def self.type_cast(value)"
+    - "  def obj.type_cast(value)"
     # the 4.2 replacements
     - "  column.type_cast_from_database(value)"
     - "  column.type_cast_from_user(value)"
+    # also gone on 4.2, but a different method this pattern does not cover
     - "  column.type_cast_for_write(value)"
+    # comment line
     - "  # column.type_cast(value)"
