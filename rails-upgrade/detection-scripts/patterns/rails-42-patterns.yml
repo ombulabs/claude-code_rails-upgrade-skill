@@ -149,6 +149,20 @@ upgrade_findings:
       fix: "Remove gem 'foreigner', run bundle install, run bin/rake db:schema:dump, verify db/schema.rb. Note: Rails FK support is a subset of Foreigner"
       variable_name: "FOREIGNER"
 
+    - name: "Numeric#ago / until / since / from_now on a bare number"
+      kind: "breaking"
+      pattern: "(?:(?<![\\w.])\\d+(?:_\\d+)*(?:\\.\\d+)?|\\.to_[if]|\\([^()*\\/]*[*\\/][^()]*\\))\\.(?:ago|until|since|from_now)(?![\\w?!])"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.1 deprecated calling ago, until, since and from_now on a plain number (`Calling #ago or #until on a number (e.g. 5.ago) is deprecated`, and the same for #since / #from_now). Rails 4.2 removes them from Numeric, so `5.ago` raises `NoMethodError: undefined method 'ago' for 5:Fixnum`. Methods on a Duration (`5.seconds.ago`) are unchanged. The pattern flags a numeric literal (`5.ago`, `1.5.since`, `3_600.from_now`), a `.to_i` / `.to_f` result (`1.day.to_i.ago`), and a parenthesized expression with `*` or `/` (`(2.hours * 3).ago`, `(TIMEOUT * 4).ago`, `(60 * 60).ago`): through 4.2 a Duration has no `*` or `/` of its own, method_missing hands them to the Integer value and returns a plain Integer, so those calls warn on 4.1 and raise on 4.2. The parenthesized branch spans lines inside the parentheses. Duration `+` and `-` keep a Duration and are not flagged. Commented-out lines are skipped. Not detected: a variable holding seconds (`timeout.ago`), such as an Integer read from YAML, ENV or a settings table and handed to a gem that calls ago on it, and an Integer on the left of `+` (`(5 + 1.hour).ago`). Those show up as the 4.1 deprecation warning in logs and test output, so fix every such warning on 4.1 before the bump. A Duration plus a product inside one pair of parentheses (`(1.day + 2 * 3.hours).ago`) is flagged although the sum is a Duration, and a nested parenthesis inside the expression hides the call"
+      fix: "Give the number a unit: `5.ago` becomes `5.seconds.ago`, `timeout.from_now` becomes `timeout.seconds.from_now`, `(2.hours * 3).ago` becomes `(2.hours * 3).seconds.ago` or `Time.current - 2.hours * 3`. For a value read from configuration, convert it where it is read (`setting.seconds`) so every consumer gets a Duration. A Duration compares, does arithmetic and serializes to JSON as the same Integer, and `.seconds` exists on every Rails version, so the fix runs on 4.1 and 4.2 with no NextRails.next? branch"
+      variable_name: "NUMERIC_AGO_WITHOUT_UNIT"
+
   low_priority:
     - name: "Procfile rails server without explicit bind"
       kind: "breaking"

@@ -1,0 +1,48 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+NUMERIC_AGO_WITHOUT_UNIT:
+  match:
+    # numeric literals, including floats, underscores and a leading minus
+    - "    expires_at = 5.ago"
+    - "Time.zone.now > 30.from_now"
+    - "x = 1.5.since(start)"
+    - "cutoff = 3_600.from_now"
+    - "  let(:time) { -30.from_now }"
+    - "<%= 5.ago %>"
+    # to_i / to_f results, including a Duration turned back into an Integer
+    - "session_timeout.to_i.ago"
+    - "params[:seconds].to_f.until(deadline)"
+    - "1.day.to_i.ago"
+    # Duration * and / return a plain Integer through 4.2. A product split
+    # across lines inside the parentheses is proved with pattern_lab.rb scan
+    - "where(updated_at: (2.hours * 3).ago..Time.now)"
+    - "(1.day / 2).from_now"
+    - "(TIMEOUT * 4).ago"
+    - "(60 * 60).ago"
+  no_match:
+    - "expires_at = 5.seconds.ago"
+    - "2.days.from_now"
+    - "Time.current.ago(5)"
+    - "Date.today.since(3)"
+    - "(1.day + 1.hour).ago"
+    - "(n * 1.day).seconds.ago"
+    - "(Time.now - 5).ago(1)"
+    - "foo(x * 2).bar(1.day.ago)"
+    - "# 5.ago is deprecated"
+    - "  # use 5.seconds.ago, not 5.ago"
+    - "record.agony"
+    - "5.agos"
+    - "v1.2.ago"
+    - "foo.to_iso.ago"
+    - "time.since?"
