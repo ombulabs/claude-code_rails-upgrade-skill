@@ -169,34 +169,6 @@ assert_select "a[href='/foo']"
 
 ---
 
-#### `Column#type_cast` Removed
-
-**Pattern:** `COLUMN_TYPE_CAST_INSTANCE`
-
-**What Changed:**
-Rails 4.2 removes the public instance method `ActiveRecord::ConnectionAdapters::Column#type_cast(value)`. A 4.2 column hands casting to its `cast_type` and exposes it as `type_cast_from_database` and `type_cast_from_user` (both new in 4.2). `Type::Value#type_cast` is private, so `column.type_cast(value)` raises `NoMethodError`. The usual caller casts a param or a calculation result through `Model.columns_hash[name].type_cast(value)`.
-
-The two-argument `connection.type_cast(value, column)` quoting method is a different API, still present on 4.2, and the pattern skips it. The removed class-level helpers (`Column.value_to_boolean` and friends) are a separate change.
-
-**Detection Pattern:** the `COLUMN_TYPE_CAST_INSTANCE` regex flags one-argument `.type_cast` calls and `send` / `try(:type_cast, value)`. The `try` form does not raise on 4.2: Active Support `try` checks `respond_to?` and returns `nil`, so the cast silently becomes `nil`. Any other object with a public one-argument `type_cast` is flagged too, so check that the receiver is a column.
-
-**Fix:**
-First check whether the cast does anything. `minimum` and `maximum` already cast through the column on 4.1 and 4.2, so a cast of their result can simply go. Otherwise branch on the version:
-
-```ruby
-# BEFORE
-column = Order.columns_hash["total"]
-column.type_cast(params[:total])
-
-# AFTER (works on 4.1 and 4.2)
-column = Order.columns_hash["total"]
-NextRails.next? ? column.type_cast_from_database(params[:total]) : column.type_cast(params[:total])
-```
-
-`type_cast_from_database` gives the 4.1 result for string, integer, decimal, boolean and datetime inputs, with one difference: a string column now returns a String for any value (`5` becomes `"5"`). `type_cast_from_user` is what an attribute writer uses, but it differs more: a blank string cast through an integer column gives `nil` instead of `0`. Rails 5.0 replaces both with `Order.type_for_attribute("total").cast(value)`.
-
----
-
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -327,6 +299,34 @@ form_authenticity_token
 
 **Fix:**
 Rails form helpers handle masking automatically. If you build forms outside Rails (e.g., a static page posting to your app), fetch the token per request rather than caching it.
+
+---
+
+#### `Column#type_cast` Removed
+
+**Pattern:** `COLUMN_TYPE_CAST_INSTANCE`
+
+**What Changed:**
+Rails 4.2 removes the public instance method `ActiveRecord::ConnectionAdapters::Column#type_cast(value)`. A 4.2 column hands casting to its `cast_type` and exposes it as `type_cast_from_database` and `type_cast_from_user` (both new in 4.2). `Type::Value#type_cast` is private, so `column.type_cast(value)` raises `NoMethodError`. The usual caller casts a param or a calculation result through `Model.columns_hash[name].type_cast(value)`.
+
+The two-argument `connection.type_cast(value, column)` quoting method is a different API, still present on 4.2, and the pattern skips it. The removed class-level helpers (`Column.value_to_boolean` and friends) are a separate change.
+
+**Detection Pattern:** the `COLUMN_TYPE_CAST_INSTANCE` regex flags one-argument `.type_cast` calls and `send` / `try(:type_cast, value)`. The `try` form does not raise on 4.2: Active Support `try` checks `respond_to?` and returns `nil`, so the cast silently becomes `nil`. Any other object with a public one-argument `type_cast` is flagged too, so check that the receiver is a column.
+
+**Fix:**
+First check whether the cast does anything. `minimum` and `maximum` already cast through the column on 4.1 and 4.2, so a cast of their result can simply go. Otherwise branch on the version:
+
+```ruby
+# BEFORE
+column = Order.columns_hash["total"]
+column.type_cast(params[:total])
+
+# AFTER (works on 4.1 and 4.2)
+column = Order.columns_hash["total"]
+NextRails.next? ? column.type_cast_from_database(params[:total]) : column.type_cast(params[:total])
+```
+
+`type_cast_from_database` gives the 4.1 result for string, integer, decimal, boolean and datetime inputs, with one difference: a string column now returns a String for any value (`5` becomes `"5"`). `type_cast_from_user` is what an attribute writer uses, but it differs more: a blank string cast through an integer column gives `nil` instead of `0`. Rails 5.0 replaces both with `Order.type_for_attribute("total").cast(value)`.
 
 ---
 
