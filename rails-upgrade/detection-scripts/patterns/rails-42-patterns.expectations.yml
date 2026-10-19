@@ -22,6 +22,9 @@ COLUMN_DEFAULT_RAW:
     - "connection.columns(:things).detect { |c| c.name == \"ttl\" }.default"
     - "    puts column.default"
     - "@column.default.to_i"
+    - "Thing.columns_hash[\"ttl\"]&.default"
+    - "Thing.columns_hash[\"ttl\"].try(:default)"
+    - "connection.schema_cache.columns_hash(\"things\")[\"ttl\"].default"
   no_match:
     # the replacement, typed on 4.0, 4.1 and 4.2
     - "Thing.column_defaults[\"ttl\"]"
@@ -34,3 +37,9 @@ COLUMN_DEFAULT_RAW:
     - "I18n.default_locale"
     - "config.default = 1"
     - "Thing.columns.map(&:name)"
+    # .default outside the find block, or read inside it
+    - "col = Thing.columns.find { |c| c.name == x } || Settings.default"
+    - "x = columns.find { |c| c.default.nil? }"
+    # a column method on another object, and a setter
+    - "grid.column.default"
+    - "column.default = 3"

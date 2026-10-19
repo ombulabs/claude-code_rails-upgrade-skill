@@ -121,13 +121,17 @@ upgrade_findings:
 
     - name: "Column default read through the column object"
       kind: "breaking"
-      pattern: "(?:\\bcolumns_hash(?:\\[[^\\]\\n]+\\]|\\.fetch\\([^)\\n]*\\))|\\bcolumn_for_attribute\\([^)\\n]*\\)|\\bcolumns(?:\\([^)\\n]*\\))?\\.(?:find|detect)\\b[^\\n]*?|\\bcolumn)\\.default\\b(?![?!])"
+      pattern: "(?:\\bcolumns_hash(?:\\([^)\\n]*\\))?(?:\\[[^\\]\\n]+\\]|\\.fetch\\([^)\\n]*\\))|\\bcolumn_for_attribute\\([^)\\n]*\\)|\\bcolumns(?:\\([^)\\n]*\\))?\\.(?:find|detect)[ \\t]*\\{[^}\\n]*\\}|(?<![.\\w])column)(?:&?\\.default\\b(?![?!]|[ \\t]*=[^=~>])|\\.try\\([ \\t]*:default[ \\t]*\\))"
       exclude: "\\A\\s*#"
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 4.1 typed a column's default when it built the column (Column#initialize called extract_default), so Model.columns_hash[\"active\"].default returned false for a boolean column and an Integer for an integer column. From 4.2.0 Column#default is the raw string the adapter read from the schema (\"f\", \"604800\", \"0\"), with no warning. Arithmetic on it raises (Time.now - default: TypeError: can't convert String into an exact number), comparisons with an Integer or a boolean silently fail, and a boolean false default (\"f\" on SQLite) is now truthy. Matches columns_hash[...].default, columns_hash.fetch(...).default, column_for_attribute(...).default, columns.find / detect {...}.default on one line, and column.default. Missed: other variable names (c.default inside columns.each), and a find block that spans lines"
-      fix: "Read Model.column_defaults[\"name\"] instead. It returns the typed default on 4.0, 4.1 and 4.2 (on 4.2 it is built from the attribute types), so no version conditional is needed. For a column object from connection.columns(table), which is not tied to a model, keep the raw string and cast it yourself"
+        - "config/"
+        - "db/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.1 typed a column's default when it built the column (Column#initialize called extract_default), so Model.columns_hash[\"active\"].default returned false for a boolean column and an Integer for an integer column. From 4.2.0 Column#default is the raw string the adapter read from the schema (\"604800\", and \"f\" for a false boolean on SQLite), with no warning. Arithmetic on it raises (Time.now - default: TypeError: can't convert String into an exact number), < and > against an Integer raise ArgumentError (comparison of String with 3 failed), == against an Integer or a boolean quietly returns false, and a false boolean default is now a non-empty String, so it is truthy. Matches .default, &.default and .try(:default) on columns_hash[...] (also columns_hash(table)[...] from the schema cache), columns_hash.fetch(...), column_for_attribute(...), a one-line columns.find / detect { } block, and a variable named column (a column object from another library with that name is flagged too). Missed: other variable names (c.default inside columns.each), a nested index (columns_hash[NAMES[0]]), a find block or a .default that spans lines"
+      fix: "Read Model.column_defaults[\"name\"] instead. It returns the typed default on 4.0, 4.1 and 4.2, so plain columns need no version conditional. On 4.2 it goes through the model's attribute types, so a serialize'd column's default comes back deserialized there: check those columns on both versions. For a column object that is not tied to a model (connection.columns(table)), cast on 4.2 only: NextRails.next? ? column.type_cast_from_database(column.default) : column.default"
       variable_name: "COLUMN_DEFAULT_RAW"
 
     - name: "serve_static_assets config"
