@@ -1,0 +1,45 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+COLUMN_DEFAULT_RAW:
+  match:
+    - "Thing.columns_hash[\"ttl\"].default"
+    - "    created_at < Time.now - self.class.columns_hash[\"ttl\"].default"
+    - "Thing.columns_hash[name.to_s].default || 0"
+    - "columns_hash.fetch(\"active\").default"
+    - "column_for_attribute(:active).default"
+    - "Thing.columns.find { |c| c.name == \"ttl\" }.default"
+    - "connection.columns(:things).detect { |c| c.name == \"ttl\" }.default"
+    - "    puts column.default"
+    - "@column.default.to_i"
+    - "Thing.columns_hash[\"ttl\"]&.default"
+    - "Thing.columns_hash[\"ttl\"].try(:default)"
+    - "connection.schema_cache.columns_hash(\"things\")[\"ttl\"].default"
+  no_match:
+    # the replacement, typed on 4.0, 4.1 and 4.2
+    - "Thing.column_defaults[\"ttl\"]"
+    - "# Thing.columns_hash[\"ttl\"].default"
+    # other column readers and lookalike names
+    - "columns_hash[\"id\"].default_function"
+    - "columns_hash[\"ttl\"].type"
+    - "column.default?"
+    - "my_column.default_value"
+    - "I18n.default_locale"
+    - "config.default = 1"
+    - "Thing.columns.map(&:name)"
+    # .default outside the find block, or read inside it
+    - "col = Thing.columns.find { |c| c.name == x } || Settings.default"
+    - "x = columns.find { |c| c.default.nil? }"
+    # a column method on another object, and a setter
+    - "grid.column.default"
+    - "column.default = 3"

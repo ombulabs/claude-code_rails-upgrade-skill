@@ -215,6 +215,37 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
+#### `Column#default` Returns the Raw Database String
+
+**Pattern:** `COLUMN_DEFAULT_RAW`
+
+**What Changed:**
+Through 4.1, `Column#initialize` typed the default with `extract_default`, so `Model.columns_hash["ttl"].default` was an `Integer` and a boolean column's default was `true` / `false`. From 4.2.0 the column keeps the string the adapter read from the schema and casting moved to the attribute types, so `.default` returns `"604800"`, and `"f"` for a false boolean on SQLite. Nothing warns. Arithmetic on it raises (`Time.now - default` gives `TypeError: can't convert String into an exact number`), `<` / `>` against an Integer raise `ArgumentError: comparison of String with 3 failed`, `==` against a number or a boolean quietly returns false, and a false boolean default is now a non-empty String, so it is truthy. `Model.column_defaults` is unaffected for plain columns: it returns typed values on 4.0, 4.1 and 4.2.
+
+**Detection Pattern:**
+The `COLUMN_DEFAULT_RAW` pattern flags `.default`, `&.default` and `.try(:default)` read off `columns_hash[...]`, `columns_hash.fetch(...)`, `column_for_attribute(...)`, a one-line `columns.find { }` / `detect { }` block, and a variable named `column`. A block variable with another name (`columns.each { |c| c.default }`) is not flagged, so also review loops over `columns`.
+
+**Fix:**
+```ruby
+# BEFORE (typed on 4.1, a String on 4.2)
+expires_at = created_at + self.class.columns_hash["ttl"].default
+active = Thing.columns_hash["active"].default
+
+# AFTER (typed on 4.0, 4.1 and 4.2, no conditional needed)
+expires_at = created_at + self.class.column_defaults["ttl"]
+active = Thing.column_defaults["active"]
+```
+
+On 4.2 `column_defaults` goes through the model's attribute types, so a `serialize`d column's default comes back deserialized there. Check those columns on both versions.
+
+For a column read from `connection.columns(table)`, which no model types, cast on 4.2 only:
+
+```ruby
+default = NextRails.next? ? column.type_cast_from_database(column.default) : column.default
+```
+
+---
+
 #### `config.active_support.test_order` Required
 
 **Pattern:** `TEST_ORDER`
@@ -538,8 +569,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 6. Add `config.active_record.raise_in_transactional_callbacks = true`
 7. Add `config.active_support.test_order = :random`
 8. Rename `serve_static_assets` → `serve_static_files`
-9. Consider replacing Timecop with `travel_to` (optional)
-10. Consider dropping Foreigner for native FKs (optional)
+9. Replace `columns_hash[...].default` reads with `column_defaults[...]`
+10. Consider replacing Timecop with `travel_to` (optional)
+11. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -562,6 +594,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `TypeError` or a wrong branch where code reads `columns_hash[...].default` (now a String such as `"604800"` or `"f"`), or `ArgumentError: comparison of String with ...` | "`Column#default` Returns the Raw Database String", read `column_defaults[...]` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
 ---
