@@ -215,6 +215,45 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
+#### `belongs_to` `dependent:` Cascade Runs After the Record's Own Delete
+
+**Pattern:** `BELONGS_TO_DEPENDENT_DESTROY`
+
+**What Changed:**
+Rails 4.0 and 4.1 register a `belongs_to ..., dependent: :destroy` (or `:delete`) cascade as a `before_destroy`, from the shared association builder (`activerecord-4.1.16/lib/active_record/associations/builder/association.rb`, `add_before_destroy_callbacks`). Rails 4.2.0 overrides it for `belongs_to` only and registers it as an `after_destroy` (`activerecord-4.2.0/lib/active_record/associations/builder/belongs_to.rb`, `add_destroy_callbacks`; CHANGELOG entry "Move 'dependent: :destroy' handling for `belongs_to` from `before_destroy` to `after_destroy` callback chain", rails/rails#12380). `has_one` and `has_many` cascades stay `before_destroy`.
+
+Nothing raises and nothing warns. What changes on `record.destroy`:
+- The parent row is now deleted **after** the record's own row, not before.
+- Other destroy callbacks see the parent still present in `before_destroy`, and already gone (or going) in `after_destroy`.
+- A parent destroy that returns `false` no longer stops the record's destroy. On 4.1 the cascade's `false` halted the chain and `record.destroy` returned `false`; on 4.2 the record is already deleted and `destroy` reports success while the parent row stays.
+
+This is the 3.2 order again. A reciprocal pair (`belongs_to :x, dependent: :destroy` plus `has_one`/`has_many` back with `dependent: :destroy`, see the 3.2 → 4.0 guide, "Bidirectional `dependent: :destroy` Now Recurses Forever") terminates on 4.2 only when the association back is re-read from the database. With an inverse, which 4.1 and 4.2 detect automatically for a plain `has_one`/`belongs_to` pair, the destroyed record is reused from memory and the pair still ends in `SystemStackError` on 4.2, and so does that entry's `after_destroy` workaround. Declaring `inverse_of: false` on both sides lets either form terminate on 4.2.
+
+**Detection Pattern:**
+`BELONGS_TO_DEPENDENT_DESTROY` flags each `belongs_to` with `dependent: :destroy` or `:delete`, including a declaration wrapped across lines after a trailing comma. Each hit is a "check the destroy path", not a bug.
+
+**Fix:**
+Default: keep the option and accept the 4.2 order, which every later Rails version keeps. Check each hit for callbacks or tests that depend on the parent being deleted first, or on a failed parent destroy stopping the record's destroy. Pin the order with a spec on the DELETE statements the destroy runs.
+
+If the old order matters, replace the option with an explicit callback. It behaves the same on 4.1 and 4.2, so it can ship before the bump:
+
+```ruby
+# BEFORE
+class Profile < ActiveRecord::Base
+  belongs_to :account, dependent: :destroy
+end
+
+# AFTER: keeps the 4.0/4.1 order on both versions
+class Profile < ActiveRecord::Base
+  belongs_to :account
+  before_destroy { account.destroy if account }
+end
+```
+
+Declare the `before_destroy` where the option was, so it keeps its place among the other `before_destroy` callbacks. Returning `false` from it still halts the record's destroy on 4.1 and 4.2. Do not use this form on a reciprocal pair: it brings back the 4.0/4.1 recursion.
+
+---
+
 #### `config.active_support.test_order` Required
 
 **Pattern:** `TEST_ORDER`
@@ -540,6 +579,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
 10. Consider dropping Foreigner for native FKs (optional)
+11. Review `belongs_to ..., dependent: :destroy` / `:delete` declarations: the cascade now runs after the record's own delete
 
 ### Phase 6: Testing
 - Run full test suite
@@ -548,6 +588,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 - Test forms with HTML-sanitized content
 - Test any code that caches `form_authenticity_token`
 - Test serialized attributes that may receive `nil`
+- Test destroying records whose `belongs_to` declares `dependent: :destroy` / `:delete`
 
 ---
 
@@ -562,6 +603,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| Parent row deleted after the child, or a child destroy that used to return `false` now succeeds | "`belongs_to` `dependent:` Cascade Runs After the Record's Own Delete", cascade is now `after_destroy` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
 ---

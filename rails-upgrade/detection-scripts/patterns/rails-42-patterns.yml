@@ -119,6 +119,17 @@ upgrade_findings:
       fix: "Review code that assigns nil to serialized attributes with custom coders. Check for tests that relied on the coder's nil representation (e.g., 'null' for JSON)"
       variable_name: "SERIALIZED_CUSTOM_CODER"
 
+    - name: "belongs_to with dependent: :destroy or :delete (cascade moves to after_destroy)"
+      kind: "breaking"
+      pattern: "\\bbelongs_to\\b(?:[^\\n#]*,[ \\t]*(?:#[^\\n]*)?\\n)*?[^\\n#]*?(?:\\bdependent:|:dependent[ \\t]*=>|[\"']dependent[\"'][ \\t]*=>)[ \\t]*:(?:destroy|delete)\\b"
+      exclude: "\\A[ \\t]*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.0 and 4.1 register a `belongs_to ..., dependent: :destroy` (or `:delete`) cascade as a before_destroy, from the shared association builder (activerecord-4.1.16 associations/builder/association.rb, `add_before_destroy_callbacks`). Rails 4.2.0 overrides it for belongs_to only and registers it as an after_destroy (activerecord-4.2.0 associations/builder/belongs_to.rb, `add_destroy_callbacks`; rails/rails#12380). has_one and has_many cascades stay before_destroy. Nothing raises or warns. On `record.destroy` the parent row is now deleted after the record's own row instead of before, so other destroy callbacks see a different set of rows, and a parent destroy that returns false no longer halts the record's destroy: on 4.1 `record.destroy` returned false and both rows stayed, on 4.2 the record is deleted, destroy reports success and the parent row stays. This is the 3.2 order again. A reciprocal pair (this belongs_to plus a has_one/has_many back with dependent: :destroy, BELONGS_TO_DEPENDENT in rails-40-patterns.yml) terminates on 4.2 only when the association back is re-read from the database: with an inverse, which 4.1 and 4.2 detect automatically for a plain has_one/belongs_to pair, the destroyed record is reused from memory and the pair still ends in SystemStackError on 4.2, as does the after_destroy workaround from the 4.0 entry; `inverse_of: false` on both sides lets it terminate. The pattern matches `dependent: :destroy`, `:dependent => :destroy` and `:delete`, also when the option sits on a later line of a declaration wrapped after a trailing comma; that multi-line reach comes from the whole-file scanner (detection-scripts/scan_patterns.rb), a line grep only sees one-line declarations. It skips a commented-out declaration and text in a trailing comment. It misses a declaration with a `#` before the option on the same line, such as a `\"#{...}\"` class_name"
+      fix: "Default: keep the option and accept the 4.2 order, which later Rails versions keep. For each hit, check the record's destroy callbacks and tests for code that expects the parent to be deleted first, or a failed parent destroy to stop the record's destroy, and pin the order with a spec on the DELETE statements the destroy runs. If the old order matters, drop the option and declare `before_destroy { account.destroy if account }` where the association was: it runs the cascade before the record's own delete and a false return still halts the destroy, on 4.1 and on 4.2, so it can ship before the bump. Do not use that form on a reciprocal pair, where it brings back the 4.0/4.1 recursion"
+      variable_name: "BELONGS_TO_DEPENDENT_DESTROY"
+
     - name: "serve_static_assets config"
       kind: "deprecation"
       pattern: "serve_static_assets"

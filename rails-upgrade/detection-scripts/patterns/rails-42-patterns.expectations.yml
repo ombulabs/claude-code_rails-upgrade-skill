@@ -1,0 +1,38 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+BELONGS_TO_DEPENDENT_DESTROY:
+  # A declaration wrapped across lines after a trailing comma
+  # (`belongs_to :account,` newline `dependent: :destroy`) is matched by the
+  # whole-file scanner; fixtures are single lines, so that case was proved with
+  # pattern_lab.rb scan instead.
+  match:
+    - "  belongs_to :account, dependent: :destroy"
+    # :delete moves to after_destroy too (same handle_dependency callback).
+    - "  belongs_to :account, dependent: :delete"
+    - "  belongs_to :account, :dependent => :destroy"
+    - "  belongs_to :owner, polymorphic: true, dependent: :destroy"
+    - "  belongs_to :account, -> { where(active: true) }, dependent: :destroy"
+    - "  belongs_to(:account, dependent: :destroy)"
+  no_match:
+    # Commented-out declarations register no callback.
+    - "  # belongs_to :account, dependent: :destroy"
+    # has_one / has_many cascades stay before_destroy on 4.2.
+    - "  has_one :profile, dependent: :destroy"
+    - "  has_many :items, dependent: :destroy"
+    # Text in a trailing comment is not an option.
+    - "  belongs_to :account # dependent: :destroy was removed"
+    # :nullify is not a valid belongs_to option and :destroy_async is 6.1+.
+    - "  belongs_to :account, dependent: :nullify"
+    - "  belongs_to :account, dependent: :destroy_async"
+    - "  belongs_to :creator, class_name: \"Person\""
