@@ -22,6 +22,15 @@ AREL_UNION_BINDS:
     - "a.arel.union(b.arel)"
     - "Arel::Nodes::Union.new(a.arel.ast, b.arel.ast)"
     - "Arel::Nodes::UnionAll.new(left.ast, right.ast)"
+    # intersect loses its bind values the same way
+    - "active.intersect(mine)"
+    - "Arel::Nodes::Intersect.new(a.ast, b.ast)"
+    - "Arel::Nodes::Except.new(a.ast, b.ast)"
+    # relations reached by index, a Set elsewhere on the line, a trailing comment
+    - "scopes[0].union(scopes[1])"
+    - "Post.where(id: ids & Set.new(x)).union(y)"
+    - "a.union(b) # Regexp.union"
+    - "users.union  (x)"
   no_match:
     # Regexp.union, Set#union and Array#union (Ruby 2.6+) are not Arel
     - "PATTERN = Regexp.union(KEYWORDS)"
@@ -29,6 +38,10 @@ AREL_UNION_BINDS:
     - "Set[1, 2].union([3])"
     - "ids.to_set.union(other)"
     - "[1, 2].union([3])"
+    - "all = [a, b].union(c)"
+    - "set.intersect?(other)"
+    # Relation#except is Active Record, not Arel
+    - "Post.where(a: 1).except(:order)"
     # lodash / jQuery-style helpers under app/assets
     - "var all = _.union(a, b);"
     - "all = $.union(a)"

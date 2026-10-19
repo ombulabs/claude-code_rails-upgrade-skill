@@ -139,15 +139,15 @@ upgrade_findings:
       fix: "Fetch the token per request or use Rails form helpers that handle masking automatically"
       variable_name: "CSRF_TOKEN_MASKING"
 
-    - name: "Arel union of relations drops bind values"
+    - name: "Arel union / intersect of relations drops bind values"
       kind: "breaking"
-      pattern: "(?<!Regexp)(?<![_$])\\.union(?:\\(|[ \\t]+(?=[@:A-Za-z_]))|\\b(?:Arel::)?Nodes::Union(?:All)?\\.new\\b"
-      exclude: "\\A\\s*#|\\bRegexp\\.union\\b|\\bSet(?:\\.new\\b|\\[)|\\.to_set\\.union\\b|\\]\\.union\\b"
+      pattern: "(?<!Regexp)(?<![_$])\\.(?:union|intersect)(?:\\(|[ \\t]+(?=[@:A-Za-z_(]))|\\b(?:Arel::)?Nodes::(?:Union(?:All)?|Intersect|Except)\\.new\\b"
+      exclude: "\\A\\s*#|\\bSet(?:\\.new\\([^()]*\\)|\\[[^\\[\\]]*\\])\\.union\\b|\\.to_set\\.union\\b|(?:^|[\\s=(,])\\[[^\\[\\]]*\\]\\.union\\b"
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 4.2 keeps the values of where(column: value) as bind values on the relation until the query runs. Relation#union (passed through to Arel::SelectManager#union) and Arel::Nodes::Union.new / UnionAll.new combine the two Arel trees but not their bind values, so the SQL reaches the database with a literal ? placeholder. SQLite binds it as NULL and the query silently returns no rows; PostgreSQL and MySQL raise a syntax error. On 4.1 the same code inlined the values and worked. Usual shape: Model.from(Model.arel_table.create_table_alias(a.union(b), :alias).to_sql). Calls from the active_record_union gem (Relation#union / #union_all) carry their bind values and are fine; the regex cannot tell them apart, so check the Gemfile before rewriting. Regexp.union, Set#union, array literals, lodash _.union and comment lines are skipped; a Set or Array held in a plain variable (ids.union(other)) is still flagged"
-      fix: "Build the subquery from each relation to_sql, which inlines its bind values on 4.1 and 4.2: Model.from(\"(#{a.to_sql} UNION #{b.to_sql}) alias\"). Use UNION ALL only where the old code passed :all. The values come from to_sql quoting, so nothing user-supplied is interpolated unquoted. No NextRails.next? branch is needed. Or add the active_record_union gem and call a.union(b), which returns a relation that keeps both sets of bind values"
+      explanation: "Rails 4.2 keeps the values of where(column: value) as bind values on the relation until the query runs. Relation#union and #intersect (passed through to Arel::SelectManager) and Arel::Nodes::Union / UnionAll / Intersect / Except.new combine the Arel trees but not the bind values, so the SQL reaches the database with an unfilled placeholder. SQLite gets ? and binds it as NULL, so the query silently returns no rows; MySQL gets ? and raises a syntax error; PostgreSQL gets $1 and raises \"there is no parameter $1\". On 4.1 the same code inlined the values and worked, unless a relation came from an association. Usual shape: Model.from(Model.arel_table.create_table_alias(a.union(b), :alias).to_sql). Calls from the active_record_union gem (Relation#union / #union_all) keep their bind values and are fine; the regex cannot tell them apart, so check the Gemfile before rewriting. Regexp.union, Set.new(...).union, Set[...].union, .to_set.union, array literals, lodash _.union and comment lines are skipped; a Set or Array held in a plain variable (ids.union(other)) is still flagged. Relation#except is the Active Record method, not Arel, and is not flagged; arel.except(other) is missed"
+      fix: "Build the subquery from each relation to_sql, which quotes and inlines the values: Model.from(\"(#{a.to_sql} UNION #{b.to_sql}) alias\"). This runs on 4.1 and 4.2 with no NextRails.next? branch, except on 4.1 for a relation built from an association (user.posts), whose to_sql still prints ?. For those, or to keep a relation instead of a FROM string, add gem \"active_record_union\", \"~> 1.3\" (1.4 needs Rails 6) and call a.union(b) / a.union_all(b), which keeps both sets of bind values on 4.1 and 4.2. Use UNION ALL only where the old code passed :all"
       variable_name: "AREL_UNION_BINDS"
 
     - name: "Foreigner gem"

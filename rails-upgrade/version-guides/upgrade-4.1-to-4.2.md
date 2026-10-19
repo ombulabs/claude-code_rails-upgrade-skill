@@ -302,30 +302,36 @@ Rails form helpers handle masking automatically. If you build forms outside Rail
 
 ---
 
-#### Arel `union` Drops Bind Values
+#### Arel `union` / `intersect` Drops Bind Values
 
 **Pattern:** `AREL_UNION_BINDS`
 
 **What Changed:**
-Rails 4.2 keeps the values of `where(column: value)` as bind values on the relation and fills them in only when the query runs. `Relation#union` (passed through to `Arel::SelectManager#union`) and `Arel::Nodes::Union.new` / `UnionAll.new` combine the two Arel trees but not their bind values. The SQL reaches the database with a literal `?`: SQLite binds it as `NULL` and the query silently returns no rows, PostgreSQL and MySQL raise a syntax error. On 4.1 the values were inlined and the same code worked. No deprecation warning comes first.
+Rails 4.2 keeps the values of `where(column: value)` as bind values on the relation and fills them in only when the query runs. `Relation#union` and `#intersect` (passed through to `Arel::SelectManager`) and `Arel::Nodes::Union` / `UnionAll` / `Intersect` / `Except.new` combine the Arel trees but not their bind values, so the SQL reaches the database with an unfilled placeholder:
+
+- SQLite gets `?`, binds it as `NULL` and silently returns no rows
+- MySQL gets `?` and raises a syntax error near `?`
+- PostgreSQL gets `$1` and raises `there is no parameter $1`
+
+On 4.1 the values were inlined and the same code worked, unless a relation came from an association (`user.posts`), which was already wrong there. No deprecation warning comes first.
 
 The `active_record_union` gem defines its own `Relation#union` / `#union_all` that keep both sets of bind values. If the app uses that gem, its `.union` calls are fine; the pattern cannot tell them apart from the Arel ones.
 
 **Detection Pattern:**
-The `AREL_UNION_BINDS` pattern flags `.union(` / `.union x` calls and `Arel::Nodes::Union(All).new`. It skips `Regexp.union`, `Set.new(...).union`, `.to_set.union`, array literals, lodash `_.union` and comment lines. A `Set` or `Array` held in a plain variable is still flagged.
+The `AREL_UNION_BINDS` pattern flags `.union(` / `.intersect(` calls and `Arel::Nodes::Union` / `UnionAll` / `Intersect` / `Except.new`. It skips `Regexp.union`, `Set.new(...).union`, `Set[...].union`, `.to_set.union`, array literals, lodash `_.union` and comment lines. A `Set` or `Array` held in a plain variable is still flagged.
 
 **Fix:**
 ```ruby
-# BEFORE (works on 4.1; no rows or a syntax error on 4.2)
+# BEFORE (works on 4.1; no rows or a database error on 4.2)
 active   = Post.where(state: "active")
 archived = Post.where(state: "archived")
 Post.from(Post.arel_table.create_table_alias(active.union(archived), :posts).to_sql)
 
-# AFTER (works on 4.1 and 4.2: to_sql inlines and quotes each relation's values)
+# AFTER (works on 4.1 and 4.2: to_sql quotes and inlines each relation's values)
 Post.from("(#{active.to_sql} UNION #{archived.to_sql}) posts")
 ```
 
-Keep `UNION ALL` only where the old code passed `:all`. Adding `gem 'active_record_union'` and calling `active.union(archived)` is the other option.
+Keep `UNION ALL` only where the old code passed `:all`. On 4.1, `to_sql` of a relation built from an association still prints `?`. For those, or to keep a relation instead of a `FROM` string, add `gem 'active_record_union', '~> 1.3'` (1.4 needs Rails 6) and call `active.union(archived)`, which works on 4.1 and 4.2.
 
 ---
 
@@ -567,7 +573,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
 10. Consider dropping Foreigner for native FKs (optional)
-11. Rebuild Arel `union` subqueries from each relation's `to_sql`
+11. Rebuild Arel `union` / `intersect` subqueries from each relation's `to_sql`
 
 ### Phase 6: Testing
 - Run full test suite
@@ -590,7 +596,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
-| SQL with a literal `?` after `UNION` (syntax error near `?`, or no rows on SQLite) | "Arel `union` Drops Bind Values": build the subquery from `to_sql` |
+| `there is no parameter $1` or a syntax error near `?` on a `UNION` / `INTERSECT` query, or no rows on SQLite | "Arel `union` / `intersect` Drops Bind Values": build the subquery from `to_sql` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
 ---
