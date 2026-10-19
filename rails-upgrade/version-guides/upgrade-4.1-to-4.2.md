@@ -183,7 +183,15 @@ ArgumentError: Unknown key: :presence. Valid keys are: :on, :if, :unless, :prepe
 Through 4.1 `validate` handed the extra keys to `set_callback`, which ignored them. So `validate :owner_id, presence: true` has never validated anything: it only calls the `owner_id` reader as a validation callback. `allow_blank:`, `allow_nil:`, `message:` and `strict:` on a `validate` line were ignored the same way.
 
 **Detection Pattern:**
-The `VALIDATE_UNKNOWN_OPTIONS` pattern follows the argument list across lines that end in a comma. A call whose first argument is a validator object, a lambda or a string is skipped, since Rails does not check its options.
+```ruby
+validate :owner_id, presence: true
+validate :dates_in_order, on: :create, allow_blank: true
+validate :dates_in_order,
+         :message => "is invalid"
+validate :dates_in_order, "if" => :ready?
+```
+
+The `VALIDATE_UNKNOWN_OPTIONS` pattern follows the argument list across lines that end in a comma. A call whose first argument is a validator object, a lambda or a string is skipped, since Rails does not check its options. It cannot see options that come from an enclosing `with_options` block: on 4.2 both `o.validate :x` and a bare `validate :x` inside `with_options allow_blank: true do ... end` go through `ActiveSupport::OptionMerger`, which appends the block's hash, so they raise too. Check every `with_options` block that contains `validate` by hand. A `**opts` splat is not seen either.
 
 **Fix:**
 ```ruby
@@ -198,7 +206,9 @@ validate :dates_in_order, on: :create
 validates :owner_id, presence: true
 ```
 
-Both forms work on 4.1 and 4.2. Ship the switch to `validates` as its own reviewed change, separate from the upgrade, since it starts enforcing a rule the app never enforced.
+A string key such as `"if" => :ready?` raises too, and it never applied on 4.1, so deleting it keeps the old behavior while `if: :ready?` makes the validation conditional for the first time. For a `with_options` block, move `validate` out of it; when it was called as `o.validate`, carry over any `:on` / `:if` / `:unless` the block gave it.
+
+All of these work on 4.1 and 4.2. Ship the switch to `validates` as its own reviewed change, separate from the upgrade, since it starts enforcing a rule the app never enforced.
 
 ---
 
