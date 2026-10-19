@@ -149,6 +149,17 @@ upgrade_findings:
       fix: "Remove gem 'foreigner', run bundle install, run bin/rake db:schema:dump, verify db/schema.rb. Note: Rails FK support is a subset of Foreigner"
       variable_name: "FOREIGNER"
 
+    - name: "Direct use of @attributes in a model"
+      kind: "breaking"
+      pattern: "(?<![@\\w])@attributes\\b"
+      exclude: "\\A[ \\t]*#"
+      search_paths:
+        - "app/models/"
+        - "config/initializers/"
+      explanation: "Rails 4.2.0 keeps a record's attributes in an ActiveRecord::AttributeSet instead of a Hash. Swapping in a Hash breaks the first attribute read (NoMethodError: undefined method `fetch_value' for ...:Hash), Hash writes and reads such as []=, merge! and fetch raise NoMethodError, and @attributes['x'] silently returns an Attribute object instead of the value. Every direct @attributes reference in app/models/ and config/initializers/ is flagged: a plain Ruby class there with its own @attributes Hash is a known false positive, and lib/ and the rest of app/ are not scanned (the guide entry gives a grep for them)"
+      fix: "Use the public API, which works on 4.1 and 4.2: read_attribute(:x) or read_attribute_before_type_cast(:x) for reads, write_attribute(:x, v) or self[:x] = v for writes. For extra non-column values, keep them out of @attributes: hold them in the model's own instance variable, load it in after_initialize and again after reload, and override attributes to merge them in (super.merge('extra' => @extra)) if callers need them there; record[:extra] and read_attribute(:extra) then return nil, so switch those calls to record.extra. Do not call attribute_will_change! for a non-column name: on 4.2 the partial UPDATE then includes it and fails with no such column"
+      variable_name: "ATTRIBUTES_IVAR_REPLACE"
+
   low_priority:
     - name: "Procfile rails server without explicit bind"
       kind: "breaking"
