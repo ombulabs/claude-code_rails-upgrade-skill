@@ -139,6 +139,17 @@ upgrade_findings:
       fix: "Fetch the token per request or use Rails form helpers that handle masking automatically"
       variable_name: "CSRF_TOKEN_MASKING"
 
+    - name: "Arel union of relations drops bind values"
+      kind: "breaking"
+      pattern: "(?<!Regexp)(?<![_$])\\.union(?:\\(|[ \\t]+(?=[@:A-Za-z_]))|\\b(?:Arel::)?Nodes::Union(?:All)?\\.new\\b"
+      exclude: "\\A\\s*#|\\bRegexp\\.union\\b|\\bSet(?:\\.new\\b|\\[)|\\.to_set\\.union\\b|\\]\\.union\\b"
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.2 keeps the values of where(column: value) as bind values on the relation until the query runs. Relation#union (passed through to Arel::SelectManager#union) and Arel::Nodes::Union.new / UnionAll.new combine the two Arel trees but not their bind values, so the SQL reaches the database with a literal ? placeholder. SQLite binds it as NULL and the query silently returns no rows; PostgreSQL and MySQL raise a syntax error. On 4.1 the same code inlined the values and worked. Usual shape: Model.from(Model.arel_table.create_table_alias(a.union(b), :alias).to_sql). Calls from the active_record_union gem (Relation#union / #union_all) carry their bind values and are fine; the regex cannot tell them apart, so check the Gemfile before rewriting. Regexp.union, Set#union, array literals, lodash _.union and comment lines are skipped; a Set or Array held in a plain variable (ids.union(other)) is still flagged"
+      fix: "Build the subquery from each relation to_sql, which inlines its bind values on 4.1 and 4.2: Model.from(\"(#{a.to_sql} UNION #{b.to_sql}) alias\"). Use UNION ALL only where the old code passed :all. The values come from to_sql quoting, so nothing user-supplied is interpolated unquoted. No NextRails.next? branch is needed. Or add the active_record_union gem and call a.union(b), which returns a relation that keeps both sets of bind values"
+      variable_name: "AREL_UNION_BINDS"
+
     - name: "Foreigner gem"
       kind: "migration"
       pattern: "gem.*['\"]foreigner['\"]"

@@ -1,0 +1,40 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+AREL_UNION_BINDS:
+  match:
+    # the usual shape: a union of two relations used as a FROM subquery
+    - "Post.from(Post.arel_table.create_table_alias(active.union(archived), :posts).to_sql)"
+    - "    union = active.union(archived)"
+    - "  relation.union(:all, other)"
+    - "scope.union other_scope"
+    - "Post.where(state: \"a\").union(Post.where(state: \"b\"))"
+    - "a.arel.union(b.arel)"
+    - "Arel::Nodes::Union.new(a.arel.ast, b.arel.ast)"
+    - "Arel::Nodes::UnionAll.new(left.ast, right.ast)"
+  no_match:
+    # Regexp.union, Set#union and Array#union (Ruby 2.6+) are not Arel
+    - "PATTERN = Regexp.union(KEYWORDS)"
+    - "Set.new(ids).union(other_ids)"
+    - "Set[1, 2].union([3])"
+    - "ids.to_set.union(other)"
+    - "[1, 2].union([3])"
+    # lodash / jQuery-style helpers under app/assets
+    - "var all = _.union(a, b);"
+    - "all = $.union(a)"
+    - "# active.union(archived) loses binds"
+    - "sql = \"SELECT 1 UNION SELECT 2\""
+    - "def union(other)"
+    # active_record_union's union_all carries its binds
+    - "Post.where(id: 1).union_all(Post.where(id: 2))"
+    - "trade_union(x)"
