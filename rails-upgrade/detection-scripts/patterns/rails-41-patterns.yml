@@ -376,6 +376,17 @@ upgrade_findings:
       fix: "Assert on what the app controls instead of Rails wording: the exception class (raise_error(ActiveRecord::RecordNotFound)), the response status, and the id that was looked up. Where the response carries an app-written message, assert that instead. If a spec must keep checking the Rails text, match both forms, for example /Couldn't find Post with '?id'?=999/, and drop the old form once 4.0 is gone. If API clients parse the message, tell them about the new wording or return an app-owned message"
       variable_name: "RECORD_NOT_FOUND_MESSAGE"
 
+    - name: "belongs_to dependent: :destroy with an unguarded after_destroy reciprocal (automatic inverse_of)"
+      kind: breaking
+      pattern: "belongs_to\\s+:[a-z_]+.*dependent\\s*(?::|=>)\\s*:destroy"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+        - "lib/"
+      explanation: "Rails 4.1 detects `inverse_of` automatically (`automatic_inverse_of` in activerecord-4.1.x/lib/active_record/reflection.rb) for a has_one / has_many / belongs_to pair whose names match and that has no scope, `foreign_key:`, `polymorphic:`, `through:` or `inverse_of: false`; 4.0 set an inverse only when the app declared one. For a reciprocal `dependent: :destroy` pair that the app fixed on 4.0 by moving one side to an unguarded `after_destroy { attachment.destroy if attachment }`, the second pass now gets the same in-memory record back instead of a fresh read that returns nil, its callbacks run again and destroy raises SystemStackError. Run on activerecord 4.0.13 and 4.1.16 with SQLite, that shape terminates on 4.0 and recurses on 4.1 from either side, and keeps recursing on 4.2 until 5.0's re-entrancy guard. A pair still cascading with `dependent: :destroy` on both sides recurses on 4.0 already (rails-40 BELONGS_TO_DEPENDENT). Same regex as the 4.0 pattern: it flags the belongs_to side only, so treat each hit as `check the target model for an after_destroy that destroys this record back`. A declaration wrapped across lines is missed"
+      fix: "Guard the after_destroy with an instance flag: `def destroy_attachment; return if @_destroying_attachment; begin; @_destroying_attachment = true; attachment.destroy if attachment; ensure; @_destroying_attachment = false; end; end`. It terminates on 3.2 through 5.0 with the inverse automatic, explicit or disabled. `inverse_of: false` on both associations also stops the loop once the cascade is in after_destroy, but it gives up the in-memory inverse for every other caller, and it does not help a pair that still has `dependent: :destroy` on both sides. See \"Automatic `inverse_of` Brings Back the Bidirectional `dependent: :destroy` Loop\" in the 4.0 to 4.1 guide"
+      variable_name: "BELONGS_TO_DEPENDENT_AUTO_INVERSE"
+
   low_priority:
     - name: "Spring gem in Gemfile (presence check)"
       kind: optional
