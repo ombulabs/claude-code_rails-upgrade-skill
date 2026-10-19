@@ -1,0 +1,31 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not, a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+COLUMN_NEW_SQL_TYPE_ARG:
+  match:
+    # the tableless-model recipe
+    - "    columns << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)"
+    # a virtual typed field appended to a real model's columns
+    - "cols << ::ActiveRecord::ConnectionAdapters::Column.new(\"flag\", nil, \"boolean\")"
+    - "ConnectionAdapters::Column.new(name, nil, type)"
+    # the MySQL adapter Column subclasses take cast_type third on 4.2 too
+    - "  col = ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::Column.new(\"x\", nil, \"tinyint(1)\")"
+    - "  ActiveRecord::ConnectionAdapters::Mysql2Adapter::Column.new \"x\", nil, \"int(11)\""
+  no_match:
+    - "  # columns << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)"
+    - "ActiveRecord::ConnectionAdapters::ColumnDefinition.new(base, name, type)"
+    # PostgreSQLColumn already took an oid type third on 4.1
+    - "ActiveRecord::ConnectionAdapters::PostgreSQLColumn.new(\"x\", nil, oid, \"int\")"
+    - "ReportBuilder::Column.new(:name, \"Name\")"
+    - "Column.new(:title)"
+    - "connection.new_column(\"x\", nil, type)"

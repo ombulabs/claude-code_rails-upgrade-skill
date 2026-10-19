@@ -169,6 +169,44 @@ assert_select "a[href='/foo']"
 
 ---
 
+#### `ConnectionAdapters::Column.new` Takes a Cast Type Third
+
+**Pattern:** `COLUMN_NEW_SQL_TYPE_ARG`
+
+**What Changed:**
+`ActiveRecord::ConnectionAdapters::Column#initialize` changes from `(name, default, sql_type = nil, null = true)` to `(name, default, cast_type, sql_type = nil, null = true)`, and the column hands every cast (`type_cast_from_user`, `type_cast_from_database`, ...) to `cast_type`. The MySQL adapter's `Column` subclass changes the same way. Code that builds fake columns, such as the tableless-model recipe or a virtual typed field appended to a real model's `columns`, still loads, but the SQL type string now lands in `cast_type`, so the first assignment raises (`type_cast_from_database` instead on some shapes and 4.2.x releases):
+
+```
+NoMethodError: undefined method `type_cast_from_user' for "boolean":String
+```
+
+**Detection Pattern:**
+The `COLUMN_NEW_SQL_TYPE_ARG` pattern flags every `ConnectionAdapters::Column.new` call outside comments. A bare `Column.new` inside a reopened `ConnectionAdapters` module is missed.
+
+**Fix:**
+Look the cast type up from the connection on 4.2 and keep the old call on 4.1. `lookup_cast_type` does not exist on 4.1, so the branch is needed while both versions boot:
+
+```ruby
+# BEFORE
+def self.column(name, sql_type = nil, default = nil, null = true)
+  columns << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
+end
+
+# AFTER
+def self.column(name, sql_type = nil, default = nil, null = true)
+  columns << if NextRails.next?
+    cast_type = connection.lookup_cast_type(sql_type.to_s)
+    ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, cast_type, sql_type.to_s, null)
+  else
+    ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
+  end
+end
+```
+
+After the upgrade, drop the `else` branch. `lookup_cast_type` uses the adapter's type map: `boolean`, `integer` and `date` get their cast types, and a name the map does not know (`string` on SQLite) gets `ActiveRecord::Type::Value`, which casts nothing, the same as 4.1 did for that field. A table-backed model can instead declare the field with the 4.2 class method `attribute :flag, ActiveRecord::Type::Boolean.new` (absent on 4.0 and 4.1). On 4.2.0 a set `attribute` with no table column still goes into the INSERT; 4.2.1 and later leave it out. The long-term replacement is the Rails 5.0 attributes API.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -540,6 +578,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
 10. Consider dropping Foreigner for native FKs (optional)
+11. Pass a cast type to fake `ConnectionAdapters::Column.new` calls (tableless models, virtual typed fields)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -560,6 +599,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'deliver' for #<Mail::Message>` | "ActionMailer `#deliver` / `#deliver!` Deprecated" — `deliver_now` / `deliver_later` |
 | `undefined method 'respond_with' for ApplicationController` | "`respond_with` / Class-Level `respond_to` Extracted" — `gem 'responders', '~> 2.0'` |
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
+| `NoMethodError: undefined method 'type_cast_from_user' for "boolean":String` | "`ConnectionAdapters::Column.new` Takes a Cast Type Third": pass a cast type on 4.2 |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
