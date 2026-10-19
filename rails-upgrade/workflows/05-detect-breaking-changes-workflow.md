@@ -42,6 +42,7 @@ The pattern file contains:
 - `upgrade_findings.medium_priority` - Important patterns to search
 - `upgrade_findings.low_priority` - Lower-urgency patterns to search
 - Each pattern has: `name`, `kind`, `pattern`, `search_paths`, `explanation`, `fix`, `variable_name`
+- Each pattern may optionally declare `unless_file_matches:`, a regex tested against a whole file's content: when it matches, the scanner drops that pattern's matches in that file. File-marker patterns use it to skip a config file that already sets the option they ask about.
 - Each pattern may optionally declare `prereqs:` — a list of gem-version floors that must be in place for the suggested `fix:` to actually work. See "The `prereqs:` field" below.
 - `kind` is one of `breaking` / `deprecation` / `migration` / `optional` — see `CLAUDE.md` → "Assigning `kind:`" for the rubric. The bucket each finding lands in (see Step 4 / Output Format) is driven by `kind`, not by priority.
 
@@ -110,7 +111,7 @@ Flags: `--summary` prints only the summary and the status lists; `--only VAR1,VA
 
 The scanner matches against file content, so a call split across lines is found when the pattern is written to cross newlines. It also searches Packwerk packs, engines and components (`app/models/` also reaches `packs/*/app/models/`) and skips `node_modules` anywhere and `vendor`, `tmp` and `log` at the app or pack root, unless a search_path names them. A site that spans lines is reported as `file:start-end`.
 
-If Ruby cannot run in the app's environment at all, fall back to the Grep tool: for every pattern in `upgrade_findings.high_priority`, `medium_priority` and `low_priority`, run one Grep per search_path with `output_mode: "content"` and `-n: true`, then drop lines that match `exclude:`. Grep is line-based, so its counts are a floor for patterns that span lines. Grep rejects look-around (`(?=`, `(?!`, `(?<=`, `(?<!`) and, without `multiline: true`, a `\n`, with a parse error rather than zero hits: split such a pattern at its top-level `|`, drop the look-around from the alternatives that carry it, and read each of the broader hits.
+If Ruby cannot run in the app's environment at all, fall back to the Grep tool: for every pattern in `upgrade_findings.high_priority`, `medium_priority` and `low_priority`, run one Grep per search_path with `output_mode: "content"` and `-n: true`, then drop lines that match `exclude:`. For a pattern with `unless_file_matches:`, Grep each flagged file for that regex and drop the file's hits when it matches. Grep is line-based, so its counts are a floor for patterns that span lines. Grep rejects look-around (`(?=`, `(?!`, `(?<=`, `(?<!`) and, without `multiline: true`, a `\n`, with a parse error rather than zero hits: split such a pattern at its top-level `|`, drop the look-around from the alternatives that carry it, and read each of the broader hits.
 
 ---
 
@@ -263,6 +264,7 @@ upgrade_findings:
       kind: "breaking"  # one of: breaking | deprecation | migration | optional
       pattern: "regex pattern"
       exclude: "exclusion pattern (optional)"
+      unless_file_matches: "skip a file whose content matches this (optional)"
       search_paths:
         - "path/to/search"
         - "another/path"
