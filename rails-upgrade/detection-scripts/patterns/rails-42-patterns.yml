@@ -119,6 +119,19 @@ upgrade_findings:
       fix: "Review code that assigns nil to serialized attributes with custom coders. Check for tests that relied on the coder's nil representation (e.g., 'null' for JSON)"
       variable_name: "SERIALIZED_CUSTOM_CODER"
 
+    - name: "Integration test request path without a leading slash"
+      kind: "breaking"
+      pattern: "(?:^|[{;]|\\bdo\\b)[ \\t]*(?:\\|[^|\\n]*\\|[ \\t]*)?(?:(?:get|post|put|patch|delete|head)(?:_via_redirect)?|(?:xhr|xml_http_request|request_via_redirect)[ \\t]*\\(?[ \\t]*:(?:get|post|put|patch|delete|head)[ \\t]*,)[ \\t]*\\(?[ \\t]*([\"'])(?![/?#\"']|[^\"'\\n]*://)[^\"'\\s]+\\1(?![ \\t]*do\\b)"
+      exclude: ""
+      search_paths:
+        - "spec/requests/"
+        - "spec/integration/"
+        - "spec/api/"
+        - "test/integration/"
+      explanation: "Rails 4.2 builds the integration request URI as a string, scheme://host:port followed by the path (ActionDispatch::Integration::Session#build_full_uri, new in 4.2.0), so get \"users\" requests http://www.example.com:80users and rack-test raises URI::InvalidURIError (bad URI(is not URI?) on Ruby 2.x). Rails 4.1 resolved the path against \"/\" with URI#+, so the slash was optional. Flags get/post/put/patch/delete/head (and the _via_redirect, xhr, xml_http_request and request_via_redirect forms) at the start of a line or after {, ; or do, whose path argument is a string literal that starts with neither /, ? nor # and is not a full URL (a leading ? or # still forms a valid URI on 4.2). Skipped: a string followed directly by do (rswag-style operation blocks such as get \"List users\" do), symbols (get :index), path helpers and variables, routing-spec hashes (get: \"users\"), receivers such as redis.get. Missed: paths with spaces inside #{ }, calls on a session object (sess.get \"users\"), a path on the next line, and request helpers kept in spec/support/ or test/support/, which are not searched because controller shared examples there pass action names (get \"show\"). A spec that includes Rack::Test::Methods directly (Grape or Sinatra apps under spec/api/) is not affected, since rack-test adds the slash itself"
+      fix: "Add the leading slash (get \"/users\"), or use a path helper (get users_path). Both work on 4.1 and 4.2, so no dual-boot conditional is needed"
+      variable_name: "INTEGRATION_RELATIVE_PATH"
+
     - name: "serve_static_assets config"
       kind: "deprecation"
       pattern: "serve_static_assets"
