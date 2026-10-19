@@ -1,0 +1,43 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not, like a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+MAPPER_NORMALIZE_CONDITIONS:
+  # The usual nested reopen (`module Routing`, `class Mapper`, `class Mapping`
+  # on separate lines) spans lines, so it cannot be a fixture here. It was
+  # checked with a whole-file scan of a multi-line initializer, LF and CRLF.
+  # The one-line `;` forms below exercise the same branch.
+  match:
+    - "      def normalize_conditions!"
+    - "        alias_method :normalize_conditions_without_auth!, :normalize_conditions!"
+    - "  alias_method_chain :normalize_conditions!, :auth"
+    - "      def normalize_requirements!"
+    - "        options.merge!(default_controller_and_action)"
+    - "ActionDispatch::Routing::Mapper::Mapping.send(:prepend, RouteAuthOptions)"
+    - "ActionDispatch::Routing::Mapper::Mapping.class_eval do"
+    - "class ActionDispatch::Routing::Mapper::Mapping"
+    - "::ActionDispatch::Routing::Mapper::Mapping.class_eval do"
+    - "class ActionDispatch::Routing::Mapper; class Mapping"
+    - "module ActionDispatch; module Routing; class Mapper; class Mapping"
+  no_match:
+    - "      def normalize_conditions_without_auth!"
+    - "  def normalize_conditions(params)"
+    - "  normalize_requirements_for(record)"
+    - "class Mapping < ActiveRecord::Base"
+    - "  belongs_to :mapping"
+    - "ActionDispatch::Routing::Mapper.new(set)"
+    - "ActionDispatch::Routing::Mapper::Mappings"
+    - "Geo::TileMapper::Mapping.new(tile)"
+    # an app-owned Mapper::Mapping outside ActionDispatch::Routing
+    - "Importers::Mapper::Mapping.new(row)"
+    - "class Mapper; class Mapping < Struct.new(:a); end; end"
+    - "  default_controller_and_action_name = 'home#index'"
