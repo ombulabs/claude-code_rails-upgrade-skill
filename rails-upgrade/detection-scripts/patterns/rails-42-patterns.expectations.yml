@@ -15,7 +15,6 @@ POLYMORPHIC_URL_OVERRIDE:
   match:
     - "  def polymorphic_url(record_or_hash_or_array, options = {})"
     - "def polymorphic_url(*args)"
-    - "  def self.polymorphic_url(record, options = {})"
     - "  alias_method :polymorphic_url_without_locale, :polymorphic_url"
     - "  alias_method :polymorphic_url, :localized_polymorphic_url"
     - "  alias polymorphic_url_without_locale polymorphic_url"
@@ -24,12 +23,22 @@ POLYMORPHIC_URL_OVERRIDE:
     - "  alias_method \"polymorphic_url_without_locale\", \"polymorphic_url\""
     - "  define_method(:polymorphic_url) do |record, options = {}|"
     - "  define_method :polymorphic_url do |*args|"
+    - "  private def polymorphic_url(record, options = {})"
+    - "  class_eval { alias_method :polymorphic_url, :localized_url }"
+    - "PolymorphicRoutes.send(:alias_method, :polymorphic_url_without_locale, :polymorphic_url)"
+    - "PolymorphicRoutes.send(:define_method, :polymorphic_url) { |*a| x }"
+    # Arguments that wrap after a comma or an opening paren are matched by
+    # scan_patterns.rb, which reads whole files. Fixtures are single lines, so
+    # that reach was checked with pattern_lab.rb scan instead.
   no_match:
     # calls, not overrides
     - "  url = polymorphic_url(record)"
     - "  redirect_to polymorphic_url([:admin, post])"
     - "  def url; polymorphic_url(self); end"
     - "  delegate :polymorphic_url, to: :view"
+    - "  y = record.alias"
+    # a singleton method is not the instance helper that polymorphic_path and url_for reach
+    - "  def self.polymorphic_url(record)"
     # other methods whose name contains polymorphic_url
     - "  def polymorphic_path(record, options = {})"
     - "  def edit_polymorphic_url(record, options = {})"
@@ -40,3 +49,5 @@ POLYMORPHIC_URL_OVERRIDE:
     # commented out, or only named in a trailing comment
     - "  # def polymorphic_url(record, options = {})"
     - "  alias_method :foo, :bar # polymorphic_url"
+    - "  link_to \"x\", polymorphic_url(post) # alias for polymorphic_url"
+    - "  url = polymorphic_url(r) # def polymorphic_url"

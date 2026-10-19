@@ -179,7 +179,7 @@ Through Rails 4.1 every record-based route goes through `polymorphic_url`: `poly
 Rails 4.2 rewrote this. `polymorphic_path` builds the route itself, and `url_for` with a single record, class or symbol calls the named route helper (`post_path`, `post_url`) directly, skipping both polymorphic methods. On 4.2 the override still reaches only `polymorphic_url`, `edit_`/`new_polymorphic_url` and `url_for([...])` in controllers. Nothing raises: paths, `link_to` targets, form actions and `redirect_to record` just lose what the override added.
 
 **Detection Pattern:**
-`POLYMORPHIC_URL_OVERRIDE` flags `def` / `def self.` / `define_method` of `polymorphic_url` and `alias`, `alias_method` and `alias_method_chain` calls that name it, also when the arguments wrap after a comma. Commented-out lines are skipped.
+`POLYMORPHIC_URL_OVERRIDE` flags `def` (also `private def`) and `define_method` of `polymorphic_url`, and `alias`, `alias_method` and `alias_method_chain` calls that name it, also through `send` and when the arguments wrap after a comma or an opening paren. Calls, comments and `def self.polymorphic_url` are skipped.
 
 **Fix:**
 If the override only adds URL params, move them to `default_url_options`, which every route helper reads on both versions, and delete the override. This also adds the param to named helpers such as `post_path`, which the override never reached:
