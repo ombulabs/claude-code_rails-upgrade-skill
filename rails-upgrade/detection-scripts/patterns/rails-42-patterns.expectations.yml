@@ -1,0 +1,56 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not — a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+VALIDATE_UNKNOWN_OPTIONS:
+  # The multi-line shapes (an argument list continued after a trailing comma,
+  # `validate(` on its own line) are proved with pattern_lab.rb scan, since
+  # fixtures are single lines.
+  match:
+    - "  validate :owner_id, presence: true"
+    - "  validate :owner_id, :presence => true"
+    - "  validate :check_dates, allow_blank: true"
+    - "  validate :check_dates, if: :active?, allow_nil: true"
+    - "  validate :check_dates, on: :create, message: \"is invalid\""
+    - "  validate :starts_before_end, :ends_after_start, strict: true"
+    - "  validate(:check_dates, only: :create)"
+    - "  validate :check, if: -> { draft? }, presence: true"
+    - "  validate :check, on: [:create, :update], uniqueness: { scope: :account_id }"
+    - "  validate :check, :if => :ok?, :allow_nil => true"
+    - "  validate :check, \"if\" => :ok?"
+    - "  validate :valid_dates?, presence: true"
+    - "  validate(presence: true) { errors.add(:base, \"x\") }"
+    - "  validate :check,presence:true"
+  no_match:
+    - "  validate :check_dates"
+    - "  validate :check_dates, :check_other"
+    - "  validate :check_dates, on: [:create, :update]"
+    - "  validate :check_dates, if: :active?, unless: :draft?"
+    - "  validate :check, :on => :create, :if => :ok?, :unless => :no?, :prepend => true"
+    - "  validate :check, prepend: true"
+    - "  validate :check, if: -> { a? ? b : c }"
+    # a keyword argument inside a one-line block value is not an option of validate
+    - "  validate :check, if: proc { |r| r.enabled?(scope: :all) }"
+    - "  validate :check, if: Feature::Flags.enabled?"
+    - "  validate :check, if: :ok? # presence: true was removed"
+    - "  validates :owner_id, presence: true"
+    - "  validates_with OwnerValidator, fields: [:owner_id]"
+    - "  validate do |record|"
+    - "  validate { errors.add(:base, \"x\") }"
+    - "  def validate(record, options = {})"
+    - "  # validate :owner_id, presence: true"
+    - "  record.validate :foo, presence: true"
+    # Rails only checks the options when every positional argument is a Symbol
+    - "  validate OwnerValidator.new(fields: [:owner_id])"
+    - "  validate \"check_dates\", presence: true"
+    - "  validate ->(r) { r.errors.add(:base, \"x\") }, if: :ok?"
+    - "  revalidate :owner_id, presence: true"

@@ -77,6 +77,17 @@ upgrade_findings:
       fix: "Set config.active_job.queue_adapter = :sidekiq (or :resque, :delayed_job, :que, etc.) in config/application.rb or per-environment, and ensure the adapter gem is in the Gemfile. For dev/test without a backend, :inline or :async is acceptable"
       variable_name: "ACTIVE_JOB_ADAPTER"
 
+    - name: "validate called with options it does not accept"
+      kind: "breaking"
+      pattern: "^[ \\t]*validate(?:[ \\t]+|[ \\t]*\\(\\s*)(?::[A-Za-z_]\\w*[?!]?[ \\t]*,\\s*)*(?=(?:[a-z_]\\w*:(?!:)|:[a-z_]\\w*[ \\t]*=>|[\"'][^\"'\\n]*[\"'][ \\t]*=>))(?:[^\\n,#{]|,(?:[ \\t]*\\n)?|\\{[^{}\\n]*\\})*?(?<![\\w:])(?:(?!(?:on|if|unless|prepend):)[a-z_]\\w*:(?!:)|:(?!(?:on|if|unless|prepend)[ \\t]*=>)[a-z_]\\w*[ \\t]*=>|[\"'][^\"'\\n]*[\"'][ \\t]*=>)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "From Rails 4.2.0, validate (singular, the method-name and block form) checks its options against ActiveModel::Validations::VALID_OPTIONS_FOR_VALIDATE, which is :on, :if, :unless and :prepend, whenever every positional argument is a Symbol. Any other key (presence:, allow_blank:, allow_nil:, message:, strict:, a string key) raises ArgumentError (Unknown key ... Perhaps you meant to call `validates` instead of `validate`?) when the class body runs, so the model cannot load. Through 4.1 validate passed the extra keys to set_callback, which ignored them, so a line like validate :owner_id, presence: true has never validated anything: it only calls the owner_id reader as a validation callback. The pattern follows an argument list across lines that end in a comma. It skips keys inside a one-line { } block or lambda value, a call whose first argument is not a Symbol (a validator object, a lambda, a string, which Rails does not check), and anything after a # on the line. Gaps: a key after a multi-line block value, an option hash wrapped in explicit braces"
+      fix: "Decide per line. Deleting the extra options (or the whole line, when the method it names is just an attribute reader) keeps the current behavior exactly, since they never did anything. Turning the line into the validates call it was meant to be (validates :owner_id, presence: true) is a behavior change: existing records may start failing validation, so ship that as a separate, reviewed change. Either fix works on 4.1 and 4.2, no NextRails.next? branch needed"
+      variable_name: "VALIDATE_UNKNOWN_OPTIONS"
+
   medium_priority:
     - name: "find/exists? with possible AR object argument"
       kind: "deprecation"

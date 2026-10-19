@@ -169,6 +169,39 @@ assert_select "a[href='/foo']"
 
 ---
 
+#### `validate` Rejects Options Other Than `:on`, `:if`, `:unless`, `:prepend`
+
+**Pattern:** `VALIDATE_UNKNOWN_OPTIONS`
+
+**What Changed:**
+`validate` (singular, the method-name and block form) now checks its options against `ActiveModel::Validations::VALID_OPTIONS_FOR_VALIDATE` (`:on`, `:if`, `:unless`, `:prepend`) whenever every positional argument is a Symbol. Any other key raises when the class body runs, so the model cannot load:
+
+```
+ArgumentError: Unknown key: :presence. Valid keys are: :on, :if, :unless, :prepend. Perhaps you meant to call `validates` instead of `validate`?
+```
+
+Through 4.1 `validate` handed the extra keys to `set_callback`, which ignored them. So `validate :owner_id, presence: true` has never validated anything: it only calls the `owner_id` reader as a validation callback. `allow_blank:`, `allow_nil:`, `message:` and `strict:` on a `validate` line were ignored the same way.
+
+**Detection Pattern:**
+The `VALIDATE_UNKNOWN_OPTIONS` pattern follows the argument list across lines that end in a comma. A call whose first argument is a validator object, a lambda or a string is skipped, since Rails does not check its options.
+
+**Fix:**
+```ruby
+# BEFORE (loads on 4.1 and validates nothing, raises on 4.2)
+validate :owner_id, presence: true
+validate :dates_in_order, on: :create, allow_blank: true
+
+# AFTER, same behavior as 4.1: drop what never ran
+validate :dates_in_order, on: :create
+
+# AFTER, what the line meant (a behavior change: existing records may now fail)
+validates :owner_id, presence: true
+```
+
+Both forms work on 4.1 and 4.2. Ship the switch to `validates` as its own reviewed change, separate from the upgrade, since it starts enforcing a rule the app never enforced.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -540,6 +573,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
 10. Consider dropping Foreigner for native FKs (optional)
+11. Fix `validate` calls with options other than `:on` / `:if` / `:unless` / `:prepend` (`validates`, or drop the options)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -563,6 +597,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
+| `ArgumentError: Unknown key: :presence. Valid keys are: :on, :if, :unless, :prepend` when a model loads | "`validate` Rejects Options Other Than `:on`, `:if`, `:unless`, `:prepend`": `validates`, or drop the options |
 
 ---
 
