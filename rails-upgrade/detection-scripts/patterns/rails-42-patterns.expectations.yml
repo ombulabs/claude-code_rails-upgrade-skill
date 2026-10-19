@@ -31,6 +31,12 @@ INTEGRATION_RELATIVE_PATH:
     - "request_via_redirect :get, \"login\""
     - "  get_via_redirect \"login\""
     - "post_via_redirect \"sessions\", user: user"
+    # one-line blocks and statements after ;
+    - "  before do get \"users\" end"
+    - "  scenario \"x\" do; get \"users\"; end"
+    # a do later on the line, or in a comment, does not hide the request
+    - "get \"users\", params: { q: \"do\" }"
+    - "get \"users\" # do"
   no_match:
     - "    get \"/users\""
     - "get '/assets/app.css'"
@@ -63,6 +69,10 @@ INTEGRATION_RELATIVE_PATH:
     - "Net::HTTP.get(\"example.com\", \"/\")"
     - "target \"users\""
     - "forget \"users\""
-    - "get \"/users\", params: { q: \"do\" }"
-    # known gap: a space inside #{ } stops the path match
-    - "get \"users/#{ user.id }\""
+    - "undo \"users\""
+    - "it \"does get users\" do"
+    # a fragment-only path forms a valid URI on 4.2
+    - "get \"#anchor\""
+
+# Known gap, not a fixture because it does break on 4.2: a space inside #{ }
+# stops the path match, so get "users/#{ user.id }" is not flagged.

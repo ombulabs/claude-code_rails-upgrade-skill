@@ -220,10 +220,10 @@ Review code and tests that relied on the coder's nil representation. If you need
 **Pattern:** `INTEGRATION_RELATIVE_PATH`
 
 **What Changed:**
-Integration sessions (`ActionDispatch::IntegrationTest`, RSpec request specs) now build the request URI as a string: scheme, host and port, then the path as given (`Integration::Session#build_full_uri`, new in 4.2.0). Rails 4.1 resolved the path against `/` with `URI#+`, so `get "users"` worked by accident. On 4.2 the same call requests `http://www.example.com:80users` and rack-test raises `URI::InvalidURIError: bad URI (is not URI?)`. The actionpack 4.2.0 CHANGELOG lists it: the leading slash is now required in the integration test `process` helpers. A path that starts with `?` and a full URL still work. Specs that include `Rack::Test::Methods` directly (Grape or Sinatra apps) are not affected, since rack-test adds the slash itself.
+Integration sessions (`ActionDispatch::IntegrationTest`, RSpec request specs) now build the request URI as a string: scheme, host and port, then the path as given (`Integration::Session#build_full_uri`, new in 4.2.0). Rails 4.1 resolved the path against `/` with `URI#+`, so `get "users"` worked by accident. On 4.2 the same call requests `http://www.example.com:80users` and rack-test raises `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` (Ruby 2.x wording). The actionpack 4.2.0 CHANGELOG lists it: the leading slash is now required in the integration test `process` helpers. A path that starts with `?` or `#`, and a full URL, still work. Specs that include `Rack::Test::Methods` directly (Grape or Sinatra apps) are not affected, since rack-test adds the slash itself.
 
 **Detection Pattern:**
-The pattern flags `get`/`post`/`put`/`patch`/`delete`/`head` (and the `xhr`, `xml_http_request`, `*_via_redirect` forms) whose first string argument has no leading slash, in `spec/requests/`, `spec/integration/`, `spec/api/`, `spec/support/`, `test/integration/` and `test/support/`. It skips rswag-style `get "List users" do` blocks, symbols, path helpers and variables. It misses calls on a session object (`sess.get "users"`): search `open_session` blocks by hand.
+The pattern flags `get`/`post`/`put`/`patch`/`delete`/`head` (and the `xhr`, `xml_http_request`, `*_via_redirect` forms, where the path is the second argument) whose path is a string literal with no leading slash, in `spec/requests/`, `spec/integration/`, `spec/api/` and `test/integration/`. It skips rswag-style `get "List users" do` blocks, symbols, path helpers and variables. It misses calls on a session object (`sess.get "users"`) and request helpers in `spec/support/` or `test/support/` (left out because controller shared examples there pass action names such as `get "show"`): search those by hand.
 
 **Fix:**
 ```ruby
@@ -588,7 +588,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
-| `URI::InvalidURIError: bad URI (is not URI?): "http://www.example.com:80users"` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
+| `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
 ---
