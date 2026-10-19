@@ -61,7 +61,8 @@
 #    content, every match of the pattern in that file is dropped: the setting
 #    is there. Dropped this way, a site is neither a hit nor "suppressed by
 #    exclude"; the file still counts as scanned. Write the regex so a
-#    commented-out line does not count (`^[ \t]*config\.x[ \t]*=`).
+#    commented-out line does not count (`^[ \t]*config\.x[ \t]*=`). It reads
+#    text, not Ruby: a setting inside `=begin`/`=end` or a string still counts.
 
 require "yaml"
 require "json"
@@ -724,11 +725,13 @@ def self_test
                         "  # config.active_support.test_order = :random\n", true],
     "set to false" => ["    config.active_record.raise_in_transactional_callbacks = false\n", nil, true],
     "set" => ["    config.active_record.raise_in_transactional_callbacks = true\n",
-              "  config.active_support.test_order = :sorted\n", false]
+              "  config.active_support.test_order = :sorted\n", false],
+    "set to nil" => [nil, "  config.active_support.test_order = nil\n", true],
+    "set from ENV" => [nil, "  config.active_support.test_order = ENV.fetch('ORDER', 'random').to_sym\n", false]
   }.each do |state, (app_line, test_line, flagged)|
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "config/environments"))
-      File.write(File.join(dir, "config/application.rb"), format(app_rb, app_line))
+      File.write(File.join(dir, "config/application.rb"), format(app_rb, app_line.to_s))
       File.write(File.join(dir, "config/environments/test.rb"), format(test_rb, test_line.to_s))
       s = Scanner.new(dir)
       { "TRANSACTIONAL_CALLBACKS" => app_line, "TEST_ORDER" => test_line }.each do |var, line|

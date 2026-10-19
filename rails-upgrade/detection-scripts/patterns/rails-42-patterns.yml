@@ -41,7 +41,7 @@ upgrade_findings:
       unless_file_matches: "^[ \\t]*config\\.active_record\\.raise_in_transactional_callbacks[ \\t]*=[ \\t]*true\\b"
       search_paths:
         - "config/application.rb"
-      explanation: "FILE MARKER (manual review required): Rails 4.2 still suppresses exceptions in after_commit/after_rollback callbacks but emits a deprecation warning. The application file should opt-in to raising (the Rails 5.0+ default). Grep cannot detect absence of a setting, so this pattern flags config/application.rb itself — open it and verify the setting is present. scan_patterns.rb skips the file when it already sets the option to true on an uncommented line"
+      explanation: "FILE MARKER (manual review required): Rails 4.2 still suppresses exceptions in after_commit/after_rollback callbacks but emits a deprecation warning. The application file should opt-in to raising (the Rails 5.0+ default). Grep cannot detect absence of a setting, so this pattern flags config/application.rb itself — open it and verify the setting is present. scan_patterns.rb skips the file when it already sets the option to true on an uncommented line; it cannot see the option set in an initializer or an environment file, so check there before adding it"
       fix: "If config.active_record.raise_in_transactional_callbacks is NOT present in config/application.rb, add: config.active_record.raise_in_transactional_callbacks = true. If it is already set to true, no action needed"
       variable_name: "TRANSACTIONAL_CALLBACKS"
 
@@ -104,10 +104,10 @@ upgrade_findings:
       kind: "deprecation"
       pattern: "Rails\\.application\\.configure"
       exclude: ""
-      unless_file_matches: "^[ \\t]*config\\.active_support\\.test_order[ \\t]*=[ \\t]*:"
+      unless_file_matches: "^[ \\t]*config\\.active_support\\.test_order[ \\t]*=[ \\t]*(?!nil\\b)\\S"
       search_paths:
         - "config/environments/test.rb"
-      explanation: "FILE MARKER (manual review required): Rails 4.2 emits a deprecation warning when config.active_support.test_order is not explicitly set. Grep cannot detect absence of a setting, so this pattern flags the config file itself — open config/environments/test.rb and verify the setting is present. scan_patterns.rb skips the file when it sets the option on an uncommented line; it cannot see ActiveSupport::TestCase.test_order = ... in test/test_helper.rb, so check there before adding it"
+      explanation: "FILE MARKER (manual review required): Rails 4.2 emits a deprecation warning when config.active_support.test_order is not explicitly set. Grep cannot detect absence of a setting, so this pattern flags the config file itself — open config/environments/test.rb and verify the setting is present. scan_patterns.rb skips the file when it sets the option on an uncommented line; it cannot see the option in config/application.rb or ActiveSupport::TestCase.test_order = ... in test/test_helper.rb, so check there before adding it"
       fix: "If config.active_support.test_order is NOT present in config/environments/test.rb, add: config.active_support.test_order = :random (or :sorted to preserve 4.1 behavior)"
       variable_name: "TEST_ORDER"
 
