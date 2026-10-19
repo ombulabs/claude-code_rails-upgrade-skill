@@ -128,7 +128,7 @@ User.exists?(current_user.id)
 **What Changed:**
 Exceptions raised in `after_commit` or `after_rollback` callbacks are still rescued and logged by default in 4.2. While `config.active_record.raise_in_transactional_callbacks` is `false` (the 4.2 default), Rails emits a deprecation warning for every `after_commit` / `after_rollback` declaration as each model class loads, so a model with three such callbacks warns three times. Rails 5.0 removes the suppression and always raises.
 
-The setting is new in 4.2. Rails 4.1 has no `ActiveRecord::Base.raise_in_transactional_callbacks=`, and its `active_record.set_configs` initializer sends every `config.active_record` key to `ActiveRecord::Base`, so an unconditional line fails the 4.1 boot of a dual-boot app:
+The setting is new in 4.2. Rails 4.1 has no `ActiveRecord::Base.raise_in_transactional_callbacks=`, and its `active_record.set_configs` initializer sends every `config.active_record` key to `ActiveRecord::Base` when it loads. An unconditional line therefore breaks the 4.1 side of a dual-boot app as soon as `ActiveRecord::Base` loads: at boot when `eager_load` is true (production), at the first model reference otherwise (development and test, so `rails runner 'puts Rails.version'` can still pass):
 
 ```
 NoMethodError: undefined method `raise_in_transactional_callbacks=' for #<Class:0x...>
@@ -141,12 +141,14 @@ The `TRANSACTIONAL_CALLBACKS` pattern flags `config/application.rb` itself, beca
 
 **Fix:**
 ```ruby
-# BEFORE (config/application.rb): breaks the Rails 4.1 boot
+# BEFORE (config/application.rb): raises NoMethodError on Rails 4.1
 config.active_record.raise_in_transactional_callbacks = true
 
 # AFTER (config/application.rb): works on 4.1 and 4.2
 config.active_record.raise_in_transactional_callbacks = true if NextRails.next?
 ```
+
+A direct `ActiveRecord::Base.raise_in_transactional_callbacks = true` in an initializer fails on 4.1 the same way and needs the same `if NextRails.next?`. Without next_rails (a single-Gemfile bump), set the line without the condition in the commit that moves to 4.2.
 
 Then run the suite on 4.2 and fix each `after_commit` / `after_rollback` exception that now propagates. Once the app runs only on 4.2, drop the `if NextRails.next?`. Without the flag, bugs in transactional callbacks stay hidden in the log until the Rails 5.0 hop, where they raise anyway.
 
@@ -450,7 +452,7 @@ Version bumps for defaults:
 Run `bin/rake rails:update` to walk through config changes interactively. Key diffs to review:
 
 ### `config/application.rb`
-Add (inside the Application class). Gate it while dual booting, because Rails 4.1 has no such setter and fails to boot:
+Add (inside the Application class). While dual booting, gate it with `NextRails.next?`, because Rails 4.1 has no such setter (see "Transactional Callback Exception Suppression"). Without next_rails, drop the condition:
 ```ruby
 config.active_record.raise_in_transactional_callbacks = true if NextRails.next?
 ```
@@ -541,7 +543,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 3. Replace `assert_tag` with `assert_select`
 4. Update `Procfile` with `-b 0.0.0.0` if external access needed
 5. Review HTML sanitizer output in tests
-6. Add `config.active_record.raise_in_transactional_callbacks = true if NextRails.next?` and fix the `after_commit` / `after_rollback` exceptions it surfaces
+6. Add `config.active_record.raise_in_transactional_callbacks = true` (behind `if NextRails.next?` while dual booting) and fix the `after_commit` / `after_rollback` exceptions it surfaces
 7. Add `config.active_support.test_order = :random`
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Consider replacing Timecop with `travel_to` (optional)
@@ -566,8 +568,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'deliver' for #<Mail::Message>` | "ActionMailer `#deliver` / `#deliver!` Deprecated" — `deliver_now` / `deliver_later` |
 | `undefined method 'respond_with' for ApplicationController` | "`respond_with` / Class-Level `respond_to` Extracted" — `gem 'responders', '~> 2.0'` |
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression": opt in on the 4.2 side |
-| `NoMethodError: undefined method 'raise_in_transactional_callbacks='` when booting Rails 4.1 | "Transactional Callback Exception Suppression": gate the line with `if NextRails.next?` |
-| Deprecation warning `Currently, Active Record suppresses errors raised within after_rollback/after_commit callbacks` | "Transactional Callback Exception Suppression": one per callback declaration until opted in |
+| `NoMethodError: undefined method 'raise_in_transactional_callbacks='` on Rails 4.1 when `ActiveRecord::Base` loads | "Transactional Callback Exception Suppression": gate the line with `if NextRails.next?` |
+| Deprecation warning ``Currently, Active Record suppresses errors raised within `after_rollback`/`after_commit` callbacks`` | "Transactional Callback Exception Suppression": one per callback declaration until opted in |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
