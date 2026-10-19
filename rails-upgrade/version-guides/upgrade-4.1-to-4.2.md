@@ -230,7 +230,15 @@ Nothing raises and nothing warns. What changes on `record.destroy`:
 This is the 3.2 order again. A reciprocal pair (`belongs_to :x, dependent: :destroy` plus `has_one`/`has_many` back with `dependent: :destroy`, see the 3.2 → 4.0 guide, "Bidirectional `dependent: :destroy` Now Recurses Forever") terminates on 4.2 only when the association back is re-read from the database. With an inverse, which 4.1 and 4.2 detect automatically for a plain `has_one`/`belongs_to` pair, the destroyed record is reused from memory and the pair still ends in `SystemStackError` on 4.2, and so does that entry's `after_destroy` workaround. Declaring `inverse_of: false` on both sides lets either form terminate on 4.2.
 
 **Detection Pattern:**
-`BELONGS_TO_DEPENDENT_DESTROY` flags each `belongs_to` with `dependent: :destroy` or `:delete`, including a declaration wrapped across lines after a trailing comma. Each hit is a "check the destroy path", not a bug.
+```ruby
+belongs_to :account, dependent: :destroy
+belongs_to :account, :dependent => :delete
+belongs_to :account,
+  class_name: "Acct",
+  dependent: :destroy
+```
+
+`BELONGS_TO_DEPENDENT_DESTROY` flags each of these shapes. Each hit is a "check the destroy path", not a bug. It misses a scope lambda whose body spans lines before `dependent:`, so read multi-line `belongs_to :x, -> {` declarations by hand.
 
 **Fix:**
 Default: keep the option and accept the 4.2 order, which every later Rails version keeps. Check each hit for callbacks or tests that depend on the parent being deleted first, or on a failed parent destroy stopping the record's destroy. Pin the order with a spec on the DELETE statements the destroy runs.
@@ -246,11 +254,11 @@ end
 # AFTER: keeps the 4.0/4.1 order on both versions
 class Profile < ActiveRecord::Base
   belongs_to :account
-  before_destroy { account.destroy if account }
+  before_destroy { account.destroy if account } # account.delete for dependent: :delete
 end
 ```
 
-Declare the `before_destroy` where the option was, so it keeps its place among the other `before_destroy` callbacks. Returning `false` from it still halts the record's destroy on 4.1 and 4.2. Do not use this form on a reciprocal pair: it brings back the 4.0/4.1 recursion.
+Declare the `before_destroy` where the option was, so it keeps its place among the other `before_destroy` callbacks. Returning `false` from it still halts the record's destroy on 4.1 and 4.2; returning `false` is deprecated on 5.0 and stops halting on 5.1, where the halt needs `throw(:abort)`, so revisit it on those hops. Do not use this form on a reciprocal pair: it brings back the 4.0/4.1 recursion.
 
 ---
 
