@@ -11,6 +11,9 @@
 # Run with:
 #   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
 
+# TEST_ORDER is a file marker: it flags the configure block of test.rb for
+# manual review. A per-line exclude cannot see whether test_order is set on
+# another line, so a file that already sets it is still flagged.
 TEST_ORDER:
   match:
     # Rails 4.1 and later generator form
@@ -23,3 +26,6 @@ TEST_ORDER:
     - "Rails.application.config.active_support.test_order = :random"
     - "MyApp::ApplicationController.configure"
     - "Rails.application.configured?"
+    # commented-out configure lines (exclude)
+    - "# MyApp::Application.configure do"
+    - "  # Rails.application.configure do"
