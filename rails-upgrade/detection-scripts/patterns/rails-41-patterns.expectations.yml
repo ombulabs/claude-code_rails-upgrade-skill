@@ -509,3 +509,17 @@ FINDER_SQL:
     - "  Comment.find_by_sql('SELECT * FROM comments')"
     - "  Comment.count_by_sql('SELECT COUNT(*) FROM comments')"
     - "  options[:finder_sql]"
+
+BELONGS_TO_DEPENDENT_AUTO_INVERSE:
+  match:
+    - "  belongs_to :document, dependent: :destroy"
+    - "  belongs_to :document, :dependent => :destroy"
+    - "  belongs_to :document, touch: true, dependent: :destroy"
+  no_match:
+    # dependent: :delete runs no callbacks, so it cannot close the loop.
+    - "  belongs_to :document, dependent: :delete"
+    # The has_one side holds the after_destroy; the regex flags the belongs_to side.
+    - "  has_one :attachment"
+    - "  has_one :attachment, dependent: :destroy"
+    - "  after_destroy :destroy_attachment"
+    - "  belongs_to :document"

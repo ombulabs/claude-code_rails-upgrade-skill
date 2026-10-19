@@ -1263,8 +1263,8 @@ A pair that declares `inverse_of:` explicitly already recursed on 3.2, because t
 
 The loop does not simply go away on later 4.x versions. Running a reciprocal `has_one` / `belongs_to` pair on each version gives:
 
-- **4.1**: still recurses. 4.1 also starts detecting `inverse_of` automatically for a simple pair like this one, which breaks the plain `after_destroy` fix shown below (see the 4.0 to 4.1 guide).
-- **4.2**: activerecord 4.2.0 moves the `belongs_to` cascade back to `after_destroy` (CHANGELOG: "Move 'dependent: :destroy' handling for `belongs_to` from `before_destroy` to `after_destroy` callback chain", rails/rails#12380). The pair terminates again only when both sides declare `inverse_of: false`; with the inverse that 4.2 detects automatically it still raises `SystemStackError`.
+- **4.1**: still recurses. 4.1 also starts detecting `inverse_of` automatically for a simple pair like this one, which breaks the `after_destroy` fix below when it is written without the instance flag (see the 4.0 to 4.1 guide).
+- **4.2**: activerecord 4.2.0 moves the `belongs_to` cascade back to `after_destroy` (CHANGELOG: "Move 'dependent: :destroy' handling for `belongs_to` from `before_destroy` to `after_destroy` callback chain", which closes issue rails/rails#12380). The pair terminates again only when both sides declare `inverse_of: false`; with the inverse that 4.2 detects automatically it still raises `SystemStackError`.
 - **5.0**: [rails/rails#18548](https://github.com/rails/rails/pull/18548) makes `ActiveRecord::Callbacks#destroy` return early when it is called again on the same object while its callbacks run (`@_destroy_callback_already_called`). The pair terminates with or without an inverse. Not backported to 4.x.
 
 **Detection Pattern:**
@@ -1313,13 +1313,17 @@ class Document < ActiveRecord::Base
 
   def destroy_attachment
     return if @_destroying_attachment
-    @_destroying_attachment = true
-    attachment.destroy if attachment
+    begin
+      @_destroying_attachment = true
+      attachment.destroy if attachment
+    ensure
+      @_destroying_attachment = false
+    end
   end
 end
 ```
 
-The flag is what makes this safe on every version the app will pass through. Without it, the `after_destroy` alone stops the loop only when `attachment.document` is re-read from the database and comes back `nil`. With an inverse, `attachment.document` is the same in-memory `Document`, its callbacks run again, and the loop survives. That happens on 3.2 and 4.0 when the pair declares `inverse_of:`, and on 4.1 and 4.2 even without one, because those versions detect the inverse automatically. Run on activerecord 3.2.22.5, 4.0.13, 4.1.16, 4.2.0, 4.2.11.3, 5.0.0 and 5.0.7.2, the flag version terminated and deleted both rows with the inverse automatic, explicit or disabled; the version without the flag raised `SystemStackError` on 4.1 and 4.2 unless both sides declared `inverse_of: false`. `inverse_of: false` on its own, without moving the cascade to `after_destroy`, does not help on 4.0 or 4.1, where the `belongs_to` cascade is still a `before_destroy`.
+The flag is what makes this safe on every version the app will pass through, and the `ensure` clears it so a retry on the same object after a rolled-back transaction still cascades. Without it, the `after_destroy` alone stops the loop only when `attachment.document` is re-read from the database and comes back `nil`. With an inverse, `attachment.document` is the same in-memory `Document`, its callbacks run again, and the loop survives. That happens on 3.2 and 4.0 when the pair declares `inverse_of:`, and on 4.1 and 4.2 even without one, because those versions detect the inverse automatically. Run on activerecord 3.2.22.5, 4.0.13, 4.1.16, 4.2.0, 4.2.11.3, 5.0.0 and 5.0.7.2, the flag version terminated and deleted both rows with the inverse automatic, explicit or disabled; the version without the flag raised `SystemStackError` on 4.1 and 4.2 unless both sides declared `inverse_of: false`. `inverse_of: false` on its own, without moving the cascade to `after_destroy`, does not help on 4.0 or 4.1, where the `belongs_to` cascade is still a `before_destroy`.
 
 A `destroyed?` check is no substitute for the flag. On the record itself it is already `true` inside `after_destroy`, so `return if destroyed?` skips the cleanup every time and orphans the attachment. On the target, `attachment.destroyed?` is still `false` while the attachment's own `before_destroy` callbacks run, so on 4.0 and 4.1 with an inverse the loop goes on.
 

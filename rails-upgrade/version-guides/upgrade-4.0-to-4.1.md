@@ -1104,19 +1104,28 @@ end
 On 4.0 the second pass re-reads `attachment.document` from the database and gets `nil`. On 4.1 the detected inverse hands back the same in-memory `Document`, its callbacks run again, and `destroy` raises `SystemStackError`. Run on activerecord 4.0.13 and 4.1.16 with SQLite, this shape terminates on 4.0 and recurses on 4.1 from either side; it terminates on both with the flag below or with `inverse_of: false` on both associations. It keeps recursing on 4.2 (which moves the `belongs_to` cascade back to `after_destroy`) and stops only on 5.0.
 
 **Detection Pattern:**
-No 4.1 pattern. The 4.0 pattern `BELONGS_TO_DEPENDENT` flags the `belongs_to ..., dependent: :destroy` side; for each hit, check whether the target model cascades back from an `after_destroy` without a guard.
+`BELONGS_TO_DEPENDENT_AUTO_INVERSE` in `rails-41-patterns.yml` flags the `belongs_to ..., dependent: :destroy` side. A regex cannot see the other model, so for each hit check whether the target model destroys this record back from an `after_destroy` without a guard.
 
 **Fix:**
 ```ruby
+# BEFORE: terminates on 4.0, SystemStackError on 4.1
+def destroy_attachment
+  attachment.destroy if attachment
+end
+
 # AFTER: works on 3.2 through 5.0, with or without an inverse
 def destroy_attachment
   return if @_destroying_attachment
-  @_destroying_attachment = true
-  attachment.destroy if attachment
+  begin
+    @_destroying_attachment = true
+    attachment.destroy if attachment
+  ensure
+    @_destroying_attachment = false
+  end
 end
 ```
 
-`inverse_of: false` on both associations also stops the loop, but it gives up the in-memory inverse for every other caller, so prefer the flag.
+Once the cascade is in `after_destroy`, `inverse_of: false` on both associations also stops the loop, but it gives up the in-memory inverse for every other caller, so prefer the flag. It does not help a pair that still has `dependent: :destroy` on both sides: there the `belongs_to` cascade is a `before_destroy` on 4.1, and the pair recurses with or without an inverse.
 
 ---
 
@@ -1453,7 +1462,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ArgumentError: You tried to define a scope named ... but Active Record already defined a class method with the same name` | "Scope Names That Collide with Active Record Class Methods Raise": rename or delete the scope |
 | `ArgumentError: Unknown key: :finder_sql` (or `:counter_sql`) when a model loads | "Association `:finder_sql` and `:counter_sql` Removed": move the SQL into a scope |
 | A `has_and_belongs_to_many` with `:finder_sql` returns different rows | "Association `:finder_sql` and `:counter_sql` Removed": the option is silently dropped, move the SQL into a scope |
-| `SystemStackError: stack level too deep` from `destroy` on a model whose `belongs_to` has `dependent: :destroy` | "Automatic `inverse_of` Brings Back the Bidirectional `dependent: :destroy` Loop": add the instance-flag guard |
+| `SystemStackError: stack level too deep` from `destroy` on either model of a pair where one side has `belongs_to ..., dependent: :destroy` and the other destroys it back from `after_destroy` | "Automatic `inverse_of` Brings Back the Bidirectional `dependent: :destroy` Loop": add the instance-flag guard |
 
 ---
 
