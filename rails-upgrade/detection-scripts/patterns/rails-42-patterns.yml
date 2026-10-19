@@ -119,6 +119,17 @@ upgrade_findings:
       fix: "Review code that assigns nil to serialized attributes with custom coders. Check for tests that relied on the coder's nil representation (e.g., 'null' for JSON)"
       variable_name: "SERIALIZED_CUSTOM_CODER"
 
+    - name: "Write into changed_attributes"
+      kind: "breaking"
+      pattern: "(?<![@\\w])changed_attributes(?:\\(\\))?(?:\\[[^\\]\\n]*\\][ \\t]*(?:\\|\\||&&)?=(?![=~>])|\\s*\\.\\s*(?:delete|merge!|update|store|clear|replace|shift|except!|slice!|reject!|select!|keep_if|delete_if)(?![\\w!?]))"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "From Rails 4.2.0, ActiveRecord's changed_attributes returns a frozen copy (super.reverse_merge(attributes_changed_in_place).freeze in attribute_methods/dirty.rb), so changed_attributes[name] = value, changed_attributes.delete(name), merge! and the other in-place Hash writers raise RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess. Through 4.1 it returned the live hash, and code wrote into it to mark a record, often through a virtual attribute, as changed so save callbacks or versioning would run, or to drop a change. Reads keep working, and so do writes to the @changed_attributes instance variable and to changed_attributes of a plain ActiveModel::Dirty class (only the ActiveRecord override freezes), so check that a hit is inside an ActiveRecord model. A local variable named changed_attributes is flagged too"
+      fix: "To mark an attribute changed with its current value as the old one, call attribute_will_change!(name), which works on 4.1 and 4.2. To record a specific old value, use set_attribute_was(name, old) on 4.2 and keep changed_attributes[name] = old on 4.1 (NextRails.next? ? set_attribute_was(name, old) : changed_attributes[name] = old). To drop a change, use clear_attribute_changes([name]) on 4.2 and changed_attributes.delete(name) on 4.1. Both 4.2 methods are private ActiveModel::Dirty methods, so call them from inside the model; 4.1 has neither. Remove the 4.1 branch once the upgrade ships"
+      variable_name: "CHANGED_ATTRIBUTES_WRITE"
+
     - name: "serve_static_assets config"
       kind: "deprecation"
       pattern: "serve_static_assets"

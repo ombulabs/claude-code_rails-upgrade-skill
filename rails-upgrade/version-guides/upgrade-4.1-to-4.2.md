@@ -215,6 +215,48 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
+#### Writes into `changed_attributes` Raise
+
+**Pattern:** `CHANGED_ATTRIBUTES_WRITE`
+
+**What Changed:**
+On Active Record models, `changed_attributes` returns a frozen copy from Rails 4.2.0 (`super.reverse_merge(attributes_changed_in_place).freeze` in `attribute_methods/dirty.rb`). Through 4.1 it returned the live hash, and apps wrote into it to mark a virtual attribute as changed (so save callbacks or versioning gems run) or to drop a change before saving. On 4.2, `changed_attributes[name] = value`, `.delete`, `.merge!`, `.store`, `.clear`, `.except!` and the other in-place Hash writers raise `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess`. Reads are unaffected, and so is a plain `ActiveModel::Dirty` class, whose `changed_attributes` is not frozen.
+
+**Detection Pattern:** `CHANGED_ATTRIBUTES_WRITE` flags element writes and in-place Hash writers on `changed_attributes`. It skips reads, copies (`.dup.delete`) and the `@changed_attributes` instance variable. A hit in a non-Active Record class, or on a local variable with the same name, needs no change.
+
+**Fix:**
+`attribute_will_change!` exists on both versions and records the current value as the old one. Recording a specific old value and dropping a change use private `ActiveModel::Dirty` methods that only exist from 4.2, so branch on the Rails version until the upgrade ships:
+```ruby
+# BEFORE (raises on 4.2)
+def tag_list=(value)
+  changed_attributes["tag_list"] = @tag_list unless value == @tag_list
+  @tag_list = value
+end
+
+def skip_timestamp_change
+  changed_attributes.delete("updated_at")
+end
+
+# AFTER (4.1 and 4.2)
+def tag_list=(value)
+  attribute_will_change!("tag_list") unless value == @tag_list
+  @tag_list = value
+end
+
+def skip_timestamp_change
+  if NextRails.next?
+    clear_attribute_changes(["updated_at"])
+  else
+    changed_attributes.delete("updated_at")
+  end
+end
+
+# A specific old value: set_attribute_was(name, old) on 4.2,
+# changed_attributes[name] = old on 4.1
+```
+
+---
+
 #### `config.active_support.test_order` Required
 
 **Pattern:** `TEST_ORDER`
@@ -535,11 +577,12 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 3. Replace `assert_tag` with `assert_select`
 4. Update `Procfile` with `-b 0.0.0.0` if external access needed
 5. Review HTML sanitizer output in tests
-6. Add `config.active_record.raise_in_transactional_callbacks = true`
-7. Add `config.active_support.test_order = :random`
-8. Rename `serve_static_assets` → `serve_static_files`
-9. Consider replacing Timecop with `travel_to` (optional)
-10. Consider dropping Foreigner for native FKs (optional)
+6. Replace writes into `changed_attributes` with `attribute_will_change!` / `clear_attribute_changes`
+7. Add `config.active_record.raise_in_transactional_callbacks = true`
+8. Add `config.active_support.test_order = :random`
+9. Rename `serve_static_assets` → `serve_static_files`
+10. Consider replacing Timecop with `travel_to` (optional)
+11. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -562,6 +605,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess` from a model | "Writes into `changed_attributes` Raise": `attribute_will_change!`, `clear_attribute_changes` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
 ---
