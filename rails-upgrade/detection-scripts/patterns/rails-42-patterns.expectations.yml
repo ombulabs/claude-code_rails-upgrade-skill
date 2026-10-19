@@ -13,7 +13,8 @@
 
 ATTRIBUTES_IVAR_REPLACE:
   match:
-    # swapping in a Hash, the usual after_initialize shape
+    # replacing @attributes (the after_initialize swap); ||= has no effect in a
+    # record, where @attributes is always set, but is flagged as direct access
     - "    instance_variable_set(:@attributes, attributes.merge(extra))"
     - "    instance_variable_set(\"@attributes\", attrs)"
     - "    @attributes = attributes.merge(\"extra\" => 1)"
