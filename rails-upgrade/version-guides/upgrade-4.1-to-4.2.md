@@ -307,12 +307,12 @@ Rails form helpers handle masking automatically. If you build forms outside Rail
 **Pattern:** `NUMERIC_AGO_WITHOUT_UNIT`
 
 **What Changed:**
-Rails 4.1 deprecated calling `ago`, `until`, `since` and `from_now` on a plain number (`Calling #ago or #until on a number (e.g. 5.ago) is deprecated and will be removed in the future, use 5.seconds.ago instead`). Rails 4.2 removes them from `Numeric`, so `5.ago` raises `NoMethodError: undefined method 'ago' for 5:Fixnum`. The same methods on a Duration (`5.seconds.ago`) are unchanged.
+Rails 4.1 deprecated calling `ago`, `until`, `since` and `from_now` on a plain number (`Calling #ago or #until on a number (e.g. 5.ago) is deprecated and will be removed in the future, use 5.seconds.ago instead`). Rails 4.2 removes them from `Numeric`, so `5.ago` raises ``NoMethodError: undefined method `ago' for 5:Fixnum`` (`for 5:Integer` on Ruby 2.4 and later). The same methods on a Duration (`5.seconds.ago`) are unchanged.
 
 Two shapes are easy to miss. Through 4.2 a Duration has no `*` or `/` of its own: they go through `method_missing` to the Integer value and return a plain Integer, so `(2.hours * 3).ago` and `(1.day / 2).ago` raise too, while `(1.day + 1.hour).ago` keeps working. And a number of seconds stored in a variable (`timeout.ago`), often read from YAML, ENV or a settings table and passed to a gem that calls `ago` on it, cannot be found by a regex: it shows up only as the 4.1 deprecation warning in logs and test output.
 
 **Detection:**
-The pattern flags numeric literals, `.to_i` / `.to_f` results and parenthesized `*` / `/` expressions followed by one of the four methods. On 4.1, also search the test log for `Calling #ago or #until on a number` and `Calling #since or #from_now on a number`.
+The pattern flags numeric literals, `.to_i` / `.to_f` / `.abs` / `.round` / `.floor` / `.ceil` results and parenthesized `*` / `/` expressions followed by one of the four methods. Other Integer-returning calls (`items.count.ago`) are not flagged. On 4.1, also search the test log for `Calling #ago or #until on a number` and `Calling #since or #from_now on a number`.
 
 **Fix:**
 ```ruby
@@ -326,7 +326,7 @@ expires_at = 5.seconds.ago
 cutoff = timeout.seconds.from_now
 window = (2.hours * 3).seconds.ago
 ```
-For a value read from configuration, convert it once where it is read (`setting.seconds`) so every consumer gets a Duration. A Duration compares and does arithmetic like its Integer value and serializes to JSON as that Integer, so callers keep working.
+For a value read from configuration, convert it once where it is read (`setting.seconds`) so every consumer gets a Duration. A Duration is `==` to its Integer value, does arithmetic like it and serializes to JSON as it. It is not the same object to `Integer === x` (so `case x when Integer`), `eql?` or a Hash key lookup, on 4.1 and on 4.2, so check the setting's other consumers before converting it at read time.
 
 ---
 
@@ -592,7 +592,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
-| `NoMethodError: undefined method 'ago' for 5:Fixnum` (or `until` / `since` / `from_now`, or `for 1.5:Float`) | "`Numeric#ago` / `#until` / `#since` / `#from_now` Removed": add a unit: `5.seconds.ago` |
+| ``NoMethodError: undefined method `ago' for 5:Fixnum`` (or `until` / `since` / `from_now`, `for 1.5:Float`, `for 5:Integer` on Ruby 2.4+) | "`Numeric#ago` / `#until` / `#since` / `#from_now` Removed": add a unit: `5.seconds.ago` |
 
 ---
 

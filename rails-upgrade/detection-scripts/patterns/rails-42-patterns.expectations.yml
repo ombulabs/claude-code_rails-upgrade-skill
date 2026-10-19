@@ -24,8 +24,12 @@ NUMERIC_AGO_WITHOUT_UNIT:
     - "session_timeout.to_i.ago"
     - "params[:seconds].to_f.until(deadline)"
     - "1.day.to_i.ago"
+    - "x.round.ago"
+    - "value.abs.from_now"
+    - "(a.to_f / b).round.ago"
     # Duration * and / return a plain Integer through 4.2. A product split
-    # across lines inside the parentheses is proved with pattern_lab.rb scan
+    # across lines inside the parentheses is matched by scan_patterns.rb, which
+    # reads the whole file
     - "where(updated_at: (2.hours * 3).ago..Time.now)"
     - "(1.day / 2).from_now"
     - "(TIMEOUT * 4).ago"
@@ -46,3 +50,10 @@ NUMERIC_AGO_WITHOUT_UNIT:
     - "v1.2.ago"
     - "foo.to_iso.ago"
     - "time.since?"
+    - "<%# 5.ago %>"
+    # a method call's argument list is not a bare product
+    - "Time.at(ts / 1000).since(1.day)"
+    - "Time.at(ms * 0.001).ago(1.hour)"
+    - "Time.zone.parse(\"2020/01/01\").ago(1.day)"
+    - "Date.strptime(s, \"%m/%d/%Y\").since(3.days)"
+    - "list[i * 2].ago"
