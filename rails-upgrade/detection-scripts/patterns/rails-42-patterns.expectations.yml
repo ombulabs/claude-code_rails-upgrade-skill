@@ -1,0 +1,56 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+COLUMN_CAST_CLASS_METHODS:
+  match:
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_boolean(params[:archived])"
+    - "    flag = ::ActiveRecord::ConnectionAdapters::Column.value_to_boolean(v) # cast"
+    - "values.map { |v| ActiveRecord::ConnectionAdapters::Column.value_to_boolean(v) }"
+    - "checked = ActiveRecord::ConnectionAdapters::Column.value_to_boolean v"
+    # bare constant after include ActiveRecord::ConnectionAdapters, or inside module ActiveRecord
+    - "archived = Column.value_to_boolean(params[:archived])"
+    - "ConnectionAdapters::Column.string_to_time(str)"
+    - "ActiveRecord::ConnectionAdapters::Column::value_to_boolean(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_integer(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_decimal(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_date(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.string_to_dummy_time(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.binary_to_string(v)"
+    # adapter subclasses inherit the class methods on 4.1
+    - "ActiveRecord::ConnectionAdapters::PostgreSQLColumn.string_to_time(s)"
+    # the four protected helpers are reachable only through send on 4.1
+    - "ActiveRecord::ConnectionAdapters::Column.send(:fast_string_to_time, s)"
+    - "ActiveRecord::ConnectionAdapters::Column.send(\"fast_string_to_date\", s)"
+    - "ActiveRecord::ConnectionAdapters::Column.send :new_time, *parts"
+    - "Column.__send__(:new_date, 2014, 1, 1)"
+    - "ActiveRecord::ConnectionAdapters::Column.public_send(:value_to_boolean, v)"
+  no_match:
+    - "# ActiveRecord::ConnectionAdapters::Column.value_to_boolean(v)"
+    # app-owned helper with the same name
+    - "value_to_boolean(params[:x])"
+    - "  def self.value_to_boolean(value)"
+    - "record.send(:value_to_boolean, v)"
+    - "column.value_to_boolean(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_boolean_strict(v)"
+    - "ReportColumns.value_to_date(x)"
+    # still present on 4.2 (TRUE_VALUES goes away in 5.0, not here)
+    - "ActiveRecord::ConnectionAdapters::Column::TRUE_VALUES.include?(v)"
+    - "ActiveRecord::Type::Boolean.new.type_cast_from_user(v)"
+    # a feature check is the dual-boot guard, not a call
+    - "if ActiveRecord::ConnectionAdapters::Column.respond_to?(:value_to_boolean)"
+    # protected on 4.1 too: a direct call already raised before the bump
+    - "Column.new_date(2014, 1, 1)"
+    - "Column.send(:name)"
+    # separate 4.2 changes, not this pattern
+    - "Model.columns_hash[\"x\"].type_cast(v)"
+    - "Column.new(\"active\", nil, \"boolean\")"

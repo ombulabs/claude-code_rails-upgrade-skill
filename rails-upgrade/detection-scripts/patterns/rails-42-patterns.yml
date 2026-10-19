@@ -119,6 +119,18 @@ upgrade_findings:
       fix: "Review code that assigns nil to serialized attributes with custom coders. Check for tests that relied on the coder's nil representation (e.g., 'null' for JSON)"
       variable_name: "SERIALIZED_CUSTOM_CODER"
 
+    - name: "ConnectionAdapters::Column class-level cast helpers removed"
+      kind: "breaking"
+      pattern: "Column\\s*(?:\\.|::)\\s*(?:value_to_(?:boolean|integer|decimal|date)|string_to_(?:dummy_)?time|binary_to_string)(?![\\w?!])|Column\\s*\\.\\s*(?:__send__|public_send|send)\\s*\\(?\\s*[:\"']+(?:value_to_(?:boolean|integer|decimal|date)|string_to_(?:dummy_)?time|binary_to_string|new_(?:date|time)|fast_string_to_(?:date|time))(?![\\w?!])"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+      explanation: "Rails 4.2 moved type casting into ActiveRecord::Type and removed the class-level cast helpers of ActiveRecord::ConnectionAdapters::Column. Public in 4.1 and gone in 4.2.0: value_to_boolean, value_to_integer, value_to_decimal, value_to_date, string_to_time, string_to_dummy_time, binary_to_string. Protected in 4.1 (reachable only through send) and gone in 4.2.0: new_date, new_time, fast_string_to_date, fast_string_to_time. Every caller raises NoMethodError on 4.2, and 4.1 emits no deprecation warning first. Apps mostly use value_to_boolean to cast checkbox and flag params. Matches any receiver ending in Column (ActiveRecord::ConnectionAdapters::Column, a bare Column after include ActiveRecord::ConnectionAdapters, PostgreSQLColumn) and the send / __send__ / public_send forms. Missed: calls through column.class or self.class, and bare calls inside a Column subclass"
+      fix: "Replace each call with app-owned code that runs on 4.1 and 4.2, so no version conditional is needed. value_to_boolean: return nil for an empty String, otherwise test membership in an app-owned copy of the true list [true, 1, '1', 't', 'T', 'true', 'TRUE', 'on', 'ON']. Do not read Column::TRUE_VALUES (removed in 5.0) or call ActiveRecord::Type::Boolean (absent on 4.1, renamed methods on 5.0, and on 4.2 it logs a deprecation for values outside its true and false lists). value_to_integer: map true and false to 1 and 0, otherwise value.to_i. value_to_decimal: value.to_d when value responds to to_d, otherwise value.to_s.to_d (require 'bigdecimal/util'). string_to_time and value_to_date on a String: ActiveSupport::TimeZone['UTC'].parse(str), then to_date for a date; it returns nil for an empty or unparseable string as the helpers did and reads a zoneless string as UTC (the default ActiveRecord::Base.default_timezone), but it fills in today for a time-only string where the helpers returned nil, and it returns a TimeWithZone. Pass non-String values through as the helpers did. binary_to_string on the base Column returns its argument: drop the call. Pin the replacement with a spec that covers each input the old helper saw"
+      variable_name: "COLUMN_CAST_CLASS_METHODS"
+
     - name: "serve_static_assets config"
       kind: "deprecation"
       pattern: "serve_static_assets"
