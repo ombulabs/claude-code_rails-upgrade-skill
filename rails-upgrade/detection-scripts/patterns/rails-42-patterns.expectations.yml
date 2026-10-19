@@ -1,0 +1,31 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not, a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+# TEST_ORDER is a file marker: it flags the configure block of test.rb for
+# manual review. A per-line exclude cannot see whether test_order is set on
+# another line, so a file that already sets it is still flagged.
+TEST_ORDER:
+  match:
+    # Rails 4.1 and later generator form
+    - "Rails.application.configure do"
+    # Rails 4.0 and earlier generator form, kept by apps that never regenerated test.rb
+    - "MyApp::Application.configure do"
+    - "Acme::Store::Application.configure do"
+  no_match:
+    - "  config.active_support.test_order = :sorted"
+    - "Rails.application.config.active_support.test_order = :random"
+    - "MyApp::ApplicationController.configure"
+    - "Rails.application.configured?"
+    # commented-out configure lines (exclude)
+    - "# MyApp::Application.configure do"
+    - "  # Rails.application.configure do"
