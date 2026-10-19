@@ -77,19 +77,6 @@ upgrade_findings:
       fix: "Set config.active_job.queue_adapter = :sidekiq (or :resque, :delayed_job, :que, etc.) in config/application.rb or per-environment, and ensure the adapter gem is in the Gemfile. For dev/test without a backend, :inline or :async is acceptable"
       variable_name: "ACTIVE_JOB_ADAPTER"
 
-    - name: "ConnectionAdapters::Column.new with the old (name, default, sql_type) arguments"
-      kind: "breaking"
-      pattern: "\\bConnectionAdapters::(?:\\w+Adapter::)?Column\\.new\\b"
-      exclude: "\\A\\s*#"
-      search_paths:
-        - "app/"
-        - "lib/"
-        - "config/"
-        - "spec/"
-        - "test/"
-      explanation: "Rails 4.2 changes Column#initialize from (name, default, sql_type = nil, null = true) to (name, default, cast_type, sql_type = nil, null = true), and the column delegates type, limit, precision, scale and every cast (type_cast_from_user, type_cast_from_database, ...) to cast_type. Code that builds fake columns (the tableless-model recipe columns << Column.new(name.to_s, default, sql_type.to_s, null), or a virtual typed field appended to a real model's columns) still loads, but the sql_type string lands in cast_type and the first assignment, read or column lookup raises NoMethodError: undefined method `type_cast_from_user' for \"boolean\":String (or type_cast_from_database, type, limit). Matches ConnectionAdapters::Column.new and ConnectionAdapters::<X>Adapter::Column.new (AbstractMysqlAdapter::Column takes the same arguments; 4.2 drops the Mysql2Adapter and MysqlAdapter Column subclasses, so those names resolve to it). Misses a bare Column.new reached through a reopened or included ConnectionAdapters module or a constant alias"
-      fix: "Build the cast type without a connection on 4.2 and keep the old call on 4.1 (ActiveRecord::Type does not exist there): if NextRails.next? then cast_type = ActiveRecord::Type.const_get(VIRTUAL_CAST_TYPES.fetch(sql_type.to_s)).new; Column.new(name.to_s, default, cast_type, sql_type.to_s, null) else Column.new(name.to_s, default, sql_type.to_s, null) end, with VIRTUAL_CAST_TYPES mapping boolean, integer, date, datetime, decimal and float to the Type class of the same name and string, text and an empty type to Value (it casts nothing, as 4.1 did; Type::String would to_s an Array). fetch raises KeyError on an undeclared type at class load. Do not use connection.lookup_cast_type: it needs a connection at class load and on PostgreSQL raises for string. Drop the else branch after the upgrade. A table-backed model can use the 4.2 class method attribute :flag, ActiveRecord::Type::Boolean.new instead (absent on 4.0 and 4.1); a set attribute with no table column still goes into the INSERT on 4.2.0, and on later 4.2 releases when partial_writes is off. The long-term replacement is the Rails 5.0 attributes API"
-      variable_name: "COLUMN_NEW_SQL_TYPE_ARG"
 
   medium_priority:
     - name: "find/exists? with possible AR object argument"
@@ -162,6 +149,19 @@ upgrade_findings:
       explanation: "Rails 4.2 adds native foreign key support (add_foreign_key, t.references foreign_key: true) that can replace Foreigner for most cases"
       fix: "Remove gem 'foreigner', run bundle install, run bin/rake db:schema:dump, verify db/schema.rb. Note: Rails FK support is a subset of Foreigner"
       variable_name: "FOREIGNER"
+    - name: "ConnectionAdapters::Column.new with the old (name, default, sql_type) arguments"
+      kind: "breaking"
+      pattern: "\\bConnectionAdapters::(?:\\w+Adapter::)?Column\\.new\\b"
+      exclude: "\\A\\s*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.2 changes Column#initialize from (name, default, sql_type = nil, null = true) to (name, default, cast_type, sql_type = nil, null = true), and the column delegates type, limit, precision, scale and every cast (type_cast_from_user, type_cast_from_database, ...) to cast_type. Code that builds fake columns (the tableless-model recipe columns << Column.new(name.to_s, default, sql_type.to_s, null), or a virtual typed field appended to a real model's columns) still loads, but the sql_type string lands in cast_type and the first assignment, read or column lookup raises NoMethodError: undefined method `type_cast_from_user' for \"boolean\":String (or type_cast_from_database, type, limit). Matches ConnectionAdapters::Column.new and ConnectionAdapters::<X>Adapter::Column.new (AbstractMysqlAdapter::Column takes the same arguments; 4.2 drops the Mysql2Adapter and MysqlAdapter Column subclasses, so those names resolve to it). Misses a bare Column.new reached through a reopened or included ConnectionAdapters module or a constant alias"
+      fix: "Build the cast type without a connection on 4.2 and keep the old call on 4.1 (ActiveRecord::Type does not exist there): if NextRails.next? then cast_type = ActiveRecord::Type.const_get(VIRTUAL_CAST_TYPES.fetch(sql_type.to_s)).new; Column.new(name.to_s, default, cast_type, sql_type.to_s, null) else Column.new(name.to_s, default, sql_type.to_s, null) end, with VIRTUAL_CAST_TYPES mapping boolean, integer, date, datetime, decimal and float to the Type class of the same name and string, text and an empty type to Value (it casts nothing, as 4.1 did; Type::String would to_s an Array). fetch raises KeyError on an undeclared type at class load. Do not use connection.lookup_cast_type: it needs a connection at class load and on PostgreSQL raises for string. Drop the else branch after the upgrade. A table-backed model can use the 4.2 class method attribute :flag, ActiveRecord::Type::Boolean.new instead (absent on 4.0 and 4.1); a set attribute with no table column still goes into the INSERT on 4.2.0, and on later 4.2 releases when partial_writes is off. The long-term replacement is the Rails 5.0 attributes API"
+      variable_name: "COLUMN_NEW_SQL_TYPE_ARG"
 
   low_priority:
     - name: "Procfile rails server without explicit bind"

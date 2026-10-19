@@ -169,53 +169,6 @@ assert_select "a[href='/foo']"
 
 ---
 
-#### `ConnectionAdapters::Column.new` Takes a Cast Type Third
-
-**Pattern:** `COLUMN_NEW_SQL_TYPE_ARG`
-
-**What Changed:**
-`ActiveRecord::ConnectionAdapters::Column#initialize` changes from `(name, default, sql_type = nil, null = true)` to `(name, default, cast_type, sql_type = nil, null = true)`, and the column hands `type`, `limit`, `precision`, `scale` and every cast (`type_cast_from_user`, `type_cast_from_database`, ...) to `cast_type`. `AbstractMysqlAdapter::Column` takes the same arguments (4.2 drops the `Mysql2Adapter::Column` and `MysqlAdapter::Column` subclasses, so those names resolve to it). Code that builds fake columns, such as the tableless-model recipe or a virtual typed field appended to a real model's `columns`, still loads, but the SQL type string now lands in `cast_type`, so the first assignment, read or column lookup raises:
-
-```
-NoMethodError: undefined method `type_cast_from_user' for "boolean":String
-```
-
-(or `type_cast_from_database`, `type`, `limit`, depending on what touches the column first).
-
-**Detection Pattern:**
-The `COLUMN_NEW_SQL_TYPE_ARG` pattern flags every `ConnectionAdapters::Column.new` call outside comments. It misses a bare `Column.new` reached through a reopened or included `ConnectionAdapters` module or a constant alias, so also search the tableless models for `Column.new` by hand.
-
-**Fix:**
-Build the cast type yourself on 4.2 and keep the old call on 4.1. `ActiveRecord::Type` does not exist on 4.1, so the branch is needed while both versions boot. Do not use `connection.lookup_cast_type`: it needs a database connection at class load, and on PostgreSQL it runs `SELECT 'string'::regtype`, which raises for `string`.
-
-```ruby
-# BEFORE
-def self.column(name, sql_type = nil, default = nil, null = true)
-  columns << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
-end
-
-# AFTER
-VIRTUAL_CAST_TYPES = {
-  "boolean" => "Boolean", "integer" => "Integer", "date" => "Date",
-  "datetime" => "DateTime", "decimal" => "Decimal", "float" => "Float",
-  "string" => "Value", "text" => "Value", "" => "Value"
-}.freeze
-
-def self.column(name, sql_type = nil, default = nil, null = true)
-  columns << if NextRails.next?
-    cast_type = ActiveRecord::Type.const_get(VIRTUAL_CAST_TYPES.fetch(sql_type.to_s)).new
-    ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, cast_type, sql_type.to_s, null)
-  else
-    ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
-  end
-end
-```
-
-`string`, `text` and untyped fields map to `ActiveRecord::Type::Value`, which casts nothing, as 4.1 did for them (`Type::String` would call `to_s` on an Array kept in the field). An undeclared type raises `KeyError` at class load instead of failing later. After the upgrade, drop the `else` branch.
-
-A table-backed model can instead declare the field with the 4.2 class method `attribute :flag, ActiveRecord::Type::Boolean.new` (absent on 4.0 and 4.1). A set `attribute` with no table column still goes into the INSERT on 4.2.0, and on later 4.2 releases when `partial_writes` is off. The long-term replacement is the Rails 5.0 attributes API.
----
-
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -347,6 +300,53 @@ form_authenticity_token
 **Fix:**
 Rails form helpers handle masking automatically. If you build forms outside Rails (e.g., a static page posting to your app), fetch the token per request rather than caching it.
 
+---
+
+#### `ConnectionAdapters::Column.new` Takes a Cast Type Third
+
+**Pattern:** `COLUMN_NEW_SQL_TYPE_ARG`
+
+**What Changed:**
+`ActiveRecord::ConnectionAdapters::Column#initialize` changes from `(name, default, sql_type = nil, null = true)` to `(name, default, cast_type, sql_type = nil, null = true)`, and the column hands `type`, `limit`, `precision`, `scale` and every cast (`type_cast_from_user`, `type_cast_from_database`, ...) to `cast_type`. `AbstractMysqlAdapter::Column` takes the same arguments (4.2 drops the `Mysql2Adapter::Column` and `MysqlAdapter::Column` subclasses, so those names resolve to it). Code that builds fake columns, such as the tableless-model recipe or a virtual typed field appended to a real model's `columns`, still loads, but the SQL type string now lands in `cast_type`, so the first assignment, read or column lookup raises:
+
+```
+NoMethodError: undefined method `type_cast_from_user' for "boolean":String
+```
+
+(or `type_cast_from_database`, `type`, `limit`, depending on what touches the column first).
+
+**Detection Pattern:**
+The `COLUMN_NEW_SQL_TYPE_ARG` pattern flags every `ConnectionAdapters::Column.new` call outside comments. It misses a bare `Column.new` reached through a reopened or included `ConnectionAdapters` module or a constant alias, so also search the tableless models for `Column.new` by hand.
+
+**Fix:**
+Build the cast type yourself on 4.2 and keep the old call on 4.1. `ActiveRecord::Type` does not exist on 4.1, so the branch is needed while both versions boot. Do not use `connection.lookup_cast_type`: it needs a database connection at class load, and on PostgreSQL it runs `SELECT 'string'::regtype`, which raises for `string`.
+
+```ruby
+# BEFORE
+def self.column(name, sql_type = nil, default = nil, null = true)
+  columns << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
+end
+
+# AFTER
+VIRTUAL_CAST_TYPES = {
+  "boolean" => "Boolean", "integer" => "Integer", "date" => "Date",
+  "datetime" => "DateTime", "decimal" => "Decimal", "float" => "Float",
+  "string" => "Value", "text" => "Value", "" => "Value"
+}.freeze
+
+def self.column(name, sql_type = nil, default = nil, null = true)
+  columns << if NextRails.next?
+    cast_type = ActiveRecord::Type.const_get(VIRTUAL_CAST_TYPES.fetch(sql_type.to_s)).new
+    ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, cast_type, sql_type.to_s, null)
+  else
+    ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
+  end
+end
+```
+
+`string`, `text` and untyped fields map to `ActiveRecord::Type::Value`, which casts nothing, as 4.1 did for them (`Type::String` would call `to_s` on an Array kept in the field). An undeclared type raises `KeyError` at class load instead of failing later. After the upgrade, drop the `else` branch.
+
+A table-backed model can instead declare the field with the 4.2 class method `attribute :flag, ActiveRecord::Type::Boolean.new` (absent on 4.0 and 4.1). A set `attribute` with no table column still goes into the INSERT on 4.2.0, and on later 4.2 releases when `partial_writes` is off. The long-term replacement is the Rails 5.0 attributes API.
 ---
 
 ### 🟢 LOW PRIORITY
