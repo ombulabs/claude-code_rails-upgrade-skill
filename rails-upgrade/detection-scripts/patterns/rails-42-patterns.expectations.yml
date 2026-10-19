@@ -22,6 +22,14 @@ AREL_ATTRIBUTE_AS_VALUE:
     - "  scope :mine, -> { where(owner_id: arel_table[:id]) }"
     - "Post.joins(:owner).where(owners: { id: Post.arel_table[:owner_id] })"
     - "Post.find_by(owner_id: Owner.arel_table[\"id\"])"
+    - "  where(owner_id: self.class.arel_table[:id])"
+    - "  where(owner_id: klass.arel_table[:id])"
+    - "Post.where(owner_id: ::Owner.arel_table[:id])"
+    - "Post.where(\"owner_id\": Owner.arel_table[:id])"
+    - "Post.where('owner_id' => Owner.arel_table[:id])"
+    # accepted false positive: any hash literal with an arel_table value is
+    # flagged, including one not passed to where (a sort-column map)
+    - "SORTS = { name: arel_table[:name] }"
   no_match:
     # the fix: an Arel predicate, not a hash value
     - "Post.where(Post.arel_table[:owner_id].eq(Owner.arel_table[:id]))"
@@ -32,6 +40,9 @@ AREL_ATTRIBUTE_AS_VALUE:
     - "Foo::Bar.arel_table[:id]"
     - "x = cond ? a : Owner.arel_table[:id]"
     - "Post.where(owner_id: owner.id)"
+    # a dotted "table.column" key is not in columns_hash, so 4.2.3+ never
+    # binds it and the column comparison still works
+    - "Post.where(\"posts.owner_id\" => Owner.arel_table[:id])"
     - "  # Post.where(owner_id: Owner.arel_table[:id])"
     # known gaps, stated in the explanation: a hoisted table or attribute and
     # an attribute passed to a scope argument
