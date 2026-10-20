@@ -22,8 +22,8 @@ CHANGED_ATTRIBUTES_WRITE:
     # one level of nested index in the key
     - "    changed_attributes[attrs[:name]] = old"
     # in-place Hash writers (a chain split across lines, changed_attributes
-    # then .delete(...) on the next line, is matched by scan_patterns.rb and
-    # proved with pattern_lab.rb scan, since fixtures are single lines)
+    # then .delete(...) on the next line, is matched by scan_patterns.rb
+    # which reads whole files; fixtures are single lines)
     - "    changed_attributes.delete(\"updated_at\")"
     - "    record.changed_attributes.delete(:token)"
     - "    changed_attributes.merge!(\"tags\" => old_tags)"
