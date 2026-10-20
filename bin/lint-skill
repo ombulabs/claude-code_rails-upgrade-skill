@@ -19,7 +19,8 @@ ROOT = File.expand_path("..", __dir__)
 
 SKILLS = {
   "rails-upgrade" => File.join(ROOT, "rails-upgrade"),
-  "upgrade-cleanup" => File.join(ROOT, "upgrade-cleanup", "upgrade-cleanup")
+  "upgrade-cleanup" => File.join(ROOT, "upgrade-cleanup", "upgrade-cleanup"),
+  "rails-roadmap" => File.join(ROOT, "rails-roadmap", "rails-roadmap")
 }.freeze
 
 $errors = []
@@ -52,6 +53,7 @@ SKILLS.each_value do |skill_dir|
     File.read(f).each_line.with_index(1) do |line, ln|
       next if line.include?(".github/") # e.g. `.github/workflows/ci.yml` — CI config, not a skill path
       next if line.include?("dual-boot") # cross-plugin reference into the external dual-boot skill repo
+      next if line.include?("rails-upgrade/") # rails-roadmap pointing into the rails-upgrade catalog
 
       line.scan(PATH_TOKEN) do |token|
         next if token.include?("{") || token.include?("<") || token.include?("*")
@@ -344,6 +346,43 @@ end
 
 # ---------------------------------------------------------------------------
 $warnings.each { |w| puts "WARN  #{w}" }
+# 10. Plugin manifests parse, and their `skills` / `commands` paths exist
+#
+# This repo ships three plugins, each with its own manifest and its own entry in
+# the marketplace. A manifest whose `skills` path is wrong installs a plugin that
+# silently exposes nothing, which is invisible until someone tries to use it.
+# ---------------------------------------------------------------------------
+require "json"
+
+Dir.glob(File.join(ROOT, "**", ".claude-plugin", "plugin.json")).sort.each do |f|
+  plugin_root = File.dirname(File.dirname(f))
+
+  begin
+    manifest = JSON.parse(File.read(f))
+  rescue JSON::ParserError => e
+    err(f, "JSON parse error: #{e.message}")
+    next
+  end
+
+  %w[name version description].each do |key|
+    err(f, "missing required key `#{key}`") if manifest[key].to_s.empty?
+  end
+
+  %w[skills commands].each do |key|
+    Array(manifest[key]).each do |rel|
+      path = File.expand_path(rel, plugin_root)
+      err(f, "`#{key}` points at `#{rel}`, which does not exist") unless Dir.exist?(path)
+    end
+  end
+
+  # A plugin's skill dir should hold a SKILL.md whose frontmatter name matches it.
+  Array(manifest["skills"]).each do |rel|
+    skill_md = File.join(File.expand_path(rel, plugin_root), "SKILL.md")
+    err(f, "`skills` dir `#{rel}` has no SKILL.md") unless File.exist?(skill_md)
+  end
+end
+
+# ---------------------------------------------------------------------------
 if $errors.empty?
   puts "lint-skill: OK#{$warnings.empty? ? '' : " (#{$warnings.length} warning(s))"}"
 else

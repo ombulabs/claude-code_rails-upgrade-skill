@@ -26,7 +26,7 @@ We've encountered (and solved) edge cases that don't appear in any documentation
 
 ### Installation
 
-This skill depends on two companion skills: [rails-load-defaults](https://github.com/ombulabs/claude-code_rails-load-defaults-skill) and [dual-boot](https://github.com/ombulabs/claude-code_dual-boot-skill). A fourth sibling plugin, `upgrade-cleanup`, lives in this repo and runs the post-upgrade scaffolding teardown. The marketplace install handles all four.
+This skill depends on two companion skills: [rails-load-defaults](https://github.com/ombulabs/claude-code_rails-load-defaults-skill) and [dual-boot](https://github.com/ombulabs/claude-code_dual-boot-skill). Two sibling plugins live in this repo: `upgrade-cleanup`, which runs the post-upgrade scaffolding teardown, and `rails-roadmap`, which surveys the whole path to the latest Ruby and Rails without changing anything. The marketplace install handles all of them.
 
 **From inside the Claude Code CLI prompt (recommended):**
 
@@ -36,6 +36,7 @@ This skill depends on two companion skills: [rails-load-defaults](https://github
 /plugin install rails-load-defaults@ombulabs-ai
 /plugin install dual-boot@ombulabs-ai
 /plugin install upgrade-cleanup@ombulabs-ai
+/plugin install rails-roadmap@ombulabs-ai
 ```
 
 **From your terminal:**
@@ -46,6 +47,7 @@ claude plugin install rails-upgrade@ombulabs-ai
 claude plugin install rails-load-defaults@ombulabs-ai
 claude plugin install dual-boot@ombulabs-ai
 claude plugin install upgrade-cleanup@ombulabs-ai
+claude plugin install rails-roadmap@ombulabs-ai
 ```
 
 **Manual install:**
@@ -57,6 +59,9 @@ cp -r claude-code_rails-upgrade-skill/rails-upgrade ~/.claude/skills/
 
 # 2. upgrade-cleanup (sibling plugin, same repo)
 cp -r claude-code_rails-upgrade-skill/upgrade-cleanup ~/.claude/skills/
+
+# 3. rails-roadmap (sibling plugin, same repo)
+cp -r claude-code_rails-upgrade-skill/rails-roadmap ~/.claude/skills/
 
 # 3. rails-load-defaults (dependency)
 git clone https://github.com/ombulabs/claude-code_rails-load-defaults-skill.git
@@ -86,15 +91,39 @@ In Claude Code, navigate to your Rails application directory and use natural lan
 
 | Command | Description |
 |---------|-------------|
-| `/rails-upgrade` | Start the upgrade assistant |
-| "Finish the upgrade" / "Clean up dual-boot" / "Abandon this upgrade" | Trigger the `upgrade-cleanup` plugin. Asks whether to keep the next or current version, then drops `NextRails.next?` / `NextRails.current?` branches and retires dual-boot scaffolding. |
+| `/rails-roadmap` | Survey the whole path to the latest Ruby and Rails and write `RAILS_ROADMAP.md`. Read-only — changes nothing. Optionally takes a target: `/rails-roadmap 8.0` |
 | "Upgrade to Rails X.Y" | Generate reports from detection results |
 | "Show app:update changes" | Preview configuration file changes |
 | "Plan upgrade from X to Y" | Get multi-hop upgrade strategy |
+| "Finish the upgrade" / "Clean up dual-boot" / "Abandon this upgrade" | Trigger the `upgrade-cleanup` plugin. Asks whether to keep the next or current version, then drops `NextRails.next?` / `NextRails.current?` branches and retires dual-boot scaffolding. |
+
+`rails-upgrade` itself has no slash command — it activates from the phrasings above, or from any
+request to upgrade, analyse, or plan a Rails version change. (An earlier version of this table
+listed a `/rails-upgrade` command that was never implemented.)
 
 ## Design Decisions & Best Practices
 
 This skill implements the **FastRuby.io upgrade methodology**, which includes:
+
+### Survey Before You Start (`/rails-roadmap`)
+
+Before committing to an upgrade, it helps to see the whole road. The `rails-roadmap` sibling
+plugin surveys every hop from where the app is today to the latest Ruby and Rails, and writes
+`RAILS_ROADMAP.md` — a committable document you can take to a planning meeting.
+
+It is deliberately the inverse of this skill. This skill executes one hop and changes things.
+The roadmap plans every hop and changes nothing: no dual-boot setup, no `bundle install`, no
+applied fixes. Its only write is the roadmap file itself.
+
+The one design decision worth knowing about is **confidence tiering**. The immediate next hop is
+surveyed `ACTIONABLE`, with real `file:line` references. Later hops are surveyed `INDICATIVE` —
+pattern counts only, plus a standing note to re-run before you get there. That is because every
+hop is grepped against today's code, and by the time you reach hop four, hops one through three
+will have rewritten much of it. Presenting both at the same fidelity would invite planning hop
+four in detail against references guaranteed to be stale.
+
+For the same reason the roadmap never reports a project-wide total of findings: one line of code
+can match patterns in three different hops, so a summed figure is inflated.
 
 ### Dual-Boot Strategy
 

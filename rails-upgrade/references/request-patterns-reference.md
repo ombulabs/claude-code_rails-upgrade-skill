@@ -29,4 +29,6 @@
 
 Analysis Only intentionally skips Workflow 04 (Dual-Boot setup) and Workflow 03 (Validate Upgrade Path) because the user is not yet committing to an upgrade. Reports Only is a Full Upgrade that stops after Workflow 09: the user wants both deliverables and will do the implementation, CI sync and load_defaults work themselves.
 
+**If the question is about scope rather than a single hop** — "how far behind are we?", "what would it take to get current?", "estimate the upgrade" — the `rails-roadmap` plugin is the better entry point than Analysis Only. It surveys every hop from here to the latest Rails and writes a committable `RAILS_ROADMAP.md`, without running the test suite or setting anything up. Mention it, then follow Analysis Only if the user still wants the single-hop detail.
+
 Next-Hop Readiness is not in the table: it uses only the patch check of Workflow 00 and two scripts. It is a quick read-only answer for the next hop only, with no test suite, no next_rails setup and no report. Follow `references/next-hop-readiness-reference.md`.
