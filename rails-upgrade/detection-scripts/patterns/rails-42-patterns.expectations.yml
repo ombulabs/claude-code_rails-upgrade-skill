@@ -1,0 +1,63 @@
+# Fixture expectations for rails-42-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-42-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag (the real breaking-change shapes)
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not, like a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
+
+CHANGED_ATTRIBUTES_WRITE:
+  match:
+    # element writes, including through self, a receiver and ||=
+    - "    changed_attributes[\"tag_list\"] = nil"
+    - "    changed_attributes[:name] = name_was"
+    - "    self.changed_attributes[\"state\"] = old_state"
+    - "    changed_attributes[attr] ||= old"
+    - "    changed_attributes[:count] += 1"
+    # one level of nested index in the key
+    - "    changed_attributes[attrs[:name]] = old"
+    # in-place Hash writers (a chain split across lines, changed_attributes
+    # then .delete(...) on the next line, is matched by scan_patterns.rb
+    # which reads whole files; fixtures are single lines)
+    - "    changed_attributes.delete(\"updated_at\")"
+    - "    record.changed_attributes.delete(:token)"
+    - "    changed_attributes.merge!(\"tags\" => old_tags)"
+    - "    changed_attributes.reverse_merge!(\"tags\" => old_tags)"
+    - "    changed_attributes&.delete(\"x\")"
+    - "    changed_attributes.store(\"tags\", old)"
+    - "    changed_attributes.clear"
+    - "    changed_attributes.except!(*IGNORED)"
+    - "    changed_attributes.delete_if { |k, _| k == \"x\" }"
+    - "    changed_attributes.reject! { |k, _| k.start_with?(\"_\") }"
+    - "    changed_attributes().update(\"a\" => 1)"
+  no_match:
+    # reads and copies keep working on 4.2
+    - "    old = changed_attributes[\"name\"]"
+    - "    if changed_attributes[\"name\"] == \"x\""
+    - "    changed_attributes[:a] != 1"
+    - "    changed_attributes[keys[0]] <= 1"
+    - "    changed_attributes.reverse_merge(\"a\" => 1)"
+    - "    changed_attributes[\"a\"] =~ /x/"
+    - "    { changed_attributes[\"a\"] => 1 }"
+    - "    changed_attributes.key?(\"name\")"
+    - "    changed_attributes.merge(\"a\" => 1)"
+    - "    changed_attributes.except(\"updated_at\")"
+    - "    changed_attributes.dup.delete(\"x\")"
+    - "    changed_attributes.keys.delete(\"x\")"
+    # the instance variable is the unfrozen ActiveModel hash
+    - "    @changed_attributes[\"name\"] = old"
+    - "    @changed_attributes.delete(\"name\")"
+    # the replacements, definitions, lookalike names and comments
+    - "    attribute_will_change!(\"tag_list\")"
+    - "    set_attribute_was(\"name\", old)"
+    - "    clear_attribute_changes([\"name\"])"
+    - "    def changed_attributes"
+    - "    my_changed_attributes.delete(\"x\")"
+    - "    changed_attributes_for(:x).delete(\"x\")"
+    - "    changed_attributes.update_counters"
+    - "    # changed_attributes[\"name\"] = old"
