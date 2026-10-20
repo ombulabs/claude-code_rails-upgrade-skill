@@ -9,9 +9,9 @@
 #   bin/validate-patterns --self-test    # run built-in fixture assertions
 #
 # Checks: YAML parses, required keys, `kind:` enum, and every `pattern` /
-# `exclude` regex compiles, has no control characters (a single backslash in a
-# YAML double-quoted string, like "\b", becomes a backspace, not a word
-# boundary), and finishes in bounded time on long stress inputs (catastrophic
+# `exclude` / `unless_file_matches` (optional absence check) regex compiles,
+# has no control characters (a single backslash in a YAML double-quoted
+# string, like "\b", becomes a backspace, not a word boundary), and finishes in bounded time on long stress inputs (catastrophic
 # backtracking). Every error ends with a `hint:` on how to fix it.
 #
 # Exits 0 if all files / assertions pass, 1 otherwise.
@@ -24,6 +24,10 @@ TOP_LEVEL_KEYS = %w[version description upgrade_findings].freeze
 PATTERN_KEYS = %w[name kind pattern exclude search_paths explanation fix variable_name].freeze
 PRIORITY_KEYS = %w[high_priority medium_priority low_priority].freeze
 KIND_VALUES = %w[breaking deprecation migration optional].freeze
+# Optional regex keys, skipped when absent or "". `unless_file_matches` makes
+# scan_patterns.rb skip a file whose content matches it (the setting a
+# file-marker pattern asks about is already there).
+OPTIONAL_REGEX_KEYS = %w[exclude unless_file_matches].freeze
 
 # Control characters YAML makes from a single-backslash escape in a
 # double-quoted string, mapped to the regex escape the author meant.
@@ -112,10 +116,20 @@ def validate(path)
                   "hint: judge the change at this hop, see CLAUDE.md \"Assigning kind\""
       end
 
-      %w[pattern exclude].each do |key|
+      if entry["pattern"].to_s.empty? && !entry["unless_file_matches"].to_s.empty?
+        errors << "#{label}: unless_file_matches on a path-based entry (empty pattern) has no effect; " \
+                  "hint: remove it, the scanner only applies it to files a pattern matched"
+      end
+
+      %w[pattern exclude unless_file_matches].each do |key|
         val = entry[key]
-        next if key == "exclude" && (val.nil? || val.to_s.empty?)
+        next if OPTIONAL_REGEX_KEYS.include?(key) && (val.nil? || val.to_s.empty?)
         next if val.nil?
+
+        unless val.is_a?(String)
+          errors << "#{label}: #{key} is #{val.class}, not a String; hint: quote the regex"
+          next
+        end
 
         begin
           Regexp.new(val)
@@ -189,6 +203,23 @@ def self_test
   control = Marshal.load(Marshal.dump(base))
   control["upgrade_findings"]["high_priority"][0]["pattern"] = "\bfoo\b"
   cases << { name: "single-backslash \\b read as a backspace", doc: control, expect: :fail, match: /control character "\\b".*word boundary/ }
+
+  absence = Marshal.load(Marshal.dump(base))
+  absence["upgrade_findings"]["high_priority"][0]["unless_file_matches"] = '^[ \t]*config\.foo[ \t]*='
+  cases << { name: "valid unless_file_matches", doc: absence, expect: :pass }
+
+  bad_absence = Marshal.load(Marshal.dump(base))
+  bad_absence["upgrade_findings"]["high_priority"][0]["unless_file_matches"] = 'config\.foo('
+  cases << { name: "broken unless_file_matches regex", doc: bad_absence, expect: :fail, match: /unless_file_matches regex does not compile/ }
+
+  absence_control = Marshal.load(Marshal.dump(base))
+  absence_control["upgrade_findings"]["high_priority"][0]["unless_file_matches"] = "\bfoo"
+  absence_path = Marshal.load(Marshal.dump(base))
+  absence_path["upgrade_findings"]["high_priority"][0]["pattern"] = ""
+  absence_path["upgrade_findings"]["high_priority"][0]["unless_file_matches"] = "foo"
+  cases << { name: "unless_file_matches on a path-based entry", doc: absence_path, expect: :fail, match: /path-based entry .*has no effect/ }
+
+  cases << { name: "control character in unless_file_matches", doc: absence_control, expect: :fail, match: /unless_file_matches contains control character/ }
 
   if Regexp.respond_to?(:timeout)
     slow = Marshal.load(Marshal.dump(base))

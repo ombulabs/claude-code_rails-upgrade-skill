@@ -55,6 +55,14 @@
 #    depth, unless a search_path names them.
 # 7. An entry with an empty `pattern:` is path-based: it fires when any file
 #    exists under its search_paths (e.g. vendor/plugins/).
+# 8. `unless_file_matches:` (optional) is an absence check. A regex cannot see
+#    that a setting is missing, so a file-marker pattern flags the file that
+#    should hold it. When this second regex matches anywhere in a file's
+#    content, every match of the pattern in that file is dropped: the setting
+#    is there. Dropped this way, a site is neither a hit nor "suppressed by
+#    exclude"; the file still counts as scanned. Write the regex so a
+#    commented-out line does not count (`^[ \t]*config\.x[ \t]*=`). It reads
+#    text, not Ruby: a setting inside `=begin`/`=end` or a string still counts.
 
 require "yaml"
 require "json"
@@ -211,6 +219,7 @@ class Scanner
 
     pattern = Regexp.new(entry["pattern"])
     exclude = entry["exclude"].to_s.empty? ? nil : Regexp.new(entry["exclude"])
+    present = entry["unless_file_matches"].to_s.empty? ? nil : Regexp.new(entry["unless_file_matches"])
     hits = []
     suppressed = []
     files.each do |file|
@@ -222,6 +231,7 @@ class Scanner
       # Scrub rather than skip: skipping a file with one bad byte reports it
       # as scanned clean.
       content = content.scrub("?") unless content.valid_encoding?
+      next if present && safe_match(present, content, 0)
       scan_content(content, pattern, exclude).each do |line, text, excluded, start|
         (excluded ? suppressed : hits) << [relative(file), line, text, start]
       end
@@ -702,6 +712,45 @@ def self_test
     check.call("reads the hop from Gemfile.lock",
                Hop.resolve(File.read(File.join(dir, "Gemfile.lock")), nil)[:from] == "4.0")
   end
+  # unless_file_matches: the two real file-marker patterns of 4.2 fire when
+  # the setting is missing or only commented out, and not when it is set.
+  doc42 = YAML.load_file(patterns_file_for("4.2"))["upgrade_findings"]
+  e42 = {}
+  PRIORITIES.each { |p| Array(doc42[p]).each { |e| e42[e["variable_name"]] = e } }
+  app_rb = "module Demo\n  class Application < Rails::Application\n%s  end\nend\n"
+  test_rb = "Rails.application.configure do\n  config.cache_classes = true\n%send\n"
+  {
+    "missing" => ["", "", true],
+    "commented out" => ["    # config.active_record.raise_in_transactional_callbacks = true\n",
+                        "  # config.active_support.test_order = :random\n", true],
+    "set to false" => ["    config.active_record.raise_in_transactional_callbacks = false\n", nil, true],
+    "set" => ["    config.active_record.raise_in_transactional_callbacks = true\n",
+              "  config.active_support.test_order = :sorted\n", false],
+    "set to nil" => [nil, "  config.active_support.test_order = nil\n", true],
+    "set from ENV" => [nil, "  config.active_support.test_order = ENV.fetch('ORDER', 'random').to_sym\n", false]
+  }.each do |state, (app_line, test_line, flagged)|
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "config/environments"))
+      File.write(File.join(dir, "config/application.rb"), format(app_rb, app_line.to_s))
+      File.write(File.join(dir, "config/environments/test.rb"), format(test_rb, test_line.to_s))
+      s = Scanner.new(dir)
+      { "TRANSACTIONAL_CALLBACKS" => app_line, "TEST_ORDER" => test_line }.each do |var, line|
+        next if line.nil?
+        r = s.scan(e42[var])
+        check.call("#{var} with the setting #{state}: want #{flagged ? 'flagged' : 'clean'}, got #{r[:hits].length} hit(s)",
+                   r[:hits].length == (flagged ? 1 : 0) && r[:suppressed].empty? && r[:files_scanned] == 1 &&
+                   status_of(r) == (flagged ? "found" : "clean"))
+      end
+    end
+  end
+  Dir.mktmpdir do |dir|
+    File.write(File.join(dir, "a.rb"), "foo\nfoo\nbar\n")
+    File.write(File.join(dir, "b.rb"), "foo\n")
+    r = Scanner.new(dir).scan("pattern" => "foo", "exclude" => "", "unless_file_matches" => "^bar$", "search_paths" => ["a.rb", "b.rb"])
+    check.call("unless_file_matches drops every match in the matching file only (got #{r[:hits].inspect})",
+               r[:hits].map(&:first) == ["b.rb"] && r[:files_scanned] == 2)
+  end
+
   railties = "    railties (6.0.6)\n"
   check.call("the 6.0 hop is 6.1 per the guides, read from railties",
              Hop.resolve(railties, nil).values_at(:to, :source) == ["6.1", "Gemfile.lock pins railties 6.0.6"])
