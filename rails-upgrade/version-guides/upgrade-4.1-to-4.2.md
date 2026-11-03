@@ -215,6 +215,31 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
+#### Integration Test Paths Need a Leading Slash
+
+**Pattern:** `INTEGRATION_RELATIVE_PATH`
+
+**What Changed:**
+Integration sessions (`ActionDispatch::IntegrationTest`, RSpec request specs) now build the request URI as a string: scheme, host and port, then the path as given (`Integration::Session#build_full_uri`, new in 4.2.0). Rails 4.1 resolved the path against `/` with `URI#+`, so `get "users"` worked by accident. On 4.2 the same call requests `http://www.example.com:80users` and rack-test raises `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` (Ruby 2.x wording). The actionpack 4.2.0 CHANGELOG lists it: the leading slash is now required in the integration test `process` helpers. A path that starts with `?` or `#`, and a full URL, still work. Specs that include `Rack::Test::Methods` directly (Grape or Sinatra apps) are not affected, since rack-test adds the slash itself.
+
+**Detection Pattern:**
+The pattern flags `get`/`post`/`put`/`patch`/`delete`/`head` (and the `xhr`, `xml_http_request`, `*_via_redirect` forms, where the path is the second argument) whose path is a string literal with no leading slash, in `spec/requests/`, `spec/integration/`, `spec/api/` and `test/integration/`. It skips rswag-style `get "List users" do` blocks, symbols, path helpers and variables. It misses a path that starts with interpolation (`get "#{id}/edit"`), a request used as an expression (`expect(get "users")`), a request followed by a block, calls on a session object (`sess.get "users"`) and request helpers in `spec/support/` or `test/support/` (left out because controller shared examples there pass action names such as `get "show"`): search those by hand.
+
+**Fix:**
+```ruby
+# BEFORE
+get "users", format: :json
+xhr :post, "comments", body: "x"
+
+# AFTER (works on 4.1 and 4.2)
+get "/users", format: :json
+xhr :post, "/comments", body: "x"
+# or a path helper
+get users_path(format: :json)
+```
+
+---
+
 #### `config.active_support.test_order` Not Set
 
 **Pattern:** `TEST_ORDER`
@@ -571,8 +596,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 7. Add `config.active_support.test_order = :sorted` (or `:random` once the suite passes in random order)
 8. Rename `serve_static_assets` → `serve_static_files`
 9. Add a unit to `ago` / `until` / `since` / `from_now` called on a bare number (`5.ago` → `5.seconds.ago`)
-10. Consider replacing Timecop with `travel_to` (optional)
-11. Consider dropping Foreigner for native FKs (optional)
+10. Add the leading slash to integration and request spec paths (`get "/users"`)
+11. Consider replacing Timecop with `travel_to` (optional)
+12. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -595,6 +621,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 | ``DEPRECATION WARNING: You did not specify a value for the configuration option `active_support.test_order` `` | "`config.active_support.test_order` Not Set", set `:sorted` to keep the 4.1 order |
 | ``NoMethodError: undefined method `ago' for 5:Fixnum`` (or `until` / `since` / `from_now`, `for 1.5:Float`, `for 5:Integer` on Ruby 2.4+) | "`Numeric#ago` / `#until` / `#since` / `#from_now` Removed": add a unit: `5.seconds.ago` |
