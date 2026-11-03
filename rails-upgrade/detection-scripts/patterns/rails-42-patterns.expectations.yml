@@ -21,6 +21,9 @@ TEST_ORDER:
     # Rails 4.0 and earlier generator form, kept by apps that never regenerated test.rb
     - "MyApp::Application.configure do"
     - "Acme::Store::Application.configure do"
+    - "::MyApp::Application.configure do"
+    # brace block
+    - "Rails.application.configure {"
   no_match:
     - "  config.active_support.test_order = :sorted"
     - "Rails.application.config.active_support.test_order = :random"
