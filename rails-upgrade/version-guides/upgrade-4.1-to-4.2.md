@@ -511,6 +511,56 @@ Rails form helpers handle masking automatically. If you build forms outside Rail
 
 ---
 
+#### `ConnectionAdapters::Column.new` Takes a Cast Type Third
+
+**Pattern:** `COLUMN_NEW_SQL_TYPE_ARG`
+
+**What Changed:**
+`ActiveRecord::ConnectionAdapters::Column#initialize` changes from `(name, default, sql_type = nil, null = true)` to `(name, default, cast_type, sql_type = nil, null = true)`, and the column hands `type`, `limit`, `precision`, `scale` and every cast (`type_cast_from_user`, `type_cast_from_database`, ...) to `cast_type`. `AbstractMysqlAdapter::Column` takes the same arguments (4.2 drops the `Mysql2Adapter::Column` and `MysqlAdapter::Column` subclasses, so those names resolve to it). Code that builds fake columns, such as the tableless-model recipe or a virtual typed field appended to a real model's `columns`, still loads, but the SQL type string now lands in `cast_type`, so the first assignment, read or column lookup raises:
+
+```
+NoMethodError: undefined method `type_cast_from_user' for "boolean":String
+```
+
+(or `type_cast_from_database`, `type`, `limit`, depending on what touches the column first).
+
+**Detection Pattern:**
+The `COLUMN_NEW_SQL_TYPE_ARG` pattern flags every `ConnectionAdapters::Column.new` call outside comments. A call split before `.new` is matched by the whole-file scanner. A splat call, `Column.new(*args)`, is skipped because it is the shape the fix below uses: check any other splat call by hand. It misses a bare `Column.new` reached through a reopened or included `ConnectionAdapters` module or a constant alias, so also search the tableless models for `Column.new` by hand.
+
+**Fix:**
+Build the cast type yourself on 4.2 and keep the old call on 4.1. `ActiveRecord::Type` does not exist on 4.1, so the branch is needed while both versions boot. Do not use `connection.lookup_cast_type`: it needs a database connection at class load, and on PostgreSQL it runs `SELECT 'string'::regtype::oid`, which raises for `string`.
+
+```ruby
+# BEFORE
+def self.column(name, sql_type = nil, default = nil, null = true)
+  columns << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
+end
+
+# AFTER
+VIRTUAL_CAST_TYPES = {
+  "boolean" => "Boolean", "integer" => "Integer", "date" => "Date",
+  "datetime" => "DateTime", "timestamp" => "DateTime", "time" => "Time",
+  "decimal" => "Decimal", "float" => "Float", "binary" => "Binary",
+  "string" => "Value", "text" => "Value", "" => "Value"
+}.freeze
+
+def self.column(name, sql_type = nil, default = nil, null = true)
+  args = [name.to_s, default, sql_type.to_s, null]
+  if NextRails.next?
+    # 4.2 takes a cast type before sql_type; "string(255)" looks up "string"
+    type_name = VIRTUAL_CAST_TYPES.fetch(sql_type.to_s.sub(/\(.*/, ""))
+    args.insert(2, ActiveRecord::Type.const_get(type_name).new)
+  end
+  columns << ActiveRecord::ConnectionAdapters::Column.new(*args)
+end
+```
+
+`string`, `text` and untyped fields map to `ActiveRecord::Type::Value`, which casts nothing, as 4.1 did for them (`Type::String` would call `to_s` on an Array kept in the field). `Value#type` is `nil`, so a form builder or other code that reads `column.type` (to pick a textarea for `text`, for example) gets `nil` where 4.1 gave `:string` or `:text`: map those fields to `ActiveRecord::Type::String` / `Type::Text` if that matters, accepting that they call `to_s`. An undeclared type (`varchar`, `json`) raises `KeyError` at class load instead of failing later: add it to the map. After the upgrade, drop the `NextRails.next?` branch and pass the cast type directly.
+
+A table-backed model can instead declare the field with the 4.2 class method `attribute :flag, ActiveRecord::Type::Boolean.new` (absent on 4.0 and 4.1). A set `attribute` with no table column still goes into the INSERT on 4.2.0, and on later 4.2 releases when `partial_writes` is off. The long-term replacement is the Rails 5.0 attributes API.
+
+---
+
 #### `@attributes` Is an `AttributeSet`, Not a Hash
 
 **Pattern:** `ATTRIBUTES_IVAR_REPLACE`
@@ -900,8 +950,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 14. Replace `ConnectionAdapters::Column.value_to_boolean` and the other removed class-level cast helpers with app-owned casts
 15. Replace `columns_hash[...].default` and `column_for_attribute(...).default` reads with `column_defaults[...]`; cast a model-less `connection.columns(...)` default with `type_cast_from_database` behind `NextRails.next?`
 16. Replace direct `@attributes` access in models with `read_attribute` / `write_attribute`
-17. Consider replacing Timecop with `travel_to` (optional)
-18. Consider dropping Foreigner for native FKs (optional)
+17. Pass a cast type to fake `ConnectionAdapters::Column.new` calls (tableless models, virtual typed fields)
+18. Consider replacing Timecop with `travel_to` (optional)
+19. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -922,6 +973,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'deliver' for #<Mail::Message>` | "ActionMailer `#deliver` / `#deliver!` Deprecated" — `deliver_now` / `deliver_later` |
 | `undefined method 'respond_with' for ApplicationController` | "`respond_with` / Class-Level `respond_to` Extracted" — `gem 'responders', '~> 2.0'` |
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
+| `NoMethodError: undefined method 'type_cast_from_user'` (or `type_cast_from_database`, `type`, `limit`) for a SQL type String such as `"boolean"` | "`ConnectionAdapters::Column.new` Takes a Cast Type Third": pass a cast type on 4.2 |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | ``NoMethodError: undefined method `fetch_value' for ...:Hash`` on an attribute read | "`@attributes` Is an `AttributeSet`, Not a Hash": stop replacing `@attributes` |
