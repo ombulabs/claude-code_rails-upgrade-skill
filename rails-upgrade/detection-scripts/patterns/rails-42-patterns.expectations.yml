@@ -262,3 +262,51 @@ TEST_ORDER:
     # commented-out configure lines (exclude)
     - "# MyApp::Application.configure do"
     - "  # Rails.application.configure do"
+
+COLUMN_TYPE_CAST_INSTANCE:
+  match:
+    - "    Model.columns_hash[\"amount\"].type_cast(params[:amount])"
+    - "  self.class.columns_hash[name.to_s].type_cast(raw)"
+    - "  column_for_attribute(:active).type_cast(\"1\")"
+    - "  Order.columns_hash[\"total\"].type_cast(Order.maximum(:total))"
+    # a comma inside a nested call is not a second argument
+    - "  column.type_cast(format(\"%d,%d\", a, b))"
+    - "  @column.type_cast value"
+    - "  columns_hash[key].try(:type_cast, value)"
+    - "  column.send(:type_cast, value)"
+    - "  col.try!(:type_cast, value)"
+    - "  col.__send__(:type_cast, value)"
+    # a comma inside a string literal is not a second argument
+    - "  col.type_cast(\"1,000\")"
+    - "  col.type_cast(opts[:a] || \"x, y\")"
+    # paren-less and string-named send / try
+    - "  col.send :type_cast, v"
+    - "  col.try :type_cast, value"
+    - "  col.send(\"type_cast\", v)"
+    # other one-argument shapes
+    - "  col.type_cast (value)"
+    - "  col.type_cast -1"
+    - "  col.type_cast *args"
+    - "  col.type_cast(value, &blk)"
+  no_match:
+    # two-argument connection quoting method, still public on 4.2
+    - "  connection.type_cast(value, column)"
+    - "  ActiveRecord::Base.connection.type_cast(quote(value), column)"
+    - "  conn.type_cast value, column"
+    - "  conn.send(:type_cast, value, column)"
+    - "  conn.send(:type_cast, quote(value), column)"
+    # zero-argument call followed by a modifier, not a one-argument call
+    - "  x = col.type_cast if foo"
+    - "  x = col.type_cast - 1"
+    - "  col.type_cast()"
+    # definitions, not calls
+    - "  def type_cast(value)"
+    - "  def self.type_cast(value)"
+    - "  def obj.type_cast(value)"
+    # the 4.2 replacements
+    - "  column.type_cast_from_database(value)"
+    - "  column.type_cast_from_user(value)"
+    # also gone on 4.2, but a different method this pattern does not cover
+    - "  column.type_cast_for_write(value)"
+    # comment line
+    - "  # column.type_cast(value)"

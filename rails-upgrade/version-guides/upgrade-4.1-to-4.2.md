@@ -432,6 +432,34 @@ Rails form helpers handle masking automatically. If you build forms outside Rail
 
 ---
 
+#### `Column#type_cast` Removed
+
+**Pattern:** `COLUMN_TYPE_CAST_INSTANCE`
+
+**What Changed:**
+Rails 4.2 removes the public instance method `ActiveRecord::ConnectionAdapters::Column#type_cast(value)`. A 4.2 column hands casting to its `cast_type` and exposes it as `type_cast_from_database` and `type_cast_from_user` (both new in 4.2). `Type::Value#type_cast` is private, so `column.type_cast(value)` raises `NoMethodError`. The usual caller casts a param or a calculation result through `Model.columns_hash[name].type_cast(value)`.
+
+The two-argument `connection.type_cast(value, column)` quoting method is a different API, still present on 4.2, and the pattern skips it. The removed class-level helpers (`Column.value_to_boolean` and friends) are a separate change.
+
+**Detection Pattern:** the `COLUMN_TYPE_CAST_INSTANCE` regex flags one-argument `.type_cast` calls, with or without parentheses, and `send` / `try(:type_cast, value)` with or without parentheses. It skips the two-argument `connection.type_cast(value, column)` quoting method, which still exists, unless its first argument nests parentheses two levels deep (`type_cast(foo(a(b, c)), col)` is flagged, check the argument count). The `try` form does not raise on 4.2: Active Support `try` checks `respond_to?` and returns `nil`, so the cast silently becomes `nil`. Any other object with a public one-argument `type_cast` is flagged too, so check that the receiver is a column.
+
+**Fix:**
+First check whether the cast does anything. `minimum` and `maximum` already cast through the column on 4.1 and 4.2, so a cast of their result can simply go. Otherwise branch on the version:
+
+```ruby
+# BEFORE
+column = Order.columns_hash["total"]
+column.type_cast(params[:total])
+
+# AFTER (works on 4.1 and 4.2)
+column = Order.columns_hash["total"]
+NextRails.next? ? column.type_cast_from_database(params[:total]) : column.type_cast(params[:total])
+```
+
+`type_cast_from_database` gives the 4.1 result for string, integer, decimal, boolean and datetime inputs, with one difference: a string column now returns a String for any value (`5` becomes `"5"`). `type_cast_from_user` is what an attribute writer uses, but it differs more: a blank string cast through an integer column gives `nil` instead of `0`. Rails 5.0 replaces both with `Order.type_for_attribute("total").cast(value)`.
+
+---
+
 #### `Numeric#ago` / `#until` / `#since` / `#from_now` Removed
 
 **Pattern:** `NUMERIC_AGO_WITHOUT_UNIT`
@@ -700,8 +728,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 10. Add a unit to `ago` / `until` / `since` / `from_now` called on a bare number (`5.ago` → `5.seconds.ago`)
 11. Add the leading slash to integration and request spec paths (`get "/users"`)
 12. If the app patches `Mapper::Mapping` (`normalize_conditions!` and friends), move the custom route options under `defaults:` and drop the patch
-13. Consider replacing Timecop with `travel_to` (optional)
-14. Consider dropping Foreigner for native FKs (optional)
+13. Replace one-argument `column.type_cast(value)` with `type_cast_from_database` behind `NextRails.next?`
+14. Consider replacing Timecop with `travel_to` (optional)
+15. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -727,6 +756,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess` from a model | "Writes into `changed_attributes` Raise": `attribute_will_change!`, `clear_attribute_changes` |
 | `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
+| ``NoMethodError: undefined method `type_cast' for #<ActiveRecord::ConnectionAdapters::...Column>`` | "`Column#type_cast` Removed", use `type_cast_from_database` |
 | ``NameError: undefined method `normalize_conditions!' for class `ActionDispatch::Routing::Mapper::Mapping'`` at boot | "Routing `Mapper::Mapping` Patches Stop Running": drop the patch, move the option under `defaults:` |
 | `ActionController::UrlGenerationError` from `url_for` on a route with a custom option that worked on 4.1 | "Routing `Mapper::Mapping` Patches Stop Running": the `normalize_conditions!` patch no longer runs |
 | `ArgumentError: wrong number of arguments (given N, expected 0)` (or `(N for 0)` before Ruby 2.3) when routes are drawn | "Routing `Mapper::Mapping` Patches Stop Running": a `normalize_defaults!` / `normalize_options!` / `normalize_path!` override needs the 4.2 signature |
