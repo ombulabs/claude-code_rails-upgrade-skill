@@ -222,7 +222,7 @@ Review code and tests that relied on the coder's nil representation. If you need
 **What Changed:**
 On Active Record models, `changed_attributes` returns a frozen copy from Rails 4.2.0 (`super.reverse_merge(attributes_changed_in_place).freeze` in `attribute_methods/dirty.rb`). Through 4.1 it returned the live hash, and apps wrote into it to mark a virtual attribute as changed (so save callbacks or versioning gems run) or to drop a change before saving. On 4.2, `changed_attributes[name] = value`, `.delete`, `.merge!`, `.store`, `.clear`, `.except!` and the other in-place Hash writers raise `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess`. Reads are unaffected, and so is a plain `ActiveModel::Dirty` class, whose `changed_attributes` is not frozen.
 
-**Detection Pattern:** `CHANGED_ATTRIBUTES_WRITE` flags element writes and in-place Hash writers on `changed_attributes`. It skips reads, copies (`.dup.delete`) and the `@changed_attributes` instance variable. A hit in a non-Active Record class, on a local variable with the same name, or inside a string needs no change. Writes through indirection are missed: `send(:changed_attributes)`, a `tap` block, or a copy of the reference (`h = changed_attributes` then `h.delete(k)`).
+**Detection Pattern:** `CHANGED_ATTRIBUTES_WRITE` flags element writes and in-place Hash writers on `changed_attributes`. It skips reads, copies (`.dup.delete`), the `@changed_attributes` instance variable and any line that mentions `NextRails.next?`, so the one-line dual-boot form below scans clean. A hit in a non-Active Record class, on a local variable with the same name, or inside a string needs no change. Writes through indirection are missed: `send(:changed_attributes)`, a `tap` block, or a copy of the reference (`h = changed_attributes` then `h.delete(k)`).
 
 **Fix:**
 `attribute_will_change!` exists on both versions and records what the reader returns now as the old value (nil when there is no reader). It does nothing when the attribute is already changed, so the first old value is kept. Where the old code wrote some other value, use `set_attribute_was` instead. Recording a specific old value and dropping a change use private `ActiveModel::Dirty` methods that only exist from 4.2, so branch on the Rails version until the upgrade ships:
@@ -244,16 +244,16 @@ def tag_list=(value)
 end
 
 def skip_timestamp_change
-  if NextRails.next?
-    clear_attribute_changes(["updated_at"])
-  else
-    changed_attributes.delete("updated_at")
-  end
+  NextRails.next? ? clear_attribute_changes(["updated_at"]) : changed_attributes.delete("updated_at")
 end
 
-# A specific old value: set_attribute_was(name, old) on 4.2,
-# changed_attributes[name] = old on 4.1
+# A specific old value
+NextRails.next? ? set_attribute_was(name, old) : changed_attributes[name] = old
+
+# From another object: the 4.2 methods are private
+NextRails.next? ? record.send(:clear_attribute_changes, [:token]) : record.changed_attributes.delete(:token)
 ```
+`clear_attribute_changes` drops only a change recorded through a setter. On 4.2 a serialized or JSON column that was mutated in place (`prefs["x"] = 1`) stays in `changes` and is still written on save.
 
 ---
 

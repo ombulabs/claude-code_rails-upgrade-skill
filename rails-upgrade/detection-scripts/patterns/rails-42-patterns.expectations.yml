@@ -35,6 +35,18 @@ CHANGED_ATTRIBUTES_WRITE:
     - "    changed_attributes.delete_if { |k, _| k == \"x\" }"
     - "    changed_attributes.reject! { |k, _| k.start_with?(\"_\") }"
     - "    changed_attributes().update(\"a\" => 1)"
+    - "    changed_attributes.deep_merge!(\"a\" => 1)"
+    - "    changed_attributes.reverse_update(\"a\" => 1)"
+    - "    changed_attributes.replace({})"
+    - "    changed_attributes.shift"
+    - "    changed_attributes.slice!(\"a\")"
+    - "    changed_attributes.select! { |k, _| k }"
+    - "    changed_attributes.keep_if { |k, _| k }"
+    - "    changed_attributes.compact!"
+    - "    changed_attributes.transform_values!(&:to_s)"
+    - "    changed_attributes.[]=(attr, old)"
+    - "    changed_attributes[:a] &&= nil"
+    - "    changed_attributes[:flags] <<= 1"
   no_match:
     # reads and copies keep working on 4.2
     - "    old = changed_attributes[\"name\"]"
@@ -61,3 +73,7 @@ CHANGED_ATTRIBUTES_WRITE:
     - "    changed_attributes_for(:x).delete(\"x\")"
     - "    changed_attributes.update_counters"
     - "    # changed_attributes[\"name\"] = old"
+    # the dual-boot one-liners from fix: (exclude)
+    - "    NextRails.next? ? clear_attribute_changes([\"updated_at\"]) : changed_attributes.delete(\"updated_at\")"
+    - "    NextRails.next? ? set_attribute_was(name, old) : changed_attributes[name] = old"
+    - "    changed_attributes.compact"
