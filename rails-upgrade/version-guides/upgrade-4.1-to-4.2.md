@@ -301,6 +301,7 @@ For a column read from `connection.columns(table)`, which no model types, cast o
 
 ```ruby
 default = NextRails.next? ? column.type_cast_from_database(column.default) : column.default
+```
 
 ---
 
