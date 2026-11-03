@@ -28,7 +28,7 @@ COLUMN_CAST_CLASS_METHODS:
     - "ActiveRecord::ConnectionAdapters::Column.binary_to_string(v)"
     # adapter subclasses inherit the class methods on 4.1
     - "ActiveRecord::ConnectionAdapters::PostgreSQLColumn.string_to_time(s)"
-    # the four protected helpers are reachable only through send on 4.1
+    # the seven protected helpers are reachable only through send or method on 4.1
     - "ActiveRecord::ConnectionAdapters::Column.send(:fast_string_to_time, s)"
     - "ActiveRecord::ConnectionAdapters::Column.send(\"fast_string_to_date\", s)"
     - "ActiveRecord::ConnectionAdapters::Column.send :new_time, *parts"
@@ -36,6 +36,8 @@ COLUMN_CAST_CLASS_METHODS:
     - "ActiveRecord::ConnectionAdapters::Column.public_send(:value_to_boolean, v)"
     - "Column.send(:fallback_string_to_time, s)"
     - "Column.send(:microseconds, h)"
+    - "NEW_TIME = ActiveRecord::ConnectionAdapters::Column.method(:new_time)"
+    - "ActiveRecord::ConnectionAdapters::MysqlAdapter::Column.string_to_date(t)"
     # try returns nil on 4.2 instead of raising
     - "ActiveRecord::ConnectionAdapters::Column.try(:value_to_boolean, params[:x])"
     - "flags.map(&ActiveRecord::ConnectionAdapters::Column.method(:value_to_boolean))"
@@ -57,6 +59,7 @@ COLUMN_CAST_CLASS_METHODS:
     - "ReportColumn.value_to_date(x)"
     - "GridColumn.value_to_boolean(v)"
     - "MyColumn.string_to_hstore(s)"
+    - "Reports::Column.value_to_date(x)"
     - "PostgreSQLColumn::CastHelper"
     # still present on 4.2 (TRUE_VALUES goes away in 5.0, not here)
     - "ActiveRecord::ConnectionAdapters::Column::TRUE_VALUES.include?(v)"
