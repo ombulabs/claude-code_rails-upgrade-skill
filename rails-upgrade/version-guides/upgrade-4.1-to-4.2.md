@@ -312,7 +312,7 @@ Rails 4.1 deprecated calling `ago`, `until`, `since` and `from_now` on a plain n
 Two shapes are easy to miss. Through 4.2 a Duration has no `*` or `/` of its own: they go through `method_missing` to the Integer value and return a plain Integer, so `(2.hours * 3).ago` and `(1.day / 2).ago` raise too, while `(1.day + 1.hour).ago` keeps working. And a number of seconds stored in a variable (`timeout.ago`), often read from YAML, ENV or a settings table and passed to a gem that calls `ago` on it, cannot be found by a regex: it shows up only as the 4.1 deprecation warning in logs and test output.
 
 **Detection:**
-The pattern flags numeric literals, `.to_i` / `.to_f` / `.abs` / `.round` / `.floor` / `.ceil` results and parenthesized `*` / `/` expressions followed by one of the four methods. Other Integer-returning calls (`items.count.ago`) are not flagged. On 4.1, also search the test log for `Calling #ago or #until on a number` and `Calling #since or #from_now on a number`.
+The pattern flags numeric literals and `.to_i` / `.to_f` / `.abs` results followed by one of the four methods, and `.round` / `.floor` / `.ceil` results and parenthesized `*` / `/` expressions followed by one of them with no argument. `Time#ago` and `#since` always take an argument, so `Time.current.round.ago(1.hour)` and `(Time.now - 2 * 3600).since(1.hour)` are left alone. A hit can still be a Duration: `(1.day + 2 * 3.hours).ago` is flagged although the sum keeps its unit, so check the receiver before adding `.seconds`. Other Integer-returning calls (`items.count.ago`) are not flagged. On 4.1, also search the test log for `Calling #ago or #until on a number` and `Calling #since or #from_now on a number`.
 
 **Fix:**
 ```ruby
