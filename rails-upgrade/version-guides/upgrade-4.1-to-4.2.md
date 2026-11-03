@@ -223,7 +223,7 @@ Review code and tests that relied on the coder's nil representation. If you need
 Integration sessions (`ActionDispatch::IntegrationTest`, RSpec request specs) now build the request URI as a string: scheme, host and port, then the path as given (`Integration::Session#build_full_uri`, new in 4.2.0). Rails 4.1 resolved the path against `/` with `URI#+`, so `get "users"` worked by accident. On 4.2 the same call requests `http://www.example.com:80users` and rack-test raises `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` (Ruby 2.x wording). The actionpack 4.2.0 CHANGELOG lists it: the leading slash is now required in the integration test `process` helpers. A path that starts with `?` or `#`, and a full URL, still work. Specs that include `Rack::Test::Methods` directly (Grape or Sinatra apps) are not affected, since rack-test adds the slash itself.
 
 **Detection Pattern:**
-The pattern flags `get`/`post`/`put`/`patch`/`delete`/`head` (and the `xhr`, `xml_http_request`, `*_via_redirect` forms, where the path is the second argument) whose path is a string literal with no leading slash, in `spec/requests/`, `spec/integration/`, `spec/api/` and `test/integration/`. It skips rswag-style `get "List users" do` blocks, symbols, path helpers and variables. It misses calls on a session object (`sess.get "users"`) and request helpers in `spec/support/` or `test/support/` (left out because controller shared examples there pass action names such as `get "show"`): search those by hand.
+The pattern flags `get`/`post`/`put`/`patch`/`delete`/`head` (and the `xhr`, `xml_http_request`, `*_via_redirect` forms, where the path is the second argument) whose path is a string literal with no leading slash, in `spec/requests/`, `spec/integration/`, `spec/api/` and `test/integration/`. It skips rswag-style `get "List users" do` blocks, symbols, path helpers and variables. It misses a path that starts with interpolation (`get "#{id}/edit"`), a request used as an expression (`expect(get "users")`), a request followed by a block, calls on a session object (`sess.get "users"`) and request helpers in `spec/support/` or `test/support/` (left out because controller shared examples there pass action names such as `get "show"`): search those by hand.
 
 **Fix:**
 ```ruby
@@ -563,9 +563,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 6. Add `config.active_record.raise_in_transactional_callbacks = true`
 7. Add `config.active_support.test_order = :random`
 8. Rename `serve_static_assets` → `serve_static_files`
-9. Consider replacing Timecop with `travel_to` (optional)
-10. Consider dropping Foreigner for native FKs (optional)
-11. Add the leading slash to integration and request spec paths (`get "/users"`)
+9. Add the leading slash to integration and request spec paths (`get "/users"`)
+10. Consider replacing Timecop with `travel_to` (optional)
+11. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite

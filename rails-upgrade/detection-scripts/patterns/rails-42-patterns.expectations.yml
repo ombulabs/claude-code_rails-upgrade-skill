@@ -13,6 +13,8 @@
 
 INTEGRATION_RELATIVE_PATH:
   match:
+    # a URL in the query still leaves a relative path on 4.2
+    - "get \"auth/callback?return_to=http://x.com\""
     - "    get \"users\""
     - "get 'assets/app.css'"
     - "    post \"users\", user: { name: \"x\" }"
@@ -73,6 +75,11 @@ INTEGRATION_RELATIVE_PATH:
     - "it \"does get users\" do"
     # a fragment-only path forms a valid URI on 4.2
     - "get \"#anchor\""
+    # comment lines (exclude)
+    - "# before { get \"users\" }"
+    - "  # TODO: do get \"users\" later"
+    # a full URL is skipped only when the scheme starts the string
+    - "get \"https://api.example.com/users\""
 
 # Known gap, not a fixture because it does break on 4.2: a space inside #{ }
 # stops the path match, so get "users/#{ user.id }" is not flagged.
