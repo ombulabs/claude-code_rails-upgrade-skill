@@ -169,6 +169,65 @@ assert_select "a[href='/foo']"
 
 ---
 
+#### Routing `Mapper::Mapping` Patches Stop Running
+
+**Pattern:** `MAPPER_NORMALIZE_CONDITIONS`
+
+**What Changed:**
+Rails 4.2 rewrote the private `ActionDispatch::Routing::Mapper::Mapping`. On 4.0 and 4.1, `normalize_conditions!` builds each route's `required_defaults`: every option that is not a `Regexp`, a path segment or an ignored option. Apps patch it to keep custom route options (authorization metadata, for instance) out of `required_defaults`, so `url_for(controller: ..., action: ...)` without the named helper still finds the route. On 4.2:
+- `normalize_conditions!`, `normalize_requirements!` and `default_controller_and_action` are gone. `required_defaults` is built in a new private `constraints(options, path_params)`.
+- `normalize_defaults!`, `normalize_options!` and `normalize_path!` now take arguments.
+
+What the app sees depends on how the patch hooks in:
+- `alias_method` / `alias_method_chain` on a removed method: ``NameError: undefined method `normalize_conditions!' for class `ActionDispatch::Routing::Mapper::Mapping'`` at boot.
+- Reopen or `prepend` overriding a removed method: the override never runs, the custom option is required again, and `url_for` raises `ActionController::UrlGenerationError`. Nothing fails at boot.
+- A zero-argument override of `normalize_defaults!`, `normalize_options!` or `normalize_path!`: `ArgumentError: wrong number of arguments (given 1, expected 0)` on Ruby 2.3 and later, `(1 for 0)` on earlier Rubies (2 for `normalize_path!`, 5 for `normalize_options!`), when routes are drawn.
+- An `initialize` override: 4.2 calls `Mapping.new(scope, set, path, defaults, as, options)` instead of `(set, scope, path, options)`, so a four-argument override raises `ArgumentError` when routes are drawn. The `scope`, `path` and `options` readers are gone, so a hook that reads `options[:authorize]` raises `NameError`.
+
+**Detection Pattern:**
+`MAPPER_NORMALIZE_CONDITIONS` flags the removed method names, `Routing::Mapper::Mapping` references and a `Mapping` reopen nested in `module Routing` / `class Mapper` (or written `class Mapper::Mapping` inside `module Routing`), in `app/`, `lib/` and `config/`. The `NextRails.next?` fallback below keeps matching until its 4.1 branch is removed. A bare `Mapper::Mapping` constant written inside `module Routing`, or a nested reopen with other code between `class Mapper` and `class Mapping`, is missed unless it names a removed method.
+
+**Fix:**
+Prefer dropping the patch. Options passed under `defaults:` land in `params` but never become required defaults, on 4.1 and 4.2 alike:
+```ruby
+# BEFORE (needs the Mapping patch so url_for ignores :authorize)
+get "/posts/:id" => "posts#show", as: :post, authorize: :admin
+
+# AFTER (no patch; scope defaults: { authorize: :admin } works the same way)
+get "/posts/:id" => "posts#show", as: :post, defaults: { authorize: :admin }
+```
+
+If the patch must stay, hook the method each side has. Hooking `constraints` on 4.1 raises `ArgumentError` when routes are drawn, so pick it with `NextRails.next?`. An override of `normalize_defaults!`, `normalize_options!` or `normalize_path!` gets the same treatment with the 4.2 signature. `Module#prepend` needs Ruby 2.0; on 1.9.3 use `alias_method_chain` inside the same branches:
+```ruby
+# config/initializers/route_options.rb
+module RouteOptionsOutOfRequiredDefaults
+  CUSTOM_ROUTE_OPTIONS = [:authorize]
+
+  if NextRails.next?
+    private
+
+    def constraints(options, path_params)
+      result = super
+      @conditions[:required_defaults] -= CUSTOM_ROUTE_OPTIONS
+      result
+    end
+  else
+    private
+
+    def normalize_conditions!
+      super
+      @conditions[:required_defaults] -= CUSTOM_ROUTE_OPTIONS
+    end
+  end
+end
+
+ActionDispatch::Routing::Mapper::Mapping.send(:prepend, RouteOptionsOutOfRequiredDefaults)
+```
+
+Rails 5.0 changes `constraints` again (it returns the options grouped by kind and no longer writes `@conditions`), so a 4.2 hook breaks at the next hop. Move to `defaults:` before then.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -640,8 +699,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 9. Rename `serve_static_assets` → `serve_static_files`
 10. Add a unit to `ago` / `until` / `since` / `from_now` called on a bare number (`5.ago` → `5.seconds.ago`)
 11. Add the leading slash to integration and request spec paths (`get "/users"`)
-12. Consider replacing Timecop with `travel_to` (optional)
-13. Consider dropping Foreigner for native FKs (optional)
+12. If the app patches `Mapper::Mapping` (`normalize_conditions!` and friends), move the custom route options under `defaults:` and drop the patch
+13. Consider replacing Timecop with `travel_to` (optional)
+14. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -667,6 +727,9 @@ Error → section lookup for the most common errors encountered during this upgr
 | `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess` from a model | "Writes into `changed_attributes` Raise": `attribute_will_change!`, `clear_attribute_changes` |
 | `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
+| ``NameError: undefined method `normalize_conditions!' for class `ActionDispatch::Routing::Mapper::Mapping'`` at boot | "Routing `Mapper::Mapping` Patches Stop Running": drop the patch, move the option under `defaults:` |
+| `ActionController::UrlGenerationError` from `url_for` on a route with a custom option that worked on 4.1 | "Routing `Mapper::Mapping` Patches Stop Running": the `normalize_conditions!` patch no longer runs |
+| `ArgumentError: wrong number of arguments (given N, expected 0)` (or `(N for 0)` before Ruby 2.3) when routes are drawn | "Routing `Mapper::Mapping` Patches Stop Running": a `normalize_defaults!` / `normalize_options!` / `normalize_path!` override needs the 4.2 signature |
 | ``DEPRECATION WARNING: You did not specify a value for the configuration option `active_support.test_order` `` | "`config.active_support.test_order` Not Set", set `:sorted` to keep the 4.1 order |
 | ``NoMethodError: undefined method `ago' for 5:Fixnum`` (or `until` / `since` / `from_now`, `for 1.5:Float`, `for 5:Integer` on Ruby 2.4+) | "`Numeric#ago` / `#until` / `#since` / `#from_now` Removed": add a unit: `5.seconds.ago` |
 
