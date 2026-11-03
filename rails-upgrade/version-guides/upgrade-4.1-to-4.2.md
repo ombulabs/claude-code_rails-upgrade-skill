@@ -316,10 +316,10 @@ NoMethodError: undefined method `type_cast_from_user' for "boolean":String
 (or `type_cast_from_database`, `type`, `limit`, depending on what touches the column first).
 
 **Detection Pattern:**
-The `COLUMN_NEW_SQL_TYPE_ARG` pattern flags every `ConnectionAdapters::Column.new` call outside comments. It misses a bare `Column.new` reached through a reopened or included `ConnectionAdapters` module or a constant alias, so also search the tableless models for `Column.new` by hand.
+The `COLUMN_NEW_SQL_TYPE_ARG` pattern flags every `ConnectionAdapters::Column.new` call outside comments. A call split before `.new` is matched by the whole-file scanner. A splat call, `Column.new(*args)`, is skipped because it is the shape the fix below uses: check any other splat call by hand. It misses a bare `Column.new` reached through a reopened or included `ConnectionAdapters` module or a constant alias, so also search the tableless models for `Column.new` by hand.
 
 **Fix:**
-Build the cast type yourself on 4.2 and keep the old call on 4.1. `ActiveRecord::Type` does not exist on 4.1, so the branch is needed while both versions boot. Do not use `connection.lookup_cast_type`: it needs a database connection at class load, and on PostgreSQL it runs `SELECT 'string'::regtype`, which raises for `string`.
+Build the cast type yourself on 4.2 and keep the old call on 4.1. `ActiveRecord::Type` does not exist on 4.1, so the branch is needed while both versions boot. Do not use `connection.lookup_cast_type`: it needs a database connection at class load, and on PostgreSQL it runs `SELECT 'string'::regtype::oid`, which raises for `string`.
 
 ```ruby
 # BEFORE
@@ -330,23 +330,26 @@ end
 # AFTER
 VIRTUAL_CAST_TYPES = {
   "boolean" => "Boolean", "integer" => "Integer", "date" => "Date",
-  "datetime" => "DateTime", "decimal" => "Decimal", "float" => "Float",
+  "datetime" => "DateTime", "timestamp" => "DateTime", "time" => "Time",
+  "decimal" => "Decimal", "float" => "Float", "binary" => "Binary",
   "string" => "Value", "text" => "Value", "" => "Value"
 }.freeze
 
 def self.column(name, sql_type = nil, default = nil, null = true)
-  columns << if NextRails.next?
-    cast_type = ActiveRecord::Type.const_get(VIRTUAL_CAST_TYPES.fetch(sql_type.to_s)).new
-    ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, cast_type, sql_type.to_s, null)
-  else
-    ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
+  args = [name.to_s, default, sql_type.to_s, null]
+  if NextRails.next?
+    # 4.2 takes a cast type before sql_type; "string(255)" looks up "string"
+    type_name = VIRTUAL_CAST_TYPES.fetch(sql_type.to_s.sub(/\(.*/, ""))
+    args.insert(2, ActiveRecord::Type.const_get(type_name).new)
   end
+  columns << ActiveRecord::ConnectionAdapters::Column.new(*args)
 end
 ```
 
-`string`, `text` and untyped fields map to `ActiveRecord::Type::Value`, which casts nothing, as 4.1 did for them (`Type::String` would call `to_s` on an Array kept in the field). An undeclared type raises `KeyError` at class load instead of failing later. After the upgrade, drop the `else` branch.
+`string`, `text` and untyped fields map to `ActiveRecord::Type::Value`, which casts nothing, as 4.1 did for them (`Type::String` would call `to_s` on an Array kept in the field). `Value#type` is `nil`, so a form builder or other code that reads `column.type` (to pick a textarea for `text`, for example) gets `nil` where 4.1 gave `:string` or `:text`: map those fields to `ActiveRecord::Type::String` / `Type::Text` if that matters, accepting that they call `to_s`. An undeclared type (`varchar`, `json`) raises `KeyError` at class load instead of failing later: add it to the map. After the upgrade, drop the `NextRails.next?` branch and pass the cast type directly.
 
 A table-backed model can instead declare the field with the 4.2 class method `attribute :flag, ActiveRecord::Type::Boolean.new` (absent on 4.0 and 4.1). A set `attribute` with no table column still goes into the INSERT on 4.2.0, and on later 4.2 releases when `partial_writes` is off. The long-term replacement is the Rails 5.0 attributes API.
+
 ---
 
 ### 🟢 LOW PRIORITY
