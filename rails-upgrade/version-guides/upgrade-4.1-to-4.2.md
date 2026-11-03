@@ -311,7 +311,7 @@ Rails 4.2 removes the public instance method `ActiveRecord::ConnectionAdapters::
 
 The two-argument `connection.type_cast(value, column)` quoting method is a different API, still present on 4.2, and the pattern skips it. The removed class-level helpers (`Column.value_to_boolean` and friends) are a separate change.
 
-**Detection Pattern:** the `COLUMN_TYPE_CAST_INSTANCE` regex flags one-argument `.type_cast` calls and `send` / `try(:type_cast, value)`. The `try` form does not raise on 4.2: Active Support `try` checks `respond_to?` and returns `nil`, so the cast silently becomes `nil`. Any other object with a public one-argument `type_cast` is flagged too, so check that the receiver is a column.
+**Detection Pattern:** the `COLUMN_TYPE_CAST_INSTANCE` regex flags one-argument `.type_cast` calls, with or without parentheses, and `send` / `try(:type_cast, value)` with or without parentheses. It skips the two-argument `connection.type_cast(value, column)` quoting method, which still exists, unless its first argument nests parentheses two levels deep (`type_cast(foo(a(b, c)), col)` is flagged, check the argument count). The `try` form does not raise on 4.2: Active Support `try` checks `respond_to?` and returns `nil`, so the cast silently becomes `nil`. Any other object with a public one-argument `type_cast` is flagged too, so check that the receiver is a column.
 
 **Fix:**
 First check whether the cast does anything. `minimum` and `maximum` already cast through the column on 4.1 and 4.2, so a cast of their result can simply go. Otherwise branch on the version:

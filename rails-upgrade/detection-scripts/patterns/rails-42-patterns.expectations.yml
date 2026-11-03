@@ -24,6 +24,18 @@ COLUMN_TYPE_CAST_INSTANCE:
     - "  column.send(:type_cast, value)"
     - "  col.try!(:type_cast, value)"
     - "  col.__send__(:type_cast, value)"
+    # a comma inside a string literal is not a second argument
+    - "  col.type_cast(\"1,000\")"
+    - "  col.type_cast(opts[:a] || \"x, y\")"
+    # paren-less and string-named send / try
+    - "  col.send :type_cast, v"
+    - "  col.try :type_cast, value"
+    - "  col.send(\"type_cast\", v)"
+    # other one-argument shapes
+    - "  col.type_cast (value)"
+    - "  col.type_cast -1"
+    - "  col.type_cast *args"
+    - "  col.type_cast(value, &blk)"
   no_match:
     # two-argument connection quoting method, still public on 4.2
     - "  connection.type_cast(value, column)"
@@ -33,6 +45,8 @@ COLUMN_TYPE_CAST_INSTANCE:
     - "  conn.send(:type_cast, quote(value), column)"
     # zero-argument call followed by a modifier, not a one-argument call
     - "  x = col.type_cast if foo"
+    - "  x = col.type_cast - 1"
+    - "  col.type_cast()"
     # definitions, not calls
     - "  def type_cast(value)"
     - "  def self.type_cast(value)"
