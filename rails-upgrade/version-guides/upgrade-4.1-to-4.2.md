@@ -223,7 +223,7 @@ Review code and tests that relied on the coder's nil representation. If you need
 Through 4.1, `Column#initialize` typed the default with `extract_default`, so `Model.columns_hash["ttl"].default` was an `Integer` and a boolean column's default was `true` / `false`. From 4.2.0 the column keeps the string the adapter read from the schema and casting moved to the attribute types, so `.default` returns `"604800"`, and `"f"` for a false boolean on SQLite. Nothing warns. Arithmetic on it raises (`Time.now - default` gives `TypeError: can't convert String into an exact number`), `<` / `>` against an Integer raise `ArgumentError: comparison of String with 3 failed`, `==` against a number or a boolean quietly returns false, and a false boolean default is now a non-empty String, so it is truthy. `Model.column_defaults` is unaffected for plain columns: it returns typed values on 4.0, 4.1 and 4.2.
 
 **Detection Pattern:**
-The `COLUMN_DEFAULT_RAW` pattern flags `.default`, `&.default` and `.try(:default)` read off `columns_hash[...]`, `columns_hash.fetch(...)`, `column_for_attribute(...)`, a one-line `columns.find { }` / `detect { }` block, and a variable named `column`. A block variable with another name (`columns.each { |c| c.default }`) is not flagged, so also review loops over `columns`.
+The `COLUMN_DEFAULT_RAW` pattern flags `.default`, `&.default` and `try` / `send` / `public_send` with `:default` read off `columns_hash[...]` (also `columns_hash(table)[...]` on the schema cache), `columns_hash.fetch(...)`, `column_for_attribute(...)`, a one-line `columns.find { }` / `detect { }` block, `columns.index_by(&:name)[...]`, and `column`, `@column` or `self.column`. It skips `.default.nil?`, which still works. A block variable with another name (`columns.each { |c| c.default }`) or a receiver-qualified `field.column.default` is not flagged, so also review loops over `columns` and wrappers that hold a column.
 
 **Fix:**
 ```ruby
@@ -569,7 +569,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 6. Add `config.active_record.raise_in_transactional_callbacks = true`
 7. Add `config.active_support.test_order = :random`
 8. Rename `serve_static_assets` → `serve_static_files`
-9. Replace `columns_hash[...].default` reads with `column_defaults[...]`
+9. Replace `columns_hash[...].default` and `column_for_attribute(...).default` reads with `column_defaults[...]`; cast a model-less `connection.columns(...)` default with `type_cast_from_database` behind `NextRails.next?`
 10. Consider replacing Timecop with `travel_to` (optional)
 11. Consider dropping Foreigner for native FKs (optional)
 
