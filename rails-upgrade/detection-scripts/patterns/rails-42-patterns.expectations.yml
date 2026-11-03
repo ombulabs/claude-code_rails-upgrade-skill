@@ -6,7 +6,7 @@
 #   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
 #
 # A line is "flagged" when the entry's `pattern` regex matches it AND the
-# entry's `exclude` regex (when present) does not, like a per-line grep + grep -v.
+# entry's `exclude` regex (when present) does not, a per-line grep + grep -v.
 #
 # Run with:
 #   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
@@ -77,3 +77,153 @@ CHANGED_ATTRIBUTES_WRITE:
     - "    NextRails.next? ? clear_attribute_changes([\"updated_at\"]) : changed_attributes.delete(\"updated_at\")"
     - "    NextRails.next? ? set_attribute_was(name, old) : changed_attributes[name] = old"
     - "    changed_attributes.compact"
+
+INTEGRATION_RELATIVE_PATH:
+  match:
+    # a URL in the query still leaves a relative path on 4.2
+    - "get \"auth/callback?return_to=http://x.com\""
+    - "    get \"users\""
+    - "get 'assets/app.css'"
+    - "    post \"users\", user: { name: \"x\" }"
+    - "get(\"users.json\")"
+    - "  delete \"users/#{user.id}\""
+    - "head \"status\""
+    # "users?page=2" breaks too: only a leading ? is safe
+    - "get \"users?page=2\""
+    # request inside a { } block
+    - "  expect { post \"users\", user: attrs }.to change(User, :count).by(1)"
+    - "  before { get \"dashboard\" }"
+    # xhr / redirect-following forms take the path as the second argument
+    - "  xhr :get, \"users\""
+    - "xhr(:post, \"comments\", body: \"x\")"
+    - "xml_http_request :get, \"users\""
+    - "request_via_redirect :get, \"login\""
+    - "  get_via_redirect \"login\""
+    - "post_via_redirect \"sessions\", user: user"
+    # one-line blocks and statements after ;
+    - "  before do get \"users\" end"
+    - "  scenario \"x\" do; get \"users\"; end"
+    # a do later on the line, or in a comment, does not hide the request
+    - "get \"users\", params: { q: \"do\" }"
+    - "get \"users\" # do"
+  no_match:
+    - "    get \"/users\""
+    - "get '/assets/app.css'"
+    - "  xhr :get, \"/users\""
+    # a full URL sets the host and path itself on both versions
+    - "get \"http://www.example.com/users\""
+    - "get \"https://api.example.com/users\""
+    # an interpolated prefix may already hold the slash
+    - "get \"#{base_path}/users\""
+    # "?page=2" works on 4.2 (http://www.example.com:80?page=2 is a valid URI)
+    - "get \"?page=2\""
+    - "get \"\""
+    # symbols, path helpers and variables: not a literal relative path
+    - "get :index"
+    - "get users_path"
+    - "get path, params"
+    # rswag-style operation blocks: the string is a description, not a path
+    - "    get \"List users\" do"
+    - "  post \"create\" do |example|"
+    - "  get \"index\" do"
+    # routing-spec hashes
+    - "expect(get: \"users\").to route_to(\"users#index\")"
+    - "expect(:get => \"users\").to be_routable"
+    # comments and RSpec descriptions
+    - "# get \"users\""
+    - "describe \"GET users\" do"
+    - "it \"gets users\" do"
+    # receivers and lookalike names
+    - "value = redis.get \"key\""
+    - "Net::HTTP.get(\"example.com\", \"/\")"
+    - "target \"users\""
+    - "forget \"users\""
+    - "undo \"users\""
+    - "it \"does get users\" do"
+    # a fragment-only path forms a valid URI on 4.2
+    - "get \"#anchor\""
+    # comment lines (exclude)
+    - "# before { get \"users\" }"
+    - "  # TODO: do get \"users\" later"
+    # a full URL is skipped only when the scheme starts the string
+    - "get \"https://api.example.com/users\""
+
+# Known gap, not a fixture because it does break on 4.2: a space inside #{ }
+# stops the path match, so get "users/#{ user.id }" is not flagged.
+
+NUMERIC_AGO_WITHOUT_UNIT:
+  match:
+    # numeric literals, including floats, underscores and a leading minus
+    - "    expires_at = 5.ago"
+    - "Time.zone.now > 30.from_now"
+    - "x = 1.5.since(start)"
+    - "cutoff = 3_600.from_now"
+    - "  let(:time) { -30.from_now }"
+    - "<%= 5.ago %>"
+    # to_i / to_f results, including a Duration turned back into an Integer
+    - "session_timeout.to_i.ago"
+    - "params[:seconds].to_f.until(deadline)"
+    - "1.day.to_i.ago"
+    - "x.round.ago"
+    - "value.abs.from_now"
+    - "(a.to_f / b).round.ago"
+    - "x.round(2).ago"
+    # a line that continues a string with interpolation is not a comment
+    - "  #{5.ago}"
+    # Duration * and / return a plain Integer through 4.2. A product split
+    # across lines inside the parentheses is matched by scan_patterns.rb, which
+    # reads the whole file
+    - "where(updated_at: (2.hours * 3).ago..Time.now)"
+    - "(1.day / 2).from_now"
+    - "(TIMEOUT * 4).ago"
+    - "(60 * 60).ago"
+  no_match:
+    - "expires_at = 5.seconds.ago"
+    - "2.days.from_now"
+    - "Time.current.ago(5)"
+    - "Date.today.since(3)"
+    - "(1.day + 1.hour).ago"
+    - "(n * 1.day).seconds.ago"
+    - "(Time.now - 5).ago(1)"
+    - "foo(x * 2).bar(1.day.ago)"
+    - "# 5.ago is deprecated"
+    - "  # use 5.seconds.ago, not 5.ago"
+    - "record.agony"
+    - "5.agos"
+    - "v1.2.ago"
+    - "foo.to_iso.ago"
+    - "time.since?"
+    - "<%# 5.ago %>"
+    # Time and Date arithmetic: their ago / since always take an argument
+    - "(Time.now - 2 * 3600).since(1.hour)"
+    - "(Date.today + 7/2).since(1.day)"
+    - "Time.current.round.ago(1.hour)"
+    - "Time.now.floor.since(5)"
+    # a method call's argument list is not a bare product
+    - "Time.at(ts / 1000).since(1.day)"
+    - "Time.at(ms * 0.001).ago(1.hour)"
+    - "Time.zone.parse(\"2020/01/01\").ago(1.day)"
+    - "Date.strptime(s, \"%m/%d/%Y\").since(3.days)"
+    - "list[i * 2].ago"
+
+# TEST_ORDER is a file marker: it flags the configure block of test.rb for
+# manual review. A per-line exclude cannot see whether test_order is set on
+# another line, so a file that already sets it is still flagged.
+TEST_ORDER:
+  match:
+    # Rails 4.1 and later generator form
+    - "Rails.application.configure do"
+    # Rails 4.0 and earlier generator form, kept by apps that never regenerated test.rb
+    - "MyApp::Application.configure do"
+    - "Acme::Store::Application.configure do"
+    - "::MyApp::Application.configure do"
+    # brace block
+    - "Rails.application.configure {"
+  no_match:
+    - "  config.active_support.test_order = :sorted"
+    - "Rails.application.config.active_support.test_order = :random"
+    - "MyApp::ApplicationController.configure"
+    - "Rails.application.configured?"
+    # commented-out configure lines (exclude)
+    - "# MyApp::Application.configure do"
+    - "  # Rails.application.configure do"
