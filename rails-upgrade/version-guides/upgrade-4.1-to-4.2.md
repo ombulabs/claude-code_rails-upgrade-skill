@@ -324,9 +324,10 @@ class Post < ActiveRecord::Base
 end
 ```
 
-The pattern flags every direct `@attributes` reference in `app/models/` and `config/initializers/`. A plain Ruby class with its own `@attributes` Hash (a form object or a tableless model in `app/models/`) is unaffected: check that each hit is inside an ActiveRecord model or a patch to one. The pattern does not scan `lib/` or the rest of `app/`, where plain Ruby classes with their own `@attributes` are common. Search those by hand for ActiveRecord patches and for `instance_variable_get(:@attributes)` on a record:
+The pattern flags every direct `@attributes` reference in `app/models/` and `config/initializers/`. A plain Ruby class with its own `@attributes` Hash (a form object or a tableless model in `app/models/`) is unaffected: check that each hit is inside an ActiveRecord model or a patch to one. The pattern does not scan `lib/` or the rest of `app/`, where plain Ruby classes with their own `@attributes` are common. Search those by hand for ActiveRecord patches and for `instance_variable_get(:@attributes)` on a record (this skips `app/models/`, which the scanner already covered, and comment lines):
 ```bash
-grep -rnE "(^|[^@[:alnum:]_])@attributes([^[:alnum:]_]|$)" lib app --include="*.rb"
+grep -rnE "(^|[^@[:alnum:]_])@attributes([^[:alnum:]_]|$)" lib app --include="*.rb" --exclude-dir=models \
+  | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'
 ```
 
 **Fix:**
@@ -366,6 +367,12 @@ def reload(*)
   super.tap { load_extra }
 end
 
+# becomes (and becomes!) builds the new record with klass.new, so
+# after_initialize runs on blank attributes: copy the value across
+def becomes(klass)
+  super.tap { |record| record.extra = extra if record.respond_to?(:extra=) }
+end
+
 # only if callers expect the value in attributes (serializers, audit gems)
 def attributes
   super.merge("extra" => extra)
@@ -380,7 +387,7 @@ end
 
 With this shape, `record.extra` and `attributes["extra"]` keep working, but `record[:extra]` and `read_attribute(:extra)` return `nil` on both versions. Search for those call forms and switch them to `record.extra`.
 
-Do not call `attribute_will_change!` for the extra name: on 4.2 the partial `UPDATE` then includes it and fails with `no such column`. If saving must react to a change in the extra value, track that change yourself.
+Do not call `attribute_will_change!` for the extra name: on 4.2 the partial `UPDATE` then includes it and fails with an unknown-column error: `no such column` on SQLite, `column "extra" of relation ... does not exist` on PostgreSQL, `Unknown column 'extra'` on MySQL. If saving must react to a change in the extra value, track that change yourself.
 
 ---
 
@@ -646,7 +653,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
 | ``NoMethodError: undefined method `fetch_value' for ...:Hash`` on an attribute read | "`@attributes` Is an `AttributeSet`, Not a Hash": stop replacing `@attributes` |
-| ``NoMethodError: undefined method `[]=' for #<ActiveRecord::AttributeSet>`` (or `merge!`, `fetch`, `delete`) | "`@attributes` Is an `AttributeSet`, Not a Hash": `write_attribute` / `read_attribute` |
+| ``NoMethodError: undefined method `[]=' for #<ActiveRecord::AttributeSet:0x...>`` (or `merge!`, `fetch`, `delete`) | "`@attributes` Is an `AttributeSet`, Not a Hash": `write_attribute` / `read_attribute` |
 | `@attributes['x']` returns an `ActiveRecord::Attribute` instead of the value | "`@attributes` Is an `AttributeSet`, Not a Hash": `read_attribute_before_type_cast` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 
