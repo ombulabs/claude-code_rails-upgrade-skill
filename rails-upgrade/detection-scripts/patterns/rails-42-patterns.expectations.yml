@@ -374,3 +374,49 @@ COLUMN_CAST_CLASS_METHODS:
     # separate 4.2 changes, not this pattern
     - "Model.columns_hash[\"x\"].type_cast(v)"
     - "Column.new(\"active\", nil, \"boolean\")"
+
+COLUMN_DEFAULT_RAW:
+  match:
+    # interpolation inside a find block, index_by, try / public_send forms, @column and self.column
+    - "Thing.columns.find { |c| c.name == \"#{attr}\" }.default"
+    - "Thing.columns.index_by(&:name)[\"ttl\"].default"
+    - "columns_hash[\"a\"]&.try(:default)"
+    - "columns_hash[\"a\"].try :default"
+    - "columns_hash[\"a\"].public_send(:default)"
+    - "self.column.default"
+    - "@column.default"
+    - "column.default.blank?"
+    - "Thing.columns_hash[\"ttl\"].default"
+    - "    created_at < Time.now - self.class.columns_hash[\"ttl\"].default"
+    - "Thing.columns_hash[name.to_s].default || 0"
+    - "columns_hash.fetch(\"active\").default"
+    - "column_for_attribute(:active).default"
+    - "Thing.columns.find { |c| c.name == \"ttl\" }.default"
+    - "connection.columns(:things).detect { |c| c.name == \"ttl\" }.default"
+    - "    puts column.default"
+    - "@column.default.to_i"
+    - "Thing.columns_hash[\"ttl\"]&.default"
+    - "Thing.columns_hash[\"ttl\"].try(:default)"
+    - "connection.schema_cache.columns_hash(\"things\")[\"ttl\"].default"
+  no_match:
+    # a nil default is still nil on 4.2
+    - "return if column.default.nil?"
+    # a receiver-qualified column is out of scope (listed as missed)
+    - "field.column.default"
+    # the replacement, typed on 4.0, 4.1 and 4.2
+    - "Thing.column_defaults[\"ttl\"]"
+    - "# Thing.columns_hash[\"ttl\"].default"
+    # other column readers and lookalike names
+    - "columns_hash[\"id\"].default_function"
+    - "columns_hash[\"ttl\"].type"
+    - "column.default?"
+    - "my_column.default_value"
+    - "I18n.default_locale"
+    - "config.default = 1"
+    - "Thing.columns.map(&:name)"
+    # .default outside the find block, or read inside it
+    - "col = Thing.columns.find { |c| c.name == x } || Settings.default"
+    - "x = columns.find { |c| c.default.nil? }"
+    # a column method on another object, and a setter
+    - "grid.column.default"
+    - "column.default = 3"

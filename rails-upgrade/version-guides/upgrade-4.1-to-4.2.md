@@ -274,6 +274,36 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
+#### `Column#default` Returns the Raw Database String
+
+**Pattern:** `COLUMN_DEFAULT_RAW`
+
+**What Changed:**
+Through 4.1, `Column#initialize` typed the default with `extract_default`, so `Model.columns_hash["ttl"].default` was an `Integer` and a boolean column's default was `true` / `false`. From 4.2.0 the column keeps the string the adapter read from the schema and casting moved to the attribute types, so `.default` returns `"604800"`, and `"f"` for a false boolean on SQLite. Nothing warns. Arithmetic on it raises (`Time.now - default` gives `TypeError: can't convert String into an exact number`), `<` / `>` against an Integer raise `ArgumentError: comparison of String with 3 failed`, `==` against a number or a boolean quietly returns false, and a false boolean default is now a non-empty String, so it is truthy. `Model.column_defaults` is unaffected for plain columns: it returns typed values on 4.0, 4.1 and 4.2.
+
+**Detection Pattern:**
+The `COLUMN_DEFAULT_RAW` pattern flags `.default`, `&.default` and `try` / `send` / `public_send` with `:default` read off `columns_hash[...]` (also `columns_hash(table)[...]` on the schema cache), `columns_hash.fetch(...)`, `column_for_attribute(...)`, a one-line `columns.find { }` / `detect { }` block, `columns.index_by(&:name)[...]`, and `column`, `@column` or `self.column`. It skips `.default.nil?`, which still works. A block variable with another name (`columns.each { |c| c.default }`) or a receiver-qualified `field.column.default` is not flagged, so also review loops over `columns` and wrappers that hold a column.
+
+**Fix:**
+```ruby
+# BEFORE (typed on 4.1, a String on 4.2)
+expires_at = created_at + self.class.columns_hash["ttl"].default
+active = Thing.columns_hash["active"].default
+
+# AFTER (typed on 4.0, 4.1 and 4.2, no conditional needed)
+expires_at = created_at + self.class.column_defaults["ttl"]
+active = Thing.column_defaults["active"]
+```
+
+On 4.2 `column_defaults` goes through the model's attribute types, so a `serialize`d column's default comes back deserialized there. Check those columns on both versions.
+
+For a column read from `connection.columns(table)`, which no model types, cast on 4.2 only:
+
+```ruby
+default = NextRails.next? ? column.type_cast_from_database(column.default) : column.default
+
+---
+
 #### `ConnectionAdapters::Column` Class-Level Cast Helpers Removed
 
 **Pattern:** `COLUMN_CAST_CLASS_METHODS`
@@ -382,6 +412,10 @@ xhr :post, "/comments", body: "x"
 # or a path helper
 get users_path(format: :json)
 ```
+
+---
+
+
 
 ---
 
@@ -774,8 +808,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 12. If the app patches `Mapper::Mapping` (`normalize_conditions!` and friends), move the custom route options under `defaults:` and drop the patch
 13. Replace one-argument `column.type_cast(value)` with `type_cast_from_database` behind `NextRails.next?`
 14. Replace `ConnectionAdapters::Column.value_to_boolean` and the other removed class-level cast helpers with app-owned casts
-15. Consider replacing Timecop with `travel_to` (optional)
-16. Consider dropping Foreigner for native FKs (optional)
+15. Replace `columns_hash[...].default` and `column_for_attribute(...).default` reads with `column_defaults[...]`; cast a model-less `connection.columns(...)` default with `type_cast_from_database` behind `NextRails.next?`
+16. Consider replacing Timecop with `travel_to` (optional)
+17. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -798,6 +833,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `TypeError` or a wrong branch where code reads `columns_hash[...].default` (now a String such as `"604800"` or `"f"`), or `ArgumentError: comparison of String with ...` | "`Column#default` Returns the Raw Database String", read `column_defaults[...]` |
 | `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess` from a model | "Writes into `changed_attributes` Raise": `attribute_will_change!`, `clear_attribute_changes` |
 | `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
