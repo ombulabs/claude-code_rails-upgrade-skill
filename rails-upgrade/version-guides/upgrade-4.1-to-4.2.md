@@ -181,10 +181,11 @@ Rails 4.2 rewrote the private `ActionDispatch::Routing::Mapper::Mapping`. On 4.0
 What the app sees depends on how the patch hooks in:
 - `alias_method` / `alias_method_chain` on a removed method: ``NameError: undefined method `normalize_conditions!' for class `ActionDispatch::Routing::Mapper::Mapping'`` at boot.
 - Reopen or `prepend` overriding a removed method: the override never runs, the custom option is required again, and `url_for` raises `ActionController::UrlGenerationError`. Nothing fails at boot.
-- A zero-argument override of `normalize_defaults!`, `normalize_options!` or `normalize_path!`: `ArgumentError: wrong number of arguments (given 1, expected 0)` (given 2 for `normalize_path!`, 5 for `normalize_options!`) when routes are drawn.
+- A zero-argument override of `normalize_defaults!`, `normalize_options!` or `normalize_path!`: `ArgumentError: wrong number of arguments (given 1, expected 0)` on Ruby 2.3 and later, `(1 for 0)` on earlier Rubies (2 for `normalize_path!`, 5 for `normalize_options!`), when routes are drawn.
+- An `initialize` override: 4.2 calls `Mapping.new(scope, set, path, defaults, as, options)` instead of `(set, scope, path, options)`, so a four-argument override raises `ArgumentError` when routes are drawn. The `scope`, `path` and `options` readers are gone, so a hook that reads `options[:authorize]` raises `NameError`.
 
 **Detection Pattern:**
-`MAPPER_NORMALIZE_CONDITIONS` flags the removed method names, `Routing::Mapper::Mapping` references and a `Mapping` reopen nested in `module Routing` / `class Mapper`, in `app/`, `lib/` and `config/`. A bare `Mapper::Mapping` written inside `module Routing`, or a nested reopen with other code between `class Mapper` and `class Mapping`, is missed unless it names a removed method.
+`MAPPER_NORMALIZE_CONDITIONS` flags the removed method names, `Routing::Mapper::Mapping` references and a `Mapping` reopen nested in `module Routing` / `class Mapper` (or written `class Mapper::Mapping` inside `module Routing`), in `app/`, `lib/` and `config/`. The `NextRails.next?` fallback below keeps matching until its 4.1 branch is removed. A bare `Mapper::Mapping` constant written inside `module Routing`, or a nested reopen with other code between `class Mapper` and `class Mapping`, is missed unless it names a removed method.
 
 **Fix:**
 Prefer dropping the patch. Options passed under `defaults:` land in `params` but never become required defaults, on 4.1 and 4.2 alike:
@@ -596,9 +597,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 6. Add `config.active_record.raise_in_transactional_callbacks = true`
 7. Add `config.active_support.test_order = :random`
 8. Rename `serve_static_assets` → `serve_static_files`
-9. Consider replacing Timecop with `travel_to` (optional)
-10. Consider dropping Foreigner for native FKs (optional)
-11. Move custom route options under `defaults:` and drop any `Mapper::Mapping` patch (`normalize_conditions!` and friends)
+9. If the app patches `Mapper::Mapping` (`normalize_conditions!` and friends), move the custom route options under `defaults:` and drop the patch
+10. Consider replacing Timecop with `travel_to` (optional)
+11. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -624,7 +625,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 | ``NameError: undefined method `normalize_conditions!' for class `ActionDispatch::Routing::Mapper::Mapping'`` at boot | "Routing `Mapper::Mapping` Patches Stop Running": drop the patch, move the option under `defaults:` |
 | `ActionController::UrlGenerationError` from `url_for` on a route with a custom option that worked on 4.1 | "Routing `Mapper::Mapping` Patches Stop Running": the `normalize_conditions!` patch no longer runs |
-| `ArgumentError: wrong number of arguments (given N, expected 0)` when routes are drawn | "Routing `Mapper::Mapping` Patches Stop Running": a `normalize_defaults!` / `normalize_options!` / `normalize_path!` override needs the 4.2 signature |
+| `ArgumentError: wrong number of arguments (given N, expected 0)` (or `(N for 0)` before Ruby 2.3) when routes are drawn | "Routing `Mapper::Mapping` Patches Stop Running": a `normalize_defaults!` / `normalize_options!` / `normalize_path!` override needs the 4.2 signature |
 
 ---
 

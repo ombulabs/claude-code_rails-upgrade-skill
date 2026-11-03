@@ -17,6 +17,8 @@ MAPPER_NORMALIZE_CONDITIONS:
   # checked with a whole-file scan of a multi-line initializer, LF and CRLF.
   # The one-line `;` forms below exercise the same branch.
   match:
+    # class Mapper::Mapping reopened inside module Routing
+    - "module Routing; class Mapper::Mapping"
     - "      def normalize_conditions!"
     - "        alias_method :normalize_conditions_without_auth!, :normalize_conditions!"
     - "  alias_method_chain :normalize_conditions!, :auth"
@@ -29,6 +31,8 @@ MAPPER_NORMALIZE_CONDITIONS:
     - "class ActionDispatch::Routing::Mapper; class Mapping"
     - "module ActionDispatch; module Routing; class Mapper; class Mapping"
   no_match:
+    # an app namespace under Routing is not the Rails module
+    - "module Routing::Admin; class Mapper; class Mapping"
     - "      def normalize_conditions_without_auth!"
     - "  def normalize_conditions(params)"
     - "  normalize_requirements_for(record)"
