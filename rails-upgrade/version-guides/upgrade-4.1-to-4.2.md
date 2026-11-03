@@ -215,6 +215,48 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
+#### Writes into `changed_attributes` Raise
+
+**Pattern:** `CHANGED_ATTRIBUTES_WRITE`
+
+**What Changed:**
+On Active Record models, `changed_attributes` returns a frozen copy from Rails 4.2.0 (`super.reverse_merge(attributes_changed_in_place).freeze` in `attribute_methods/dirty.rb`). Through 4.1 it returned the live hash, and apps wrote into it to mark a virtual attribute as changed (so save callbacks or versioning gems run) or to drop a change before saving. On 4.2, `changed_attributes[name] = value`, `.delete`, `.merge!`, `.store`, `.clear`, `.except!` and the other in-place Hash writers raise `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess`. Reads are unaffected, and so is a plain `ActiveModel::Dirty` class, whose `changed_attributes` is not frozen.
+
+**Detection Pattern:** `CHANGED_ATTRIBUTES_WRITE` flags element writes and in-place Hash writers on `changed_attributes`. It skips reads, copies (`.dup.delete`), the `@changed_attributes` instance variable and any line that mentions `NextRails.next?`, so the one-line dual-boot form below scans clean. A hit in a non-Active Record class, on a local variable with the same name, or inside a string needs no change. Writes through indirection are missed: `send(:changed_attributes)`, a `tap` block, or a copy of the reference (`h = changed_attributes` then `h.delete(k)`).
+
+**Fix:**
+`attribute_will_change!` exists on both versions and records what the reader returns now as the old value (nil when there is no reader). It does nothing when the attribute is already changed, so the first old value is kept. Where the old code wrote some other value, use `set_attribute_was` instead. Recording a specific old value and dropping a change use private `ActiveModel::Dirty` methods that only exist from 4.2, so branch on the Rails version until the upgrade ships:
+```ruby
+# BEFORE (raises on 4.2)
+def tag_list=(value)
+  changed_attributes["tag_list"] = @tag_list unless value == @tag_list
+  @tag_list = value
+end
+
+def skip_timestamp_change
+  changed_attributes.delete("updated_at")
+end
+
+# AFTER (4.1 and 4.2)
+def tag_list=(value)
+  attribute_will_change!("tag_list") unless value == @tag_list
+  @tag_list = value
+end
+
+def skip_timestamp_change
+  NextRails.next? ? clear_attribute_changes(["updated_at"]) : changed_attributes.delete("updated_at")
+end
+
+# A specific old value
+NextRails.next? ? set_attribute_was(name, old) : changed_attributes[name] = old
+
+# From another object: the 4.2 methods are private
+NextRails.next? ? record.send(:clear_attribute_changes, [:token]) : record.changed_attributes.delete(:token)
+```
+`clear_attribute_changes` drops only a change recorded through a setter. On 4.2 a serialized or JSON column that was mutated in place (`prefs["x"] = 1`) stays in `changes` and is still written on save.
+
+---
+
 #### Integration Test Paths Need a Leading Slash
 
 **Pattern:** `INTEGRATION_RELATIVE_PATH`
@@ -592,13 +634,14 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 3. Replace `assert_tag` with `assert_select`
 4. Update `Procfile` with `-b 0.0.0.0` if external access needed
 5. Review HTML sanitizer output in tests
-6. Add `config.active_record.raise_in_transactional_callbacks = true`
-7. Add `config.active_support.test_order = :sorted` (or `:random` once the suite passes in random order)
-8. Rename `serve_static_assets` → `serve_static_files`
-9. Add a unit to `ago` / `until` / `since` / `from_now` called on a bare number (`5.ago` → `5.seconds.ago`)
-10. Add the leading slash to integration and request spec paths (`get "/users"`)
-11. Consider replacing Timecop with `travel_to` (optional)
-12. Consider dropping Foreigner for native FKs (optional)
+6. Replace writes into `changed_attributes` with `attribute_will_change!`, or `set_attribute_was` / `clear_attribute_changes` behind `NextRails.next?` (see "Writes into `changed_attributes` Raise")
+7. Add `config.active_record.raise_in_transactional_callbacks = true`
+8. Add `config.active_support.test_order = :sorted` (or `:random` once the suite passes in random order)
+9. Rename `serve_static_assets` → `serve_static_files`
+10. Add a unit to `ago` / `until` / `since` / `from_now` called on a bare number (`5.ago` → `5.seconds.ago`)
+11. Add the leading slash to integration and request spec paths (`get "/users"`)
+12. Consider replacing Timecop with `travel_to` (optional)
+13. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -621,6 +664,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess` from a model | "Writes into `changed_attributes` Raise": `attribute_will_change!`, `clear_attribute_changes` |
 | `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 | ``DEPRECATION WARNING: You did not specify a value for the configuration option `active_support.test_order` `` | "`config.active_support.test_order` Not Set", set `:sorted` to keep the 4.1 order |
