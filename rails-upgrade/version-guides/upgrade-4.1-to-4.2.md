@@ -169,6 +169,65 @@ assert_select "a[href='/foo']"
 
 ---
 
+#### Routing `Mapper::Mapping` Patches Stop Running
+
+**Pattern:** `MAPPER_NORMALIZE_CONDITIONS`
+
+**What Changed:**
+Rails 4.2 rewrote the private `ActionDispatch::Routing::Mapper::Mapping`. On 4.0 and 4.1, `normalize_conditions!` builds each route's `required_defaults`: every option that is not a `Regexp`, a path segment or an ignored option. Apps patch it to keep custom route options (authorization metadata, for instance) out of `required_defaults`, so `url_for(controller: ..., action: ...)` without the named helper still finds the route. On 4.2:
+- `normalize_conditions!`, `normalize_requirements!` and `default_controller_and_action` are gone. `required_defaults` is built in a new private `constraints(options, path_params)`.
+- `normalize_defaults!`, `normalize_options!` and `normalize_path!` now take arguments.
+
+What the app sees depends on how the patch hooks in:
+- `alias_method` / `alias_method_chain` on a removed method: ``NameError: undefined method `normalize_conditions!' for class `ActionDispatch::Routing::Mapper::Mapping'`` at boot.
+- Reopen or `prepend` overriding a removed method: the override never runs, the custom option is required again, and `url_for` raises `ActionController::UrlGenerationError`. Nothing fails at boot.
+- A zero-argument override of `normalize_defaults!`, `normalize_options!` or `normalize_path!`: `ArgumentError: wrong number of arguments (given 1, expected 0)` on Ruby 2.3 and later, `(1 for 0)` on earlier Rubies (2 for `normalize_path!`, 5 for `normalize_options!`), when routes are drawn.
+- An `initialize` override: 4.2 calls `Mapping.new(scope, set, path, defaults, as, options)` instead of `(set, scope, path, options)`, so a four-argument override raises `ArgumentError` when routes are drawn. The `scope`, `path` and `options` readers are gone, so a hook that reads `options[:authorize]` raises `NameError`.
+
+**Detection Pattern:**
+`MAPPER_NORMALIZE_CONDITIONS` flags the removed method names, `Routing::Mapper::Mapping` references and a `Mapping` reopen nested in `module Routing` / `class Mapper` (or written `class Mapper::Mapping` inside `module Routing`), in `app/`, `lib/` and `config/`. The `NextRails.next?` fallback below keeps matching until its 4.1 branch is removed. A bare `Mapper::Mapping` constant written inside `module Routing`, or a nested reopen with other code between `class Mapper` and `class Mapping`, is missed unless it names a removed method.
+
+**Fix:**
+Prefer dropping the patch. Options passed under `defaults:` land in `params` but never become required defaults, on 4.1 and 4.2 alike:
+```ruby
+# BEFORE (needs the Mapping patch so url_for ignores :authorize)
+get "/posts/:id" => "posts#show", as: :post, authorize: :admin
+
+# AFTER (no patch; scope defaults: { authorize: :admin } works the same way)
+get "/posts/:id" => "posts#show", as: :post, defaults: { authorize: :admin }
+```
+
+If the patch must stay, hook the method each side has. Hooking `constraints` on 4.1 raises `ArgumentError` when routes are drawn, so pick it with `NextRails.next?`. An override of `normalize_defaults!`, `normalize_options!` or `normalize_path!` gets the same treatment with the 4.2 signature. `Module#prepend` needs Ruby 2.0; on 1.9.3 use `alias_method_chain` inside the same branches:
+```ruby
+# config/initializers/route_options.rb
+module RouteOptionsOutOfRequiredDefaults
+  CUSTOM_ROUTE_OPTIONS = [:authorize]
+
+  if NextRails.next?
+    private
+
+    def constraints(options, path_params)
+      result = super
+      @conditions[:required_defaults] -= CUSTOM_ROUTE_OPTIONS
+      result
+    end
+  else
+    private
+
+    def normalize_conditions!
+      super
+      @conditions[:required_defaults] -= CUSTOM_ROUTE_OPTIONS
+    end
+  end
+end
+
+ActionDispatch::Routing::Mapper::Mapping.send(:prepend, RouteOptionsOutOfRequiredDefaults)
+```
+
+Rails 5.0 changes `constraints` again (it returns the options grouped by kind and no longer writes `@conditions`), so a 4.2 hook breaks at the next hop. Move to `defaults:` before then.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -259,26 +318,97 @@ Pin the replacement with a spec that covers every input the old helper saw.
 
 ---
 
-#### `config.active_support.test_order` Required
+#### Writes into `changed_attributes` Raise
+
+**Pattern:** `CHANGED_ATTRIBUTES_WRITE`
+
+**What Changed:**
+On Active Record models, `changed_attributes` returns a frozen copy from Rails 4.2.0 (`super.reverse_merge(attributes_changed_in_place).freeze` in `attribute_methods/dirty.rb`). Through 4.1 it returned the live hash, and apps wrote into it to mark a virtual attribute as changed (so save callbacks or versioning gems run) or to drop a change before saving. On 4.2, `changed_attributes[name] = value`, `.delete`, `.merge!`, `.store`, `.clear`, `.except!` and the other in-place Hash writers raise `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess`. Reads are unaffected, and so is a plain `ActiveModel::Dirty` class, whose `changed_attributes` is not frozen.
+
+**Detection Pattern:** `CHANGED_ATTRIBUTES_WRITE` flags element writes and in-place Hash writers on `changed_attributes`. It skips reads, copies (`.dup.delete`), the `@changed_attributes` instance variable and any line that mentions `NextRails.next?`, so the one-line dual-boot form below scans clean. A hit in a non-Active Record class, on a local variable with the same name, or inside a string needs no change. Writes through indirection are missed: `send(:changed_attributes)`, a `tap` block, or a copy of the reference (`h = changed_attributes` then `h.delete(k)`).
+
+**Fix:**
+`attribute_will_change!` exists on both versions and records what the reader returns now as the old value (nil when there is no reader). It does nothing when the attribute is already changed, so the first old value is kept. Where the old code wrote some other value, use `set_attribute_was` instead. Recording a specific old value and dropping a change use private `ActiveModel::Dirty` methods that only exist from 4.2, so branch on the Rails version until the upgrade ships:
+```ruby
+# BEFORE (raises on 4.2)
+def tag_list=(value)
+  changed_attributes["tag_list"] = @tag_list unless value == @tag_list
+  @tag_list = value
+end
+
+def skip_timestamp_change
+  changed_attributes.delete("updated_at")
+end
+
+# AFTER (4.1 and 4.2)
+def tag_list=(value)
+  attribute_will_change!("tag_list") unless value == @tag_list
+  @tag_list = value
+end
+
+def skip_timestamp_change
+  NextRails.next? ? clear_attribute_changes(["updated_at"]) : changed_attributes.delete("updated_at")
+end
+
+# A specific old value
+NextRails.next? ? set_attribute_was(name, old) : changed_attributes[name] = old
+
+# From another object: the 4.2 methods are private
+NextRails.next? ? record.send(:clear_attribute_changes, [:token]) : record.changed_attributes.delete(:token)
+```
+`clear_attribute_changes` drops only a change recorded through a setter. On 4.2 a serialized or JSON column that was mutated in place (`prefs["x"] = 1`) stays in `changes` and is still written on save.
+
+---
+
+#### Integration Test Paths Need a Leading Slash
+
+**Pattern:** `INTEGRATION_RELATIVE_PATH`
+
+**What Changed:**
+Integration sessions (`ActionDispatch::IntegrationTest`, RSpec request specs) now build the request URI as a string: scheme, host and port, then the path as given (`Integration::Session#build_full_uri`, new in 4.2.0). Rails 4.1 resolved the path against `/` with `URI#+`, so `get "users"` worked by accident. On 4.2 the same call requests `http://www.example.com:80users` and rack-test raises `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` (Ruby 2.x wording). The actionpack 4.2.0 CHANGELOG lists it: the leading slash is now required in the integration test `process` helpers. A path that starts with `?` or `#`, and a full URL, still work. Specs that include `Rack::Test::Methods` directly (Grape or Sinatra apps) are not affected, since rack-test adds the slash itself.
+
+**Detection Pattern:**
+The pattern flags `get`/`post`/`put`/`patch`/`delete`/`head` (and the `xhr`, `xml_http_request`, `*_via_redirect` forms, where the path is the second argument) whose path is a string literal with no leading slash, in `spec/requests/`, `spec/integration/`, `spec/api/` and `test/integration/`. It skips rswag-style `get "List users" do` blocks, symbols, path helpers and variables. It misses a path that starts with interpolation (`get "#{id}/edit"`), a request used as an expression (`expect(get "users")`), a request followed by a block, calls on a session object (`sess.get "users"`) and request helpers in `spec/support/` or `test/support/` (left out because controller shared examples there pass action names such as `get "show"`): search those by hand.
+
+**Fix:**
+```ruby
+# BEFORE
+get "users", format: :json
+xhr :post, "comments", body: "x"
+
+# AFTER (works on 4.1 and 4.2)
+get "/users", format: :json
+xhr :post, "/comments", body: "x"
+# or a path helper
+get users_path(format: :json)
+```
+
+---
+
+#### `config.active_support.test_order` Not Set
 
 **Pattern:** `TEST_ORDER`
 
 **What Changed:**
-Rails 4.2 emits a deprecation warning when `test_order` is not explicitly set. The default becomes `:random`.
+Rails 4.2 adds `config.active_support.test_order`. When it is not set, `ActiveSupport::TestCase` keeps the 4.1 order (`:sorted`, alphabetical) and prints a deprecation warning saying the default becomes `:random` in Rails 5. The warning comes from `ActiveSupport::TestCase.test_order`, which runs only when Minitest runs an `ActiveSupport::TestCase` subclass, so a suite that is RSpec only may never print it. Set the option anyway: the 4.2 to 5.0 hop changes the default.
 
 **Detection Pattern:**
-Missing setting in `config/environments/test.rb`.
+The `TEST_ORDER` pattern cannot detect a missing setting, so it flags the configure block of `config/environments/test.rb` for manual review. It matches both `Rails.application.configure do` (generated by Rails 4.1 and later) and `<App>::Application.configure do` (generated by Rails 4.0 and earlier, kept by apps that never regenerated the file). Open the file and check for `test_order`; an app may instead set `ActiveSupport::TestCase.test_order = ...` in `test/test_helper.rb`, which also counts on 4.2. Do not add the setting that way during the dual boot: 4.1 has no `ActiveSupport::TestCase.test_order=`, so that line raises `NoMethodError` on the 4.1 side. The `config.active_support` form below works on both.
 
 **Fix:**
 ```ruby
 # config/environments/test.rb
+Rails.application.configure do # or MyApp::Application.configure do
+  # Keep the 4.1 order during the upgrade
+  config.active_support.test_order = :sorted
 
-# Run tests in random order (recommended)
-config.active_support.test_order = :random
-
-# Or preserve 4.1's implicit sorted behavior
-# config.active_support.test_order = :sorted
+  # Or opt into the 4.2 generator value and the Rails 5 default
+  # once the suite passes in random order
+  # config.active_support.test_order = :random
+end
 ```
+
+The line works on both sides of the dual boot with no conditional. On 4.1 the `active_support.set_configs` initializer skips any key that `ActiveSupport` has no setter for, and 4.1 has no `ActiveSupport.test_order=`, so the line is ignored there.
 
 ---
 
@@ -343,6 +473,62 @@ form_authenticity_token
 
 **Fix:**
 Rails form helpers handle masking automatically. If you build forms outside Rails (e.g., a static page posting to your app), fetch the token per request rather than caching it.
+
+---
+
+#### `Column#type_cast` Removed
+
+**Pattern:** `COLUMN_TYPE_CAST_INSTANCE`
+
+**What Changed:**
+Rails 4.2 removes the public instance method `ActiveRecord::ConnectionAdapters::Column#type_cast(value)`. A 4.2 column hands casting to its `cast_type` and exposes it as `type_cast_from_database` and `type_cast_from_user` (both new in 4.2). `Type::Value#type_cast` is private, so `column.type_cast(value)` raises `NoMethodError`. The usual caller casts a param or a calculation result through `Model.columns_hash[name].type_cast(value)`.
+
+The two-argument `connection.type_cast(value, column)` quoting method is a different API, still present on 4.2, and the pattern skips it. The removed class-level helpers (`Column.value_to_boolean` and friends) are a separate change.
+
+**Detection Pattern:** the `COLUMN_TYPE_CAST_INSTANCE` regex flags one-argument `.type_cast` calls, with or without parentheses, and `send` / `try(:type_cast, value)` with or without parentheses. It skips the two-argument `connection.type_cast(value, column)` quoting method, which still exists, unless its first argument nests parentheses two levels deep (`type_cast(foo(a(b, c)), col)` is flagged, check the argument count). The `try` form does not raise on 4.2: Active Support `try` checks `respond_to?` and returns `nil`, so the cast silently becomes `nil`. Any other object with a public one-argument `type_cast` is flagged too, so check that the receiver is a column.
+
+**Fix:**
+First check whether the cast does anything. `minimum` and `maximum` already cast through the column on 4.1 and 4.2, so a cast of their result can simply go. Otherwise branch on the version:
+
+```ruby
+# BEFORE
+column = Order.columns_hash["total"]
+column.type_cast(params[:total])
+
+# AFTER (works on 4.1 and 4.2)
+column = Order.columns_hash["total"]
+NextRails.next? ? column.type_cast_from_database(params[:total]) : column.type_cast(params[:total])
+```
+
+`type_cast_from_database` gives the 4.1 result for string, integer, decimal, boolean and datetime inputs, with one difference: a string column now returns a String for any value (`5` becomes `"5"`). `type_cast_from_user` is what an attribute writer uses, but it differs more: a blank string cast through an integer column gives `nil` instead of `0`. Rails 5.0 replaces both with `Order.type_for_attribute("total").cast(value)`.
+
+---
+
+#### `Numeric#ago` / `#until` / `#since` / `#from_now` Removed
+
+**Pattern:** `NUMERIC_AGO_WITHOUT_UNIT`
+
+**What Changed:**
+Rails 4.1 deprecated calling `ago`, `until`, `since` and `from_now` on a plain number (`Calling #ago or #until on a number (e.g. 5.ago) is deprecated and will be removed in the future, use 5.seconds.ago instead`). Rails 4.2 removes them from `Numeric`, so `5.ago` raises ``NoMethodError: undefined method `ago' for 5:Fixnum`` (`for 5:Integer` on Ruby 2.4 and later). The same methods on a Duration (`5.seconds.ago`) are unchanged.
+
+Two shapes are easy to miss. Through 4.2 a Duration has no `*` or `/` of its own: they go through `method_missing` to the Integer value and return a plain Integer, so `(2.hours * 3).ago` and `(1.day / 2).ago` raise too, while `(1.day + 1.hour).ago` keeps working. And a number of seconds stored in a variable (`timeout.ago`), often read from YAML, ENV or a settings table and passed to a gem that calls `ago` on it, cannot be found by a regex: it shows up only as the 4.1 deprecation warning in logs and test output.
+
+**Detection:**
+The pattern flags numeric literals and `.to_i` / `.to_f` / `.abs` results followed by one of the four methods, and `.round` / `.floor` / `.ceil` results and parenthesized `*` / `/` expressions followed by one of them with no argument. `Time#ago` and `#since` always take an argument, so `Time.current.round.ago(1.hour)` and `(Time.now - 2 * 3600).since(1.hour)` are left alone. A hit can still be a Duration: `(1.day + 2 * 3.hours).ago` is flagged although the sum keeps its unit, so check the receiver before adding `.seconds`. Other Integer-returning calls (`items.count.ago`) are not flagged. On 4.1, also search the test log for `Calling #ago or #until on a number` and `Calling #since or #from_now on a number`.
+
+**Fix:**
+```ruby
+# BEFORE
+expires_at = 5.ago
+cutoff = timeout.from_now
+window = (2.hours * 3).ago
+
+# AFTER (works on 4.1 and 4.2)
+expires_at = 5.seconds.ago
+cutoff = timeout.seconds.from_now
+window = (2.hours * 3).seconds.ago
+```
+For a value read from configuration, convert it once where it is read (`setting.seconds`) so every consumer gets a Duration. A Duration is `==` to its Integer value, does arithmetic like it and serializes to JSON as it. It is not the same object to `Integer === x` (so `case x when Integer`), `eql?` or a Hash key lookup, on 4.1 and on 4.2, so check the setting's other consumers before converting it at read time.
 
 ---
 
@@ -502,7 +688,7 @@ config.assets.digest = true
 ### `config/environments/test.rb`
 Add:
 ```ruby
-config.active_support.test_order = :random
+config.active_support.test_order = :sorted # keeps the 4.1 order; the 4.2 generator writes :random
 ```
 
 Rename:
@@ -579,12 +765,17 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 3. Replace `assert_tag` with `assert_select`
 4. Update `Procfile` with `-b 0.0.0.0` if external access needed
 5. Review HTML sanitizer output in tests
-6. Add `config.active_record.raise_in_transactional_callbacks = true`
-7. Add `config.active_support.test_order = :random`
-8. Rename `serve_static_assets` → `serve_static_files`
-9. Replace `ConnectionAdapters::Column.value_to_boolean` and the other removed class-level cast helpers with app-owned casts
-10. Consider replacing Timecop with `travel_to` (optional)
-11. Consider dropping Foreigner for native FKs (optional)
+6. Replace writes into `changed_attributes` with `attribute_will_change!`, or `set_attribute_was` / `clear_attribute_changes` behind `NextRails.next?` (see "Writes into `changed_attributes` Raise")
+7. Add `config.active_record.raise_in_transactional_callbacks = true`
+8. Add `config.active_support.test_order = :sorted` (or `:random` once the suite passes in random order)
+9. Rename `serve_static_assets` → `serve_static_files`
+10. Add a unit to `ago` / `until` / `since` / `from_now` called on a bare number (`5.ago` → `5.seconds.ago`)
+11. Add the leading slash to integration and request spec paths (`get "/users"`)
+12. If the app patches `Mapper::Mapping` (`normalize_conditions!` and friends), move the custom route options under `defaults:` and drop the patch
+13. Replace one-argument `column.type_cast(value)` with `type_cast_from_database` behind `NextRails.next?`
+14. Replace `ConnectionAdapters::Column.value_to_boolean` and the other removed class-level cast helpers with app-owned casts
+15. Consider replacing Timecop with `travel_to` (optional)
+16. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -607,8 +798,16 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess` from a model | "Writes into `changed_attributes` Raise": `attribute_will_change!`, `clear_attribute_changes` |
+| `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 | `NoMethodError: undefined method 'value_to_boolean' for ActiveRecord::ConnectionAdapters::Column:Class` (or `string_to_time`, `value_to_decimal`, ...) | "`ConnectionAdapters::Column` Class-Level Cast Helpers Removed": app-owned cast |
+| ``NoMethodError: undefined method `type_cast' for #<ActiveRecord::ConnectionAdapters::...Column>`` | "`Column#type_cast` Removed", use `type_cast_from_database` |
+| ``NameError: undefined method `normalize_conditions!' for class `ActionDispatch::Routing::Mapper::Mapping'`` at boot | "Routing `Mapper::Mapping` Patches Stop Running": drop the patch, move the option under `defaults:` |
+| `ActionController::UrlGenerationError` from `url_for` on a route with a custom option that worked on 4.1 | "Routing `Mapper::Mapping` Patches Stop Running": the `normalize_conditions!` patch no longer runs |
+| `ArgumentError: wrong number of arguments (given N, expected 0)` (or `(N for 0)` before Ruby 2.3) when routes are drawn | "Routing `Mapper::Mapping` Patches Stop Running": a `normalize_defaults!` / `normalize_options!` / `normalize_path!` override needs the 4.2 signature |
+| ``DEPRECATION WARNING: You did not specify a value for the configuration option `active_support.test_order` `` | "`config.active_support.test_order` Not Set", set `:sorted` to keep the 4.1 order |
+| ``NoMethodError: undefined method `ago' for 5:Fixnum`` (or `until` / `since` / `from_now`, `for 1.5:Float`, `for 5:Integer` on Ruby 2.4+) | "`Numeric#ago` / `#until` / `#since` / `#from_now` Removed": add a unit: `5.seconds.ago` |
 
 ---
 
