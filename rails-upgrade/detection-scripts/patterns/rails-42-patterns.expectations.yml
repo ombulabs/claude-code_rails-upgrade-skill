@@ -420,3 +420,34 @@ COLUMN_DEFAULT_RAW:
     # a column method on another object, and a setter
     - "grid.column.default"
     - "column.default = 3"
+
+ATTRIBUTES_IVAR_REPLACE:
+  match:
+    # replacing @attributes (the after_initialize swap); ||= has no effect in a
+    # record, where @attributes is always set, but is flagged as direct access
+    - "    instance_variable_set(:@attributes, attributes.merge(extra))"
+    - "    instance_variable_set(\"@attributes\", attrs)"
+    - "    @attributes = attributes.merge(\"extra\" => 1)"
+    - "    @attributes ||= {}"
+    # writing into it
+    - "    @attributes[\"title\"] = value.upcase"
+    - "    @attributes.merge!(extra)"
+    - "    @attributes.delete(\"legacy\")"
+    # reading from it: Hash methods are gone, [] returns an Attribute object
+    - "    raw = @attributes[\"price\"]"
+    - "    @attributes.fetch(\"price\")"
+    - "    instance_variable_get(:@attributes)[\"title\"]"
+  no_match:
+    # other instance variables whose name starts with @attributes
+    - "    @attributes_cache.delete(name)"
+    - "    @attributes2 = 1"
+    - "    @custom_attributes = {}"
+    # class variable
+    - "    @@attributes = []"
+    # comment
+    - "    # @attributes = attributes.merge(extra)"
+    # the public API, which works on both versions
+    - "    self.attributes = params"
+    - "    attributes.merge(extra)"
+    - "    write_attribute(:title, value)"
+    - "    read_attribute_before_type_cast(:price)"

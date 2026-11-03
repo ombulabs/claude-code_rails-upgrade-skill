@@ -243,6 +243,17 @@ upgrade_findings:
       fix: "Read Model.column_defaults[\"name\"] instead. It returns the typed default on 4.0, 4.1 and 4.2, so plain columns need no version conditional. On 4.2 it goes through the model's attribute types, so a serialize'd column's default comes back deserialized there: check those columns on both versions. For a column object that is not tied to a model (connection.columns(table)), cast on 4.2 only: NextRails.next? ? column.type_cast_from_database(column.default) : column.default"
       variable_name: "COLUMN_DEFAULT_RAW"
 
+    - name: "Direct use of @attributes in a model"
+      kind: "breaking"
+      pattern: "(?<![@\\w])@attributes\\b"
+      exclude: "\\A[ \\t]*#"
+      search_paths:
+        - "app/models/"
+        - "config/initializers/"
+      explanation: "Rails 4.2.0 keeps a record's attributes in an ActiveRecord::AttributeSet instead of a Hash. Swapping in a Hash breaks the first attribute read (NoMethodError: undefined method `fetch_value' for ...:Hash), Hash writes and reads such as []=, merge! and fetch raise NoMethodError, and @attributes['x'] silently returns an Attribute object instead of the value. Every direct @attributes reference in app/models/ and config/initializers/ is flagged: a plain Ruby class there with its own @attributes Hash is a known false positive, and lib/ and the rest of app/ are not scanned (the guide entry gives a grep for them)"
+      fix: "Use the public API, which works on 4.1 and 4.2: read_attribute(:x) or read_attribute_before_type_cast(:x) for reads, write_attribute(:x, v) or self[:x] = v for writes. For extra non-column values, keep them out of @attributes: hold them in the model's own instance variable, load it in after_initialize and again after reload, and override attributes to merge them in (super.merge('extra' => @extra)) if callers need them there; record[:extra] and read_attribute(:extra) then return nil, so switch those calls to record.extra. Do not call attribute_will_change! for a non-column name: on 4.2 the partial UPDATE then includes it and fails with an unknown-column error (no such column on SQLite, column ... does not exist on PostgreSQL, Unknown column on MySQL). Also override becomes to copy the extra value: becomes builds the new record with klass.new, so after_initialize runs on blank attributes"
+      variable_name: "ATTRIBUTES_IVAR_REPLACE"
+
   low_priority:
     - name: "Procfile rails server without explicit bind"
       kind: "breaking"

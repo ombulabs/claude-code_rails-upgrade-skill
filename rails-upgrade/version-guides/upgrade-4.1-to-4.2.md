@@ -511,6 +511,95 @@ Rails form helpers handle masking automatically. If you build forms outside Rail
 
 ---
 
+#### `@attributes` Is an `AttributeSet`, Not a Hash
+
+**Pattern:** `ATTRIBUTES_IVAR_REPLACE`
+
+**What Changed:**
+Through 4.1 a record kept its raw column values in `@attributes`, a plain Hash. Rails 4.2.0 replaces it with `ActiveRecord::AttributeSet`, which keeps `[]`, `key?`, `keys` and `to_hash` but drops the rest of the Hash API (`[]=`, `fetch`, `merge!`, `delete`, `each` and so on). Code that reaches into the instance variable breaks:
+
+- Swapping in a Hash (`instance_variable_set(:@attributes, attributes.merge(extra))` or `@attributes = ...`, usually in `after_initialize` to make extra non-column keys readable) fails on the first attribute read with ``NoMethodError: undefined method `fetch_value' for ...:Hash``.
+- Writes (`@attributes['x'] = v`, `merge!`, `update`, `store`, `delete`) and Hash reads such as `fetch` raise `NoMethodError` on `ActiveRecord::AttributeSet`.
+- `@attributes['x']` still works but returns an `ActiveRecord::Attribute` object instead of the value, so a comparison or presence check on it is silently wrong.
+
+**Detection Pattern:**
+```ruby
+class Post < ActiveRecord::Base
+  after_initialize { instance_variable_set(:@attributes, attributes.merge("extra" => 1)) }
+
+  def legacy_title
+    @attributes["title"]
+  end
+end
+```
+
+The pattern flags every direct `@attributes` reference in `app/models/` and `config/initializers/`. A plain Ruby class with its own `@attributes` Hash (a form object or a tableless model in `app/models/`) is unaffected: check that each hit is inside an ActiveRecord model or a patch to one. The pattern does not scan `lib/` or the rest of `app/`, where plain Ruby classes with their own `@attributes` are common. Search those by hand for ActiveRecord patches and for `instance_variable_get(:@attributes)` on a record (this skips `app/models/`, which the scanner already covered, and comment lines):
+```bash
+grep -rnE "(^|[^@[:alnum:]_])@attributes([^[:alnum:]_]|$)" lib app --include="*.rb" --exclude-dir=models \
+  | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'
+```
+
+**Fix:**
+Use the public attribute API, which behaves the same on 4.1 and 4.2, so no `NextRails.next?` branch is needed:
+```ruby
+# BEFORE
+def legacy_title
+  @attributes["title"]
+end
+
+def title=(value)
+  @attributes["title"] = value.upcase
+end
+
+# AFTER
+def legacy_title
+  read_attribute_before_type_cast(:title)  # or read_attribute(:title) for the cast value
+end
+
+def title=(value)
+  write_attribute(:title, value.upcase)
+end
+```
+
+For extra non-column values, keep them out of `@attributes`:
+```ruby
+# BEFORE
+after_initialize do
+  instance_variable_set(:@attributes, attributes.merge("extra" => compute_extra))
+end
+
+# AFTER
+after_initialize :load_extra
+attr_accessor :extra
+
+def reload(*)
+  super.tap { load_extra }
+end
+
+# becomes (and becomes!) builds the new record with klass.new, so
+# after_initialize runs on blank attributes: copy the value across
+def becomes(klass)
+  super.tap { |record| record.extra = extra if record.respond_to?(:extra=) }
+end
+
+# only if callers expect the value in attributes (serializers, audit gems)
+def attributes
+  super.merge("extra" => extra)
+end
+
+private
+
+def load_extra
+  self.extra = compute_extra
+end
+```
+
+With this shape, `record.extra` and `attributes["extra"]` keep working, but `record[:extra]` and `read_attribute(:extra)` return `nil` on both versions. Search for those call forms and switch them to `record.extra`.
+
+Do not call `attribute_will_change!` for the extra name: on 4.2 the partial `UPDATE` then includes it and fails with an unknown-column error: `no such column` on SQLite, `column "extra" of relation ... does not exist` on PostgreSQL, `Unknown column 'extra'` on MySQL. If saving must react to a change in the extra value, track that change yourself.
+
+---
+
 #### `Column#type_cast` Removed
 
 **Pattern:** `COLUMN_TYPE_CAST_INSTANCE`
@@ -810,8 +899,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 13. Replace one-argument `column.type_cast(value)` with `type_cast_from_database` behind `NextRails.next?`
 14. Replace `ConnectionAdapters::Column.value_to_boolean` and the other removed class-level cast helpers with app-owned casts
 15. Replace `columns_hash[...].default` and `column_for_attribute(...).default` reads with `column_defaults[...]`; cast a model-less `connection.columns(...)` default with `type_cast_from_database` behind `NextRails.next?`
-16. Consider replacing Timecop with `travel_to` (optional)
-17. Consider dropping Foreigner for native FKs (optional)
+16. Replace direct `@attributes` access in models with `read_attribute` / `write_attribute`
+17. Consider replacing Timecop with `travel_to` (optional)
+18. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -834,6 +924,9 @@ Error → section lookup for the most common errors encountered during this upgr
 | Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| ``NoMethodError: undefined method `fetch_value' for ...:Hash`` on an attribute read | "`@attributes` Is an `AttributeSet`, Not a Hash": stop replacing `@attributes` |
+| ``NoMethodError: undefined method `[]=' for #<ActiveRecord::AttributeSet:0x...>`` (or `merge!`, `fetch`, `delete`) | "`@attributes` Is an `AttributeSet`, Not a Hash": `write_attribute` / `read_attribute` |
+| `@attributes['x']` returns an `ActiveRecord::Attribute` instead of the value | "`@attributes` Is an `AttributeSet`, Not a Hash": `read_attribute_before_type_cast` |
 | `TypeError` or a wrong branch where code reads `columns_hash[...].default` (now a String such as `"604800"` or `"f"`), or `ArgumentError: comparison of String with ...` | "`Column#default` Returns the Raw Database String", read `column_defaults[...]` |
 | `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess` from a model | "Writes into `changed_attributes` Raise": `attribute_will_change!`, `clear_attribute_changes` |
 | `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
