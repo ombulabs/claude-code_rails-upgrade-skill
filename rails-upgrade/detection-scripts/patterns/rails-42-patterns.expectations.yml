@@ -11,6 +11,511 @@
 # Run with:
 #   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
 
+MAPPER_NORMALIZE_CONDITIONS:
+  # The usual nested reopen (`module Routing`, `class Mapper`, `class Mapping`
+  # on separate lines) spans lines, so it cannot be a fixture here. It was
+  # checked with a whole-file scan of a multi-line initializer, LF and CRLF.
+  # The one-line `;` forms below exercise the same branch.
+  match:
+    # class Mapper::Mapping reopened inside module Routing
+    - "module Routing; class Mapper::Mapping"
+    - "      def normalize_conditions!"
+    - "        alias_method :normalize_conditions_without_auth!, :normalize_conditions!"
+    - "  alias_method_chain :normalize_conditions!, :auth"
+    - "      def normalize_requirements!"
+    - "        options.merge!(default_controller_and_action)"
+    - "ActionDispatch::Routing::Mapper::Mapping.send(:prepend, RouteAuthOptions)"
+    - "ActionDispatch::Routing::Mapper::Mapping.class_eval do"
+    - "class ActionDispatch::Routing::Mapper::Mapping"
+    - "::ActionDispatch::Routing::Mapper::Mapping.class_eval do"
+    - "class ActionDispatch::Routing::Mapper; class Mapping"
+    - "module ActionDispatch; module Routing; class Mapper; class Mapping"
+  no_match:
+    # an app namespace under Routing is not the Rails module
+    - "module Routing::Admin; class Mapper; class Mapping"
+    - "      def normalize_conditions_without_auth!"
+    - "  def normalize_conditions(params)"
+    - "  normalize_requirements_for(record)"
+    - "class Mapping < ActiveRecord::Base"
+    - "  belongs_to :mapping"
+    - "ActionDispatch::Routing::Mapper.new(set)"
+    - "ActionDispatch::Routing::Mapper::Mappings"
+    - "Geo::TileMapper::Mapping.new(tile)"
+    # an app-owned Mapper::Mapping outside ActionDispatch::Routing
+    - "Importers::Mapper::Mapping.new(row)"
+    - "class Mapper; class Mapping < Struct.new(:a); end; end"
+    - "  default_controller_and_action_name = 'home#index'"
+
+CHANGED_ATTRIBUTES_WRITE:
+  match:
+    # element writes, including through self, a receiver and ||=
+    - "    changed_attributes[\"tag_list\"] = nil"
+    - "    changed_attributes[:name] = name_was"
+    - "    self.changed_attributes[\"state\"] = old_state"
+    - "    changed_attributes[attr] ||= old"
+    - "    changed_attributes[:count] += 1"
+    # one level of nested index in the key
+    - "    changed_attributes[attrs[:name]] = old"
+    # in-place Hash writers (a chain split across lines, changed_attributes
+    # then .delete(...) on the next line, is matched by scan_patterns.rb
+    # which reads whole files; fixtures are single lines)
+    - "    changed_attributes.delete(\"updated_at\")"
+    - "    record.changed_attributes.delete(:token)"
+    - "    changed_attributes.merge!(\"tags\" => old_tags)"
+    - "    changed_attributes.reverse_merge!(\"tags\" => old_tags)"
+    - "    changed_attributes&.delete(\"x\")"
+    - "    changed_attributes.store(\"tags\", old)"
+    - "    changed_attributes.clear"
+    - "    changed_attributes.except!(*IGNORED)"
+    - "    changed_attributes.delete_if { |k, _| k == \"x\" }"
+    - "    changed_attributes.reject! { |k, _| k.start_with?(\"_\") }"
+    - "    changed_attributes().update(\"a\" => 1)"
+    - "    changed_attributes.deep_merge!(\"a\" => 1)"
+    - "    changed_attributes.reverse_update(\"a\" => 1)"
+    - "    changed_attributes.replace({})"
+    - "    changed_attributes.shift"
+    - "    changed_attributes.slice!(\"a\")"
+    - "    changed_attributes.select! { |k, _| k }"
+    - "    changed_attributes.keep_if { |k, _| k }"
+    - "    changed_attributes.compact!"
+    - "    changed_attributes.transform_values!(&:to_s)"
+    - "    changed_attributes.[]=(attr, old)"
+    - "    changed_attributes[:a] &&= nil"
+    - "    changed_attributes[:flags] <<= 1"
+  no_match:
+    # reads and copies keep working on 4.2
+    - "    old = changed_attributes[\"name\"]"
+    - "    if changed_attributes[\"name\"] == \"x\""
+    - "    changed_attributes[:a] != 1"
+    - "    changed_attributes[keys[0]] <= 1"
+    - "    changed_attributes.reverse_merge(\"a\" => 1)"
+    - "    changed_attributes[\"a\"] =~ /x/"
+    - "    { changed_attributes[\"a\"] => 1 }"
+    - "    changed_attributes.key?(\"name\")"
+    - "    changed_attributes.merge(\"a\" => 1)"
+    - "    changed_attributes.except(\"updated_at\")"
+    - "    changed_attributes.dup.delete(\"x\")"
+    - "    changed_attributes.keys.delete(\"x\")"
+    # the instance variable is the unfrozen ActiveModel hash
+    - "    @changed_attributes[\"name\"] = old"
+    - "    @changed_attributes.delete(\"name\")"
+    # the replacements, definitions, lookalike names and comments
+    - "    attribute_will_change!(\"tag_list\")"
+    - "    set_attribute_was(\"name\", old)"
+    - "    clear_attribute_changes([\"name\"])"
+    - "    def changed_attributes"
+    - "    my_changed_attributes.delete(\"x\")"
+    - "    changed_attributes_for(:x).delete(\"x\")"
+    - "    changed_attributes.update_counters"
+    - "    # changed_attributes[\"name\"] = old"
+    # the dual-boot one-liners from fix: (exclude)
+    - "    NextRails.next? ? clear_attribute_changes([\"updated_at\"]) : changed_attributes.delete(\"updated_at\")"
+    - "    NextRails.next? ? set_attribute_was(name, old) : changed_attributes[name] = old"
+    - "    changed_attributes.compact"
+
+INTEGRATION_RELATIVE_PATH:
+  match:
+    # a URL in the query still leaves a relative path on 4.2
+    - "get \"auth/callback?return_to=http://x.com\""
+    - "    get \"users\""
+    - "get 'assets/app.css'"
+    - "    post \"users\", user: { name: \"x\" }"
+    - "get(\"users.json\")"
+    - "  delete \"users/#{user.id}\""
+    - "head \"status\""
+    # "users?page=2" breaks too: only a leading ? is safe
+    - "get \"users?page=2\""
+    # request inside a { } block
+    - "  expect { post \"users\", user: attrs }.to change(User, :count).by(1)"
+    - "  before { get \"dashboard\" }"
+    # xhr / redirect-following forms take the path as the second argument
+    - "  xhr :get, \"users\""
+    - "xhr(:post, \"comments\", body: \"x\")"
+    - "xml_http_request :get, \"users\""
+    - "request_via_redirect :get, \"login\""
+    - "  get_via_redirect \"login\""
+    - "post_via_redirect \"sessions\", user: user"
+    # one-line blocks and statements after ;
+    - "  before do get \"users\" end"
+    - "  scenario \"x\" do; get \"users\"; end"
+    # a do later on the line, or in a comment, does not hide the request
+    - "get \"users\", params: { q: \"do\" }"
+    - "get \"users\" # do"
+  no_match:
+    - "    get \"/users\""
+    - "get '/assets/app.css'"
+    - "  xhr :get, \"/users\""
+    # a full URL sets the host and path itself on both versions
+    - "get \"http://www.example.com/users\""
+    - "get \"https://api.example.com/users\""
+    # an interpolated prefix may already hold the slash
+    - "get \"#{base_path}/users\""
+    # "?page=2" works on 4.2 (http://www.example.com:80?page=2 is a valid URI)
+    - "get \"?page=2\""
+    - "get \"\""
+    # symbols, path helpers and variables: not a literal relative path
+    - "get :index"
+    - "get users_path"
+    - "get path, params"
+    # rswag-style operation blocks: the string is a description, not a path
+    - "    get \"List users\" do"
+    - "  post \"create\" do |example|"
+    - "  get \"index\" do"
+    # routing-spec hashes
+    - "expect(get: \"users\").to route_to(\"users#index\")"
+    - "expect(:get => \"users\").to be_routable"
+    # comments and RSpec descriptions
+    - "# get \"users\""
+    - "describe \"GET users\" do"
+    - "it \"gets users\" do"
+    # receivers and lookalike names
+    - "value = redis.get \"key\""
+    - "Net::HTTP.get(\"example.com\", \"/\")"
+    - "target \"users\""
+    - "forget \"users\""
+    - "undo \"users\""
+    - "it \"does get users\" do"
+    # a fragment-only path forms a valid URI on 4.2
+    - "get \"#anchor\""
+    # comment lines (exclude)
+    - "# before { get \"users\" }"
+    - "  # TODO: do get \"users\" later"
+    # a full URL is skipped only when the scheme starts the string
+    - "get \"https://api.example.com/users\""
+
+# Known gap, not a fixture because it does break on 4.2: a space inside #{ }
+# stops the path match, so get "users/#{ user.id }" is not flagged.
+
+NUMERIC_AGO_WITHOUT_UNIT:
+  match:
+    # numeric literals, including floats, underscores and a leading minus
+    - "    expires_at = 5.ago"
+    - "Time.zone.now > 30.from_now"
+    - "x = 1.5.since(start)"
+    - "cutoff = 3_600.from_now"
+    - "  let(:time) { -30.from_now }"
+    - "<%= 5.ago %>"
+    # to_i / to_f results, including a Duration turned back into an Integer
+    - "session_timeout.to_i.ago"
+    - "params[:seconds].to_f.until(deadline)"
+    - "1.day.to_i.ago"
+    - "x.round.ago"
+    - "value.abs.from_now"
+    - "(a.to_f / b).round.ago"
+    - "x.round(2).ago"
+    # a line that continues a string with interpolation is not a comment
+    - "  #{5.ago}"
+    # Duration * and / return a plain Integer through 4.2. A product split
+    # across lines inside the parentheses is matched by scan_patterns.rb, which
+    # reads the whole file
+    - "where(updated_at: (2.hours * 3).ago..Time.now)"
+    - "(1.day / 2).from_now"
+    - "(TIMEOUT * 4).ago"
+    - "(60 * 60).ago"
+  no_match:
+    - "expires_at = 5.seconds.ago"
+    - "2.days.from_now"
+    - "Time.current.ago(5)"
+    - "Date.today.since(3)"
+    - "(1.day + 1.hour).ago"
+    - "(n * 1.day).seconds.ago"
+    - "(Time.now - 5).ago(1)"
+    - "foo(x * 2).bar(1.day.ago)"
+    - "# 5.ago is deprecated"
+    - "  # use 5.seconds.ago, not 5.ago"
+    - "record.agony"
+    - "5.agos"
+    - "v1.2.ago"
+    - "foo.to_iso.ago"
+    - "time.since?"
+    - "<%# 5.ago %>"
+    # Time and Date arithmetic: their ago / since always take an argument
+    - "(Time.now - 2 * 3600).since(1.hour)"
+    - "(Date.today + 7/2).since(1.day)"
+    - "Time.current.round.ago(1.hour)"
+    - "Time.now.floor.since(5)"
+    # a method call's argument list is not a bare product
+    - "Time.at(ts / 1000).since(1.day)"
+    - "Time.at(ms * 0.001).ago(1.hour)"
+    - "Time.zone.parse(\"2020/01/01\").ago(1.day)"
+    - "Date.strptime(s, \"%m/%d/%Y\").since(3.days)"
+    - "list[i * 2].ago"
+
+# TEST_ORDER is a file marker: it flags the configure block of test.rb for
+# manual review. A per-line exclude cannot see whether test_order is set on
+# another line, so a file that already sets it is still flagged.
+TEST_ORDER:
+  match:
+    # Rails 4.1 and later generator form
+    - "Rails.application.configure do"
+    # Rails 4.0 and earlier generator form, kept by apps that never regenerated test.rb
+    - "MyApp::Application.configure do"
+    - "Acme::Store::Application.configure do"
+    - "::MyApp::Application.configure do"
+    # brace block
+    - "Rails.application.configure {"
+  no_match:
+    - "  config.active_support.test_order = :sorted"
+    - "Rails.application.config.active_support.test_order = :random"
+    - "MyApp::ApplicationController.configure"
+    - "Rails.application.configured?"
+    # commented-out configure lines (exclude)
+    - "# MyApp::Application.configure do"
+    - "  # Rails.application.configure do"
+
+COLUMN_TYPE_CAST_INSTANCE:
+  match:
+    - "    Model.columns_hash[\"amount\"].type_cast(params[:amount])"
+    - "  self.class.columns_hash[name.to_s].type_cast(raw)"
+    - "  column_for_attribute(:active).type_cast(\"1\")"
+    - "  Order.columns_hash[\"total\"].type_cast(Order.maximum(:total))"
+    # a comma inside a nested call is not a second argument
+    - "  column.type_cast(format(\"%d,%d\", a, b))"
+    - "  @column.type_cast value"
+    - "  columns_hash[key].try(:type_cast, value)"
+    - "  column.send(:type_cast, value)"
+    - "  col.try!(:type_cast, value)"
+    - "  col.__send__(:type_cast, value)"
+    # a comma inside a string literal is not a second argument
+    - "  col.type_cast(\"1,000\")"
+    - "  col.type_cast(opts[:a] || \"x, y\")"
+    # paren-less and string-named send / try
+    - "  col.send :type_cast, v"
+    - "  col.try :type_cast, value"
+    - "  col.send(\"type_cast\", v)"
+    # other one-argument shapes
+    - "  col.type_cast (value)"
+    - "  col.type_cast -1"
+    - "  col.type_cast *args"
+    - "  col.type_cast(value, &blk)"
+  no_match:
+    # two-argument connection quoting method, still public on 4.2
+    - "  connection.type_cast(value, column)"
+    - "  ActiveRecord::Base.connection.type_cast(quote(value), column)"
+    - "  conn.type_cast value, column"
+    - "  conn.send(:type_cast, value, column)"
+    - "  conn.send(:type_cast, quote(value), column)"
+    # zero-argument call followed by a modifier, not a one-argument call
+    - "  x = col.type_cast if foo"
+    - "  x = col.type_cast - 1"
+    - "  col.type_cast()"
+    # definitions, not calls
+    - "  def type_cast(value)"
+    - "  def self.type_cast(value)"
+    - "  def obj.type_cast(value)"
+    # the 4.2 replacements
+    - "  column.type_cast_from_database(value)"
+    - "  column.type_cast_from_user(value)"
+    # also gone on 4.2, but a different method this pattern does not cover
+    - "  column.type_cast_for_write(value)"
+    # comment line
+    - "  # column.type_cast(value)"
+
+COLUMN_CAST_CLASS_METHODS:
+  match:
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_boolean(params[:archived])"
+    - "    flag = ::ActiveRecord::ConnectionAdapters::Column.value_to_boolean(v) # cast"
+    - "values.map { |v| ActiveRecord::ConnectionAdapters::Column.value_to_boolean(v) }"
+    - "checked = ActiveRecord::ConnectionAdapters::Column.value_to_boolean v"
+    # bare constant after include ActiveRecord::ConnectionAdapters, or inside module ActiveRecord
+    - "archived = Column.value_to_boolean(params[:archived])"
+    - "ConnectionAdapters::Column.string_to_time(str)"
+    - "ActiveRecord::ConnectionAdapters::Column::value_to_boolean(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_integer(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_decimal(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_date(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.string_to_dummy_time(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.binary_to_string(v)"
+    # adapter subclasses inherit the class methods on 4.1
+    - "ActiveRecord::ConnectionAdapters::PostgreSQLColumn.string_to_time(s)"
+    # the seven protected helpers are reachable only through send or method on 4.1
+    - "ActiveRecord::ConnectionAdapters::Column.send(:fast_string_to_time, s)"
+    - "ActiveRecord::ConnectionAdapters::Column.send(\"fast_string_to_date\", s)"
+    - "ActiveRecord::ConnectionAdapters::Column.send :new_time, *parts"
+    - "Column.__send__(:new_date, 2014, 1, 1)"
+    - "ActiveRecord::ConnectionAdapters::Column.public_send(:value_to_boolean, v)"
+    - "Column.send(:fallback_string_to_time, s)"
+    - "Column.send(:microseconds, h)"
+    - "NEW_TIME = ActiveRecord::ConnectionAdapters::Column.method(:new_time)"
+    - "ActiveRecord::ConnectionAdapters::MysqlAdapter::Column.string_to_date(t)"
+    # try returns nil on 4.2 instead of raising
+    - "ActiveRecord::ConnectionAdapters::Column.try(:value_to_boolean, params[:x])"
+    - "flags.map(&ActiveRecord::ConnectionAdapters::Column.method(:value_to_boolean))"
+    - "ActiveRecord::ConnectionAdapters::SQLite3Column.binary_to_string(blob)"
+    - "ActiveRecord::ConnectionAdapters::Mysql2Adapter::Column.string_to_time(s)"
+    # PostgreSQLColumn::Cast helpers and the module itself
+    - "ActiveRecord::ConnectionAdapters::PostgreSQLColumn.string_to_hstore(s)"
+    - "ActiveRecord::ConnectionAdapters::PostgreSQLColumn.string_to_array(s, oid)"
+    - "include ActiveRecord::ConnectionAdapters::PostgreSQLColumn::Cast"
+  no_match:
+    - "# ActiveRecord::ConnectionAdapters::Column.value_to_boolean(v)"
+    # app-owned helper with the same name
+    - "value_to_boolean(params[:x])"
+    - "  def self.value_to_boolean(value)"
+    - "record.send(:value_to_boolean, v)"
+    - "column.value_to_boolean(v)"
+    - "ActiveRecord::ConnectionAdapters::Column.value_to_boolean_strict(v)"
+    # app classes whose name ends in Column
+    - "ReportColumn.value_to_date(x)"
+    - "GridColumn.value_to_boolean(v)"
+    - "MyColumn.string_to_hstore(s)"
+    - "Reports::Column.value_to_date(x)"
+    - "PostgreSQLColumn::CastHelper"
+    # still present on 4.2 (TRUE_VALUES goes away in 5.0, not here)
+    - "ActiveRecord::ConnectionAdapters::Column::TRUE_VALUES.include?(v)"
+    - "ActiveRecord::Type::Boolean.new.type_cast_from_user(v)"
+    # a feature check is the dual-boot guard, not a call
+    - "if ActiveRecord::ConnectionAdapters::Column.respond_to?(:value_to_boolean)"
+    # protected on 4.1 too: a direct call already raised before the bump
+    - "Column.new_date(2014, 1, 1)"
+    - "Column.public_send(:new_date, 2014, 1, 1)"
+    - "Column.try(:new_date, 2014, 1, 1)"
+    - "Column.send(:name)"
+    # separate 4.2 changes, not this pattern
+    - "Model.columns_hash[\"x\"].type_cast(v)"
+    - "Column.new(\"active\", nil, \"boolean\")"
+
+COLUMN_DEFAULT_RAW:
+  match:
+    # interpolation inside a find block, index_by, try / public_send forms, @column and self.column
+    - "Thing.columns.find { |c| c.name == \"#{attr}\" }.default"
+    - "Thing.columns.index_by(&:name)[\"ttl\"].default"
+    - "columns_hash[\"a\"]&.try(:default)"
+    - "columns_hash[\"a\"].try :default"
+    - "columns_hash[\"a\"].public_send(:default)"
+    - "self.column.default"
+    - "@column.default"
+    - "column.default.blank?"
+    - "Thing.columns_hash[\"ttl\"].default"
+    - "    created_at < Time.now - self.class.columns_hash[\"ttl\"].default"
+    - "Thing.columns_hash[name.to_s].default || 0"
+    - "columns_hash.fetch(\"active\").default"
+    - "column_for_attribute(:active).default"
+    - "Thing.columns.find { |c| c.name == \"ttl\" }.default"
+    - "connection.columns(:things).detect { |c| c.name == \"ttl\" }.default"
+    - "    puts column.default"
+    - "@column.default.to_i"
+    - "Thing.columns_hash[\"ttl\"]&.default"
+    - "Thing.columns_hash[\"ttl\"].try(:default)"
+    - "connection.schema_cache.columns_hash(\"things\")[\"ttl\"].default"
+  no_match:
+    # a nil default is still nil on 4.2
+    - "return if column.default.nil?"
+    # a receiver-qualified column is out of scope (listed as missed)
+    - "field.column.default"
+    # the replacement, typed on 4.0, 4.1 and 4.2
+    - "Thing.column_defaults[\"ttl\"]"
+    - "# Thing.columns_hash[\"ttl\"].default"
+    # other column readers and lookalike names
+    - "columns_hash[\"id\"].default_function"
+    - "columns_hash[\"ttl\"].type"
+    - "column.default?"
+    - "my_column.default_value"
+    - "I18n.default_locale"
+    - "config.default = 1"
+    - "Thing.columns.map(&:name)"
+    # .default outside the find block, or read inside it
+    - "col = Thing.columns.find { |c| c.name == x } || Settings.default"
+    - "x = columns.find { |c| c.default.nil? }"
+    # a column method on another object, and a setter
+    - "grid.column.default"
+    - "column.default = 3"
+
+ATTRIBUTES_IVAR_REPLACE:
+  match:
+    # replacing @attributes (the after_initialize swap); ||= has no effect in a
+    # record, where @attributes is always set, but is flagged as direct access
+    - "    instance_variable_set(:@attributes, attributes.merge(extra))"
+    - "    instance_variable_set(\"@attributes\", attrs)"
+    - "    @attributes = attributes.merge(\"extra\" => 1)"
+    - "    @attributes ||= {}"
+    # writing into it
+    - "    @attributes[\"title\"] = value.upcase"
+    - "    @attributes.merge!(extra)"
+    - "    @attributes.delete(\"legacy\")"
+    # reading from it: Hash methods are gone, [] returns an Attribute object
+    - "    raw = @attributes[\"price\"]"
+    - "    @attributes.fetch(\"price\")"
+    - "    instance_variable_get(:@attributes)[\"title\"]"
+  no_match:
+    # other instance variables whose name starts with @attributes
+    - "    @attributes_cache.delete(name)"
+    - "    @attributes2 = 1"
+    - "    @custom_attributes = {}"
+    # class variable
+    - "    @@attributes = []"
+    # comment
+    - "    # @attributes = attributes.merge(extra)"
+    # the public API, which works on both versions
+    - "    self.attributes = params"
+    - "    attributes.merge(extra)"
+    - "    write_attribute(:title, value)"
+    - "    read_attribute_before_type_cast(:price)"
+
+COLUMN_NEW_SQL_TYPE_ARG:
+  match:
+    # .new on the next line is matched by scan_patterns.rb (whole file); one-line spacing here
+    - "ActiveRecord::ConnectionAdapters::Column .new(\"b\", nil, \"x\")"
+    # the tableless-model recipe
+    - "    columns << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)"
+    # a virtual typed field appended to a real model's columns
+    - "cols << ::ActiveRecord::ConnectionAdapters::Column.new(\"flag\", nil, \"boolean\")"
+    - "ConnectionAdapters::Column.new(name, nil, type)"
+    # AbstractMysqlAdapter::Column takes cast_type third on 4.2; 4.2 drops Mysql2Adapter::Column, so the name resolves to it
+    - "  col = ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::Column.new(\"x\", nil, \"tinyint(1)\")"
+    - "  ActiveRecord::ConnectionAdapters::Mysql2Adapter::Column.new \"x\", nil, \"int(11)\""
+  no_match:
+    # the splat call the dual-boot fix uses
+    - "  columns << ActiveRecord::ConnectionAdapters::Column.new(*args)"
+    - "  # columns << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)"
+    - "ActiveRecord::ConnectionAdapters::ColumnDefinition.new(base, name, type)"
+    # PostgreSQLColumn already took an oid type third on 4.1
+    - "ActiveRecord::ConnectionAdapters::PostgreSQLColumn.new(\"x\", nil, oid, \"int\")"
+    - "ReportBuilder::Column.new(:name, \"Name\")"
+    - "Column.new(:title)"
+    - "connection.new_column(\"x\", nil, type)"
+
+AREL_UNION_BINDS:
+  match:
+    # the usual shape: a union of two relations used as a FROM subquery
+    - "Post.from(Post.arel_table.create_table_alias(active.union(archived), :posts).to_sql)"
+    - "    union = active.union(archived)"
+    - "  relation.union(:all, other)"
+    - "scope.union other_scope"
+    - "Post.where(state: \"a\").union(Post.where(state: \"b\"))"
+    - "a.arel.union(b.arel)"
+    - "Arel::Nodes::Union.new(a.arel.ast, b.arel.ast)"
+    - "Arel::Nodes::UnionAll.new(left.ast, right.ast)"
+    # intersect loses its bind values the same way
+    - "active.intersect(mine)"
+    - "Arel::Nodes::Intersect.new(a.ast, b.ast)"
+    - "Arel::Nodes::Except.new(a.ast, b.ast)"
+    # relations reached by index, a Set elsewhere on the line, a trailing comment
+    - "scopes[0].union(scopes[1])"
+    - "Post.where(id: ids & Set.new(x)).union(y)"
+    - "a.union(b) # Regexp.union"
+    - "users.union  (x)"
+  no_match:
+    # Regexp.union, Set#union and Array#union (Ruby 2.6+) are not Arel
+    - "PATTERN = Regexp.union(KEYWORDS)"
+    - "Set.new(ids).union(other_ids)"
+    - "Set[1, 2].union([3])"
+    - "ids.to_set.union(other)"
+    - "[1, 2].union([3])"
+    - "all = [a, b].union(c)"
+    - "set.intersect?(other)"
+    # Relation#except is Active Record, not Arel
+    - "Post.where(a: 1).except(:order)"
+    # lodash / jQuery-style helpers under app/assets
+    - "var all = _.union(a, b);"
+    - "all = $.union(a)"
+    - "# active.union(archived) loses binds"
+    - "sql = \"SELECT 1 UNION SELECT 2\""
+    - "def union(other)"
+    # active_record_union's union_all carries its binds
+    - "Post.where(id: 1).union_all(Post.where(id: 2))"
+    - "trade_union(x)"
+
 VALIDATE_UNKNOWN_OPTIONS:
   # The multi-line shapes (an argument list continued after a trailing comma,
   # `validate(` on its own line) are proved with pattern_lab.rb scan, since
