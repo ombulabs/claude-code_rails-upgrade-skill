@@ -594,3 +594,61 @@ BELONGS_TO_DEPENDENT_DESTROY:
     # The macro must be followed by a symbol name.
     - "  validates :foo, if: -> { belongs_to? }, dependent: :destroy"
     - "  reflect_on_all_associations(:belongs_to).each { |r| x(r, dependent: :destroy) }"
+
+VALIDATE_UNKNOWN_OPTIONS:
+  # The multi-line shapes (an argument list continued after a trailing comma,
+  # `validate(` on its own line) are proved with a scan_patterns.rb run on a model file, since
+  # fixtures are single lines.
+  match:
+    - "  validate :owner_id, presence: true"
+    - "  validate :owner_id, :presence => true"
+    - "  validate :check_dates, allow_blank: true"
+    - "  validate :check_dates, if: :active?, allow_nil: true"
+    - "  validate :check_dates, on: :create, message: \"is invalid\""
+    - "  validate :starts_before_end, :ends_after_start, strict: true"
+    - "  validate(:check_dates, only: :create)"
+    - "  validate :check, if: -> { draft? }, presence: true"
+    - "  validate :check, on: [:create, :update], uniqueness: { scope: :account_id }"
+    - "  validate :check, :if => :ok?, :allow_nil => true"
+    - "  validate :check, \"if\" => :ok?"
+    - "  validate :check, if: \"draft?\", message: \"is invalid\""
+    - "  validate :check, if: Flags.on?(:billing), allow_nil: true"
+    - "  validate :valid_dates?, presence: true"
+    - "  validate(presence: true) { errors.add(:base, \"x\") }"
+    - "  validate :check,presence:true"
+    # a bad key after a one-line block value that nests another block
+    - "  validate :c, if: -> { errors[:x].any? { |e| e } }, allow_nil: true"
+    - "  validate :c, if: proc { |r| r.x({ b: 1 }) }, allow_nil: true"
+  no_match:
+    # keys inside [ ] in a value, and an unquoted ternary label
+    - "  validate :check, if: %w[a: b]"
+    - "  validate :check, if: Flags[feature: :x]"
+    - "  validate :check, unless: x ? y: z"
+    - "  validate :check_dates"
+    - "  validate :check_dates, :check_other"
+    - "  validate :check_dates, on: [:create, :update]"
+    - "  validate :check_dates, if: :active?, unless: :draft?"
+    - "  validate :check, :on => :create, :if => :ok?, :unless => :no?, :prepend => true"
+    - "  validate :check, prepend: true"
+    - "  validate :check, if: -> { a? ? b : c }"
+    # a keyword argument inside a one-line block value is not an option of validate
+    - "  validate :check, if: proc { |r| r.enabled?(scope: :all) }"
+    - "  validate :check, if: Feature::Flags.enabled?"
+    - "  validate :check, if: :ok? # presence: true was removed"
+    - "  validates :owner_id, presence: true"
+    - "  validates_with OwnerValidator, fields: [:owner_id]"
+    - "  validate do |record|"
+    - "  validate { errors.add(:base, \"x\") }"
+    - "  def validate(record, options = {})"
+    - "  # validate :owner_id, presence: true"
+    - "  record.validate :foo, presence: true"
+    # Rails only checks the options when every positional argument is a Symbol
+    - "  validate OwnerValidator.new(fields: [:owner_id])"
+    - "  validate \"check_dates\", presence: true"
+    - "  validate ->(r) { r.errors.add(:base, \"x\") }, if: :ok?"
+    - "  revalidate :owner_id, presence: true"
+    # keys inside a ( ) argument list, a quoted string or after ; belong to the value, not to validate
+    - "  validate :check, if: Flags.enabled_for(feature: :billing)"
+    - "  validate :check, unless: \"kind == %q(a) ? x: y\""
+    - "  validate :check, if: :ok? ; audit(level: 1)"
+    - "  validate :check, if: :a?, unless: %w(a: b)"

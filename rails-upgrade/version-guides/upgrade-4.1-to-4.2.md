@@ -264,6 +264,49 @@ Pin each site with a test that checks the query returns rows (or the generated S
 
 ---
 
+#### `validate` Rejects Options Other Than `:on`, `:if`, `:unless`, `:prepend`
+
+**Pattern:** `VALIDATE_UNKNOWN_OPTIONS`
+
+**What Changed:**
+`validate` (singular, the method-name and block form) now checks its options against `ActiveModel::Validations::VALID_OPTIONS_FOR_VALIDATE` (`:on`, `:if`, `:unless`, `:prepend`) whenever every positional argument is a Symbol. Any other key raises when the class body runs, so the model cannot load:
+
+```
+ArgumentError: Unknown key: :presence. Valid keys are: :on, :if, :unless, :prepend. Perhaps you meant to call `validates` instead of `validate`?
+```
+
+Through 4.1 `validate` handed the extra keys to `set_callback`, which ignored them. So `validate :owner_id, presence: true` has never validated anything: it only calls the `owner_id` reader as a validation callback. `allow_blank:`, `allow_nil:`, `message:` and `strict:` on a `validate` line were ignored the same way.
+
+**Detection Pattern:**
+```ruby
+validate :owner_id, presence: true
+validate :dates_in_order, on: :create, allow_blank: true
+validate :dates_in_order,
+         :message => "is invalid"
+validate :dates_in_order, "if" => :ready?
+```
+
+The `VALIDATE_UNKNOWN_OPTIONS` pattern follows the argument list across lines that end in a comma. A call with any positional argument that is not a Symbol (a validator object, a lambda, a string) is skipped: Rails checks the options only when every positional argument is a Symbol. Keys inside a one-line `{ }`, `( )` or `[ ]` value (one level of nesting) and in an unquoted ternary (`unless: x ? y: z`) are skipped too. It cannot see options that come from an enclosing `with_options` block. `o.validate :x` inside `with_options allow_blank: true do |o| ... end` gets the block's hash appended, as on 4.1, so it raises on 4.2. A bare `validate :x` is new trouble on 4.2 only when the block takes no parameter (`with_options allow_blank: true do ... end`): 4.1 yielded and the call went straight to the class, while 4.2 runs the block with `instance_eval` on the option merger, so the call gets the hash and raises. A bare call inside a block that takes a parameter still goes to the class. Check every `with_options` block that contains `validate` by hand. A `**opts` splat is not seen either.
+
+**Fix:**
+```ruby
+# BEFORE (loads on 4.1 and validates nothing, raises on 4.2)
+validate :owner_id, presence: true
+validate :dates_in_order, on: :create, allow_blank: true
+
+# AFTER, same behavior as 4.1: drop what never ran
+validate :dates_in_order, on: :create
+
+# AFTER, what the line meant (a behavior change: existing records may now fail)
+validates :owner_id, presence: true
+```
+
+A string key such as `"if" => :ready?` raises too, and it never applied on 4.1, so deleting it keeps the old behavior while `if: :ready?` makes the validation conditional for the first time. For a `with_options` block, move `validate` out of it; carry over any `:on` / `:if` / `:unless` the block gave it when it was called as `o.validate`, or bare inside a block with no parameter.
+
+All of these work on 4.1 and 4.2. Ship the switch to `validates` as its own reviewed change, separate from the upgrade, since it starts enforcing a rule the app never enforced.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -1070,8 +1113,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 18. Pass a cast type to fake `ConnectionAdapters::Column.new` calls (tableless models, virtual typed fields)
 19. Rebuild Arel `union` / `intersect` subqueries from each relation's `to_sql`
 20. Review `belongs_to ..., dependent: :destroy` / `:delete` declarations: the cascade now runs after the record's own delete
-21. Consider replacing Timecop with `travel_to` (optional)
-22. Consider dropping Foreigner for native FKs (optional)
+21. Fix `validate` calls with options other than `:on` / `:if` / `:unless` / `:prepend` (`validates`, or drop the options)
+22. Consider replacing Timecop with `travel_to` (optional)
+23. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -1118,6 +1162,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | A `where` that compared two columns returns no rows; SQL shows `= NULL` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
 | `TypeError: can't cast Arel::Attributes::Attribute to string` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
 | A `where` on a string column returns no rows; SQL shows `= '--- !ruby/struct:Arel::Attributes::Attribute ...'` (mysql2) | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
+| `ArgumentError: Unknown key: :presence. Valid keys are: :on, :if, :unless, :prepend` when a model loads | "`validate` Rejects Options Other Than `:on`, `:if`, `:unless`, `:prepend`": `validates`, or drop the options |
 
 ---
 
