@@ -509,3 +509,25 @@ FINDER_SQL:
     - "  Comment.find_by_sql('SELECT * FROM comments')"
     - "  Comment.count_by_sql('SELECT COUNT(*) FROM comments')"
     - "  options[:finder_sql]"
+
+BELONGS_TO_DEPENDENT_AUTO_INVERSE:
+  match:
+    - "  belongs_to :document, dependent: :destroy"
+    - "  belongs_to :document, :dependent => :destroy"
+    - "  belongs_to :document, touch: true, dependent: :destroy"
+    # an explicit inverse keeps the in-memory record too
+    - "  belongs_to :document, inverse_of: :attachment, dependent: :destroy"
+  no_match:
+    # dependent: :delete runs no callbacks, so it cannot close the loop.
+    - "  belongs_to :document, dependent: :delete"
+    # The has_one side holds the after_destroy; the regex flags the belongs_to side.
+    - "  has_one :attachment"
+    - "  has_one :attachment, dependent: :destroy"
+    - "  after_destroy :destroy_attachment"
+    - "  belongs_to :document"
+    # options that turn automatic inverse detection off: 4.1 changes nothing
+    - "  belongs_to :content, polymorphic: true, dependent: :destroy"
+    - "  belongs_to :document, foreign_key: :doc_id, dependent: :destroy"
+    - "  belongs_to :document, :foreign_key => :doc_id, :dependent => :destroy"
+    - "  belongs_to :document, inverse_of: false, dependent: :destroy"
+    - "  belongs_to :document, -> { where(active: true) }, dependent: :destroy"
