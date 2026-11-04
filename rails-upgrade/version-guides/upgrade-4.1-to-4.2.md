@@ -241,7 +241,7 @@ Rails 5.0 changes `constraints` again (it returns the options grouped by kind an
 **Pattern:** `AREL_ATTRIBUTE_AS_VALUE`
 
 **What Changed:**
-From Rails 4.2.3 on, `where` turns any hash value without a special handler into a bind value cast through the column type (`PredicateBuilder.can_be_bound?` in `create_binds`). An Arel attribute is such a value. So `where(owner_id: Owner.arel_table[:id])`, which compared two columns through 4.1, now casts the attribute: an integer column gets `"posts"."owner_id" = NULL` and the query silently returns no rows, with nothing raised. A string column gets the attribute serialized as YAML, and the sqlite3 adapter raises `TypeError: can't cast Arel::Attributes::Attribute to string` when the query runs. Rails 4.2.0 to 4.2.2 still passed the attribute through, but `gem 'rails', '~> 4.2.0'` installs 4.2.11.3, and Rails 5.0 keeps the 4.2.3 behavior.
+From Rails 4.2.3 on, `where` turns any hash value without a special handler into a bind value cast through the column type (`PredicateBuilder.can_be_bound?` in `create_binds`). An Arel attribute is such a value. So `where(owner_id: Owner.arel_table[:id])`, which compared two columns through 4.1, now casts the attribute: an integer column gets `"posts"."owner_id" = NULL` and the query silently returns no rows, with nothing raised. A string column fails by adapter: sqlite3, which sends bind values, raises `TypeError: can't cast Arel::Attributes::Attribute to string` when the query runs, while mysql2 (no prepared statements on 4.2) quotes the attribute as a YAML string (`= '--- !ruby/struct:Arel::Attributes::Attribute ...'`) and silently returns no rows. Rails 4.2.0 to 4.2.2 still passed the attribute through in `where`, but `gem 'rails', '~> 4.2.0'` installs 4.2.11.3, and class-level `find_by(owner_id: Owner.arel_table[:id])` casts it from 4.2.0, because its statement cache binds every value. Rails 5.0 keeps the 4.2.3 behavior.
 
 **Detection Pattern:**
 ```ruby
@@ -249,7 +249,7 @@ Post.where(owner_id: Owner.arel_table[:id])
 where(:owner_id => self.class.arel_table[:id])
 ```
 
-`AREL_ATTRIBUTE_AS_VALUE` flags a symbol or quoted hash key (`key:` or `=>`) whose value is `X.arel_table[...]` or a bare `arel_table[...]`, on any receiver. It skips a dotted `"posts.owner_id" =>` key, which 4.2.3 does not bind. It also flags a hash that never reaches `where` (a sort-column map, an `update_all` hash), so check where each hit goes. It does not see an attribute held in a variable first (`t = Owner.arel_table` then `where(owner_id: t[:id])`) or one passed to a scope that builds the hash itself (`for_owner(Owner.arel_table[:id])`); search for `arel_table` by hand when the app uses Arel tables that way.
+`AREL_ATTRIBUTE_AS_VALUE` flags a symbol or quoted hash key (`key:` or `=>`) whose value is `X.arel_table[...]` or a bare `arel_table[...]`, on any receiver. It skips a dotted `"posts.owner_id" =>` key, which 4.2 does not bind; Rails 5.0 binds it, so it breaks on the next hop. It flags a nested hash under the model's own table name (`posts: { owner_id: Owner.arel_table[:id] }`), which also works on 4.2 and breaks on 5.0, so rewrite it now. A hash in a trailing comment after code is flagged too. It also flags a hash that never reaches `where` (a sort-column map, an `update_all` hash), so check where each hit goes. It does not see an attribute held in a variable first (`t = Owner.arel_table` then `where(owner_id: t[:id])`) or one passed to a scope that builds the hash itself (`for_owner(Owner.arel_table[:id])`); search for `arel_table` by hand when the app uses Arel tables that way.
 
 **Fix:**
 ```ruby
@@ -1067,6 +1067,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | ``NoMethodError: undefined method `ago' for 5:Fixnum`` (or `until` / `since` / `from_now`, `for 1.5:Float`, `for 5:Integer` on Ruby 2.4+) | "`Numeric#ago` / `#until` / `#since` / `#from_now` Removed": add a unit: `5.seconds.ago` |
 | A `where` that compared two columns returns no rows; SQL shows `= NULL` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
 | `TypeError: can't cast Arel::Attributes::Attribute to string` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
+| A `where` on a string column returns no rows; SQL shows `= '--- !ruby/struct:Arel::Attributes::Attribute ...'` (mysql2) | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
 
 ---
 
