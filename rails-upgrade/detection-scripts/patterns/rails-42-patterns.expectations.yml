@@ -518,7 +518,7 @@ AREL_UNION_BINDS:
 
 VALIDATE_UNKNOWN_OPTIONS:
   # The multi-line shapes (an argument list continued after a trailing comma,
-  # `validate(` on its own line) are proved with pattern_lab.rb scan, since
+  # `validate(` on its own line) are proved with a scan_patterns.rb run on a model file, since
   # fixtures are single lines.
   match:
     - "  validate :owner_id, presence: true"
@@ -537,7 +537,14 @@ VALIDATE_UNKNOWN_OPTIONS:
     - "  validate :valid_dates?, presence: true"
     - "  validate(presence: true) { errors.add(:base, \"x\") }"
     - "  validate :check,presence:true"
+    # a bad key after a one-line block value that nests another block
+    - "  validate :c, if: -> { errors[:x].any? { |e| e } }, allow_nil: true"
+    - "  validate :c, if: proc { |r| r.x({ b: 1 }) }, allow_nil: true"
   no_match:
+    # keys inside [ ] in a value, and an unquoted ternary label
+    - "  validate :check, if: %w[a: b]"
+    - "  validate :check, if: Flags[feature: :x]"
+    - "  validate :check, unless: x ? y: z"
     - "  validate :check_dates"
     - "  validate :check_dates, :check_other"
     - "  validate :check_dates, on: [:create, :update]"

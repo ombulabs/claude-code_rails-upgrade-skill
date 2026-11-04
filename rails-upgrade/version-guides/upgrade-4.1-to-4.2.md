@@ -258,7 +258,7 @@ validate :dates_in_order,
 validate :dates_in_order, "if" => :ready?
 ```
 
-The `VALIDATE_UNKNOWN_OPTIONS` pattern follows the argument list across lines that end in a comma. A call whose first argument is a validator object, a lambda or a string is skipped, since Rails does not check its options. It cannot see options that come from an enclosing `with_options` block: on 4.2 both `o.validate :x` and a bare `validate :x` inside `with_options allow_blank: true do ... end` go through `ActiveSupport::OptionMerger`, which appends the block's hash, so they raise too. Check every `with_options` block that contains `validate` by hand. A `**opts` splat is not seen either.
+The `VALIDATE_UNKNOWN_OPTIONS` pattern follows the argument list across lines that end in a comma. A call with any positional argument that is not a Symbol (a validator object, a lambda, a string) is skipped: Rails checks the options only when every positional argument is a Symbol. Keys inside a one-line `{ }`, `( )` or `[ ]` value (one level of nesting) and in an unquoted ternary (`unless: x ? y: z`) are skipped too. It cannot see options that come from an enclosing `with_options` block. `o.validate :x` inside `with_options allow_blank: true do |o| ... end` gets the block's hash appended, as on 4.1, so it raises on 4.2. A bare `validate :x` is new trouble on 4.2 only when the block takes no parameter (`with_options allow_blank: true do ... end`): 4.1 yielded and the call went straight to the class, while 4.2 runs the block with `instance_eval` on the option merger, so the call gets the hash and raises. A bare call inside a block that takes a parameter still goes to the class. Check every `with_options` block that contains `validate` by hand. A `**opts` splat is not seen either.
 
 **Fix:**
 ```ruby
@@ -273,7 +273,7 @@ validate :dates_in_order, on: :create
 validates :owner_id, presence: true
 ```
 
-A string key such as `"if" => :ready?` raises too, and it never applied on 4.1, so deleting it keeps the old behavior while `if: :ready?` makes the validation conditional for the first time. For a `with_options` block, move `validate` out of it; when it was called as `o.validate`, carry over any `:on` / `:if` / `:unless` the block gave it.
+A string key such as `"if" => :ready?` raises too, and it never applied on 4.1, so deleting it keeps the old behavior while `if: :ready?` makes the validation conditional for the first time. For a `with_options` block, move `validate` out of it; carry over any `:on` / `:if` / `:unless` the block gave it when it was called as `o.validate`, or bare inside a block with no parameter.
 
 All of these work on 4.1 and 4.2. Ship the switch to `validates` as its own reviewed change, separate from the upgrade, since it starts enforcing a rule the app never enforced.
 
