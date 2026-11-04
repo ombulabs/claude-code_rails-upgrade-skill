@@ -60,7 +60,8 @@
 #    should hold it. When this second regex matches anywhere in a file's
 #    content, every match of the pattern in that file is dropped: the setting
 #    is there. Dropped this way, a site is neither a hit nor "suppressed by
-#    exclude"; the file still counts as scanned. Write the regex so a
+#    exclude"; the file still counts as scanned and is listed in `settled`
+#    (JSON) and under "Setting already present" (markdown). Write the regex so a
 #    commented-out line does not count (`^[ \t]*config\.x[ \t]*=`). It reads
 #    text, not Ruby: a setting inside `=begin`/`=end` or a string still counts.
 
@@ -222,6 +223,7 @@ class Scanner
     present = entry["unless_file_matches"].to_s.empty? ? nil : Regexp.new(entry["unless_file_matches"])
     hits = []
     suppressed = []
+    settled = []
     files.each do |file|
       content = begin
         File.read(file)
@@ -231,12 +233,15 @@ class Scanner
       # Scrub rather than skip: skipping a file with one bad byte reports it
       # as scanned clean.
       content = content.scrub("?") unless content.valid_encoding?
-      next if present && safe_match(present, content, 0)
+      if present && safe_match(present, content, 0)
+        settled << relative(file)
+        next
+      end
       scan_content(content, pattern, exclude).each do |line, text, excluded, start|
         (excluded ? suppressed : hits) << [relative(file), line, text, start]
       end
     end
-    { :files_scanned => files.length, :hits => hits, :suppressed => suppressed }
+    { :files_scanned => files.length, :hits => hits, :suppressed => suppressed, :settled => settled }
   end
 
   def path_only(entry, files)
@@ -552,6 +557,17 @@ def render_markdown(meta, results, opts)
     end
   end
 
+  settled = results.reject { |r| Array(r[:settled]).empty? }
+  unless settled.empty?
+    out << ""
+    out << "## Setting already present"
+    out << ""
+    out << "These file-marker patterns skipped a file because its `unless_file_matches:` found the setting. " \
+           "The check reads only that file: open each entry's explanation for other files that can set or override it."
+    out << ""
+    settled.each { |r| out << "- `#{r[:variable]}`: #{r[:settled].map { |f| "`#{f}`" }.join(', ')}" }
+  end
+
   unless unscanned.empty?
     out << ""
     out << "## UNSCANNED"
@@ -615,7 +631,11 @@ def render_json(meta, results)
           "lines" => [r[:guide_entry][:first], r[:guide_entry][:last]]
         },
         "sites" => r[:hits].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } },
-        "suppressed" => r[:suppressed].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } }
+        "suppressed" => r[:suppressed].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } },
+        # Files skipped because unless_file_matches found the setting. The
+        # status can still be "clean": the explanation names other files
+        # that can override the setting.
+        "settled" => r[:settled] || []
       }
     end
   ) + "\n"
@@ -638,7 +658,7 @@ def run_scan(patterns_path, root)
         :explanation => entry["explanation"], :fix => entry["fix"], :prereqs => entry["prereqs"],
         :exclude => entry["exclude"], :search_paths => entry["search_paths"],
         :files_scanned => r[:files_scanned], :hits => r[:hits], :suppressed => r[:suppressed],
-        :path_only => r[:path_only]
+        :settled => r[:settled] || [], :path_only => r[:path_only]
       }
     end
   end
@@ -724,11 +744,16 @@ def self_test
     "commented out" => ["    # config.active_record.raise_in_transactional_callbacks = true\n",
                         "  # config.active_support.test_order = :random\n", true],
     "set to false" => ["    config.active_record.raise_in_transactional_callbacks = false\n", nil, true],
-    "set" => ["    config.active_record.raise_in_transactional_callbacks = true\n",
+    "set" => ["    config.active_record.raise_in_transactional_callbacks = true if NextRails.next?\n",
               "  config.active_support.test_order = :sorted\n", false],
+    # On the 4.1 side an ungated line is the NoMethodError bug, so it still flags.
+    "set without the NextRails gate" => ["    config.active_record.raise_in_transactional_callbacks = true\n", nil, true],
+    "set behind the wrong gate" => ["    config.active_record.raise_in_transactional_callbacks = true unless NextRails.next?\n", nil, true],
     "set to nil" => [nil, "  config.active_support.test_order = nil\n", true],
+    "left as a comment" => [nil, "  config.active_support.test_order = # TODO\n", true],
+    "compared, not set" => [nil, "  config.active_support.test_order == :random\n", true],
     "set from ENV" => [nil, "  config.active_support.test_order = ENV.fetch('ORDER', 'random').to_sym\n", false],
-    "set behind the NextRails gate" => ["    config.active_record.raise_in_transactional_callbacks = true if NextRails.next?\n", nil, false]
+    "set from a string" => [nil, "  config.active_support.test_order = \"random\".to_sym\n", false]
   }.each do |state, (app_line, test_line, flagged)|
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "config/environments"))
@@ -740,7 +765,7 @@ def self_test
         r = s.scan(e42[var])
         check.call("#{var} with the setting #{state}: want #{flagged ? 'flagged' : 'clean'}, got #{r[:hits].length} hit(s)",
                    r[:hits].length == (flagged ? 1 : 0) && r[:suppressed].empty? && r[:files_scanned] == 1 &&
-                   status_of(r) == (flagged ? "found" : "clean"))
+                   status_of(r) == (flagged ? "found" : "clean") && r[:settled].length == (flagged ? 0 : 1))
       end
     end
   end

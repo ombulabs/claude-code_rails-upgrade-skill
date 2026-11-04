@@ -140,6 +140,11 @@ def validate(path)
           next
         end
 
+        if key == "unless_file_matches" && val =~ /\(\?<?[=!]/
+          errors << "#{label}: unless_file_matches uses look-around; " \
+                    "hint: the Workflow 05 Grep fallback runs this regex as written and Grep rejects look-around, so list the allowed values instead"
+        end
+
         if (ch = val[CONTROL_RE])
           meant = CONTROL_CHARS.fetch(ch, "a doubled backslash")
           errors << "#{label}: #{key} contains control character #{ch.inspect}; " \
@@ -214,12 +219,16 @@ def self_test
 
   absence_control = Marshal.load(Marshal.dump(base))
   absence_control["upgrade_findings"]["high_priority"][0]["unless_file_matches"] = "\bfoo"
+  cases << { name: "control character in unless_file_matches", doc: absence_control, expect: :fail, match: /unless_file_matches contains control character/ }
+
+  absence_look = Marshal.load(Marshal.dump(base))
+  absence_look["upgrade_findings"]["high_priority"][0]["unless_file_matches"] = '^config\.foo = (?!nil)'
+  cases << { name: "look-around in unless_file_matches", doc: absence_look, expect: :fail, match: /unless_file_matches uses look-around/ }
+
   absence_path = Marshal.load(Marshal.dump(base))
   absence_path["upgrade_findings"]["high_priority"][0]["pattern"] = ""
   absence_path["upgrade_findings"]["high_priority"][0]["unless_file_matches"] = "foo"
   cases << { name: "unless_file_matches on a path-based entry", doc: absence_path, expect: :fail, match: /path-based entry .*has no effect/ }
-
-  cases << { name: "control character in unless_file_matches", doc: absence_control, expect: :fail, match: /unless_file_matches contains control character/ }
 
   if Regexp.respond_to?(:timeout)
     slow = Marshal.load(Marshal.dump(base))
