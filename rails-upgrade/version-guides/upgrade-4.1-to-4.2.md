@@ -714,6 +714,39 @@ For a value read from configuration, convert it once where it is read (`setting.
 
 ---
 
+#### Arel `union` / `intersect` Drops Bind Values
+
+**Pattern:** `AREL_UNION_BINDS`
+
+**What Changed:**
+Rails 4.2 keeps the values of `where(column: value)` as bind values on the relation and fills them in only when the query runs. `Relation#union` and `#intersect` (passed through to `Arel::SelectManager`) and `Arel::Nodes::Union` / `UnionAll` / `Intersect` / `Except.new` combine the Arel trees but not their bind values, so the SQL reaches the database with an unfilled placeholder:
+
+- SQLite gets `?`, binds it as `NULL` and silently returns no rows
+- MySQL gets `?` and raises a syntax error near `?`
+- PostgreSQL gets `$1` and raises `there is no parameter $1`
+
+On 4.1 the values were inlined and the same code worked, unless a relation came from an association (`user.posts`), which was already wrong there. No deprecation warning comes first.
+
+The `active_record_union` gem defines its own `Relation#union` / `#union_all` that keep both sets of bind values. If the app uses that gem, its `.union` calls are fine; the pattern cannot tell them apart from the Arel ones.
+
+**Detection Pattern:**
+The `AREL_UNION_BINDS` pattern flags `.union(` / `.intersect(` calls and `Arel::Nodes::Union` / `UnionAll` / `Intersect` / `Except.new`. It skips `Regexp.union`, `Set.new(...).union`, `Set[...].union`, `.to_set.union`, array literals, lodash `_.union` and comment lines. A `Set` or `Array` held in a plain variable is still flagged.
+
+**Fix:**
+```ruby
+# BEFORE (works on 4.1; no rows or a database error on 4.2)
+active   = Post.where(state: "active")
+archived = Post.where(state: "archived")
+Post.from(Post.arel_table.create_table_alias(active.union(archived), :posts).to_sql)
+
+# AFTER (works on 4.1 and 4.2: to_sql quotes and inlines each relation's values)
+Post.from("(#{active.to_sql} UNION #{archived.to_sql}) posts")
+```
+
+Keep `UNION ALL` only where the old code passed `:all`. On 4.1, `to_sql` of a relation built from an association still prints `?`. For those, or to keep a relation instead of a `FROM` string, add `gem 'active_record_union', '~> 1.3'` (1.4 needs Rails 6) and call `active.union(archived)`, which works on 4.1 and 4.2.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Rack Server Bind Host Changed
@@ -959,8 +992,9 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 15. Replace `columns_hash[...].default` and `column_for_attribute(...).default` reads with `column_defaults[...]`; cast a model-less `connection.columns(...)` default with `type_cast_from_database` behind `NextRails.next?`
 16. Replace direct `@attributes` access in models with `read_attribute` / `write_attribute`
 17. Pass a cast type to fake `ConnectionAdapters::Column.new` calls (tableless models, virtual typed fields)
-18. Consider replacing Timecop with `travel_to` (optional)
-19. Consider dropping Foreigner for native FKs (optional)
+18. Rebuild Arel `union` / `intersect` subqueries from each relation's `to_sql`
+19. Consider replacing Timecop with `travel_to` (optional)
+20. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -986,6 +1020,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'type_cast_from_user'` (or `type_cast_from_database`, `type`, `limit`) for a SQL type String such as `"boolean"` | "`ConnectionAdapters::Column.new` Takes a Cast Type Third": pass a cast type on 4.2 |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `there is no parameter $1` or a syntax error near `?` on a `UNION` / `INTERSECT` query, or no rows on SQLite | "Arel `union` / `intersect` Drops Bind Values": build the subquery from `to_sql` |
 | ``NoMethodError: undefined method `fetch_value' for ...:Hash`` on an attribute read | "`@attributes` Is an `AttributeSet`, Not a Hash": stop replacing `@attributes` |
 | ``NoMethodError: undefined method `[]=' for #<ActiveRecord::AttributeSet:0x...>`` (or `merge!`, `fetch`, `delete`) | "`@attributes` Is an `AttributeSet`, Not a Hash": `write_attribute` / `read_attribute` |
 | `@attributes['x']` returns an `ActiveRecord::Attribute` instead of the value | "`@attributes` Is an `AttributeSet`, Not a Hash": `read_attribute_before_type_cast` |
