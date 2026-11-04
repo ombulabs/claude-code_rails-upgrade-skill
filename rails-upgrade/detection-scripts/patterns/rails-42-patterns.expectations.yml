@@ -516,6 +516,51 @@ AREL_UNION_BINDS:
     - "Post.where(id: 1).union_all(Post.where(id: 2))"
     - "trade_union(x)"
 
+AREL_ATTRIBUTE_AS_VALUE:
+  # A key whose value sits on the next line (owner_id:\n  Owner.arel_table[:id])
+  # is matched by the scanner because \s* crosses the newline; fixtures are
+  # single lines, so that case was checked with pattern_lab.rb scan.
+  match:
+    - "Post.where(owner_id: Owner.arel_table[:id])"
+    - "Post.where(:owner_id => Owner.arel_table[:id])"
+    - "  where(\"owner_id\" => Admin::Owner.arel_table[:id])"
+    - "  scope :mine, -> { where(owner_id: arel_table[:id]) }"
+    - "Post.joins(:owner).where(owners: { id: Post.arel_table[:owner_id] })"
+    - "Post.find_by(owner_id: Owner.arel_table[\"id\"])"
+    - "  where(owner_id: self.class.arel_table[:id])"
+    - "  where(owner_id: klass.arel_table[:id])"
+    - "Post.where(owner_id: ::Owner.arel_table[:id])"
+    - "Post.where(\"owner_id\": Owner.arel_table[:id])"
+    - "Post.where('owner_id' => Owner.arel_table[:id])"
+    # accepted false positive: any hash literal with an arel_table value is
+    # flagged, including one not passed to where (a sort-column map)
+    - "SORTS = { name: arel_table[:name] }"
+    # the model's own table as a nested key: works on 4.2, bound on 5.0
+    - "Post.joins(:owner).where(posts: { owner_id: Owner.arel_table[:id] })"
+    # accepted false positive: a hash in a trailing comment after code
+    - "foo # Post.where(owner_id: Owner.arel_table[:id])"
+  no_match:
+    # the fix: an Arel predicate, not a hash value
+    - "Post.where(Post.arel_table[:owner_id].eq(Owner.arel_table[:id]))"
+    - "Post.where(owner_id: Owner.arel_table[:id].eq(1))"
+    - "Post.order(Post.arel_table[:created_at].desc)"
+    - "Post.select(Post.arel_table[:id])"
+    - "Owner.project(Owner.arel_table[:id])"
+    - "Foo::Bar.arel_table[:id]"
+    - "x = cond ? a : Owner.arel_table[:id]"
+    # a ternary with no space before the colon is not a hash key
+    - "x = cond ? a: Owner.arel_table[:id]"
+    - "Post.where(owner_id: owner.id)"
+    # a dotted "table.column" key is not in columns_hash, so 4.2 never binds
+    # it and the column comparison still works (5.0 binds it: next hop)
+    - "Post.where(\"posts.owner_id\" => Owner.arel_table[:id])"
+    - "  # Post.where(owner_id: Owner.arel_table[:id])"
+    # known gaps, stated in the explanation: a hoisted table or attribute and
+    # an attribute passed to a scope argument
+    - "owner_id = Owner.arel_table[:id]"
+    - "Post.where(owner_id: owners[:id])"
+    - "Post.for_owner(Owner.arel_table[:id])"
+
 VALIDATE_UNKNOWN_OPTIONS:
   # The multi-line shapes (an argument list continued after a trailing comma,
   # `validate(` on its own line) are proved with a scan_patterns.rb run on a model file, since
