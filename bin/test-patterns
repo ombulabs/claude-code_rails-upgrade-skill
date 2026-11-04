@@ -22,6 +22,8 @@
 # exclusion (e.g. an `exclude` that suppresses a match based on another line in
 # the same file, like propshaft suppressing sprockets) — express those as a
 # matching line plus a separate no_match line, not via cross-line state.
+# The optional `unless_file_matches:` key is file-level too and is ignored
+# here; `scan_patterns.rb --self-test` covers the patterns that use it.
 #
 # Usage:
 #   bin/test-patterns                       # test every pattern file with expectations
