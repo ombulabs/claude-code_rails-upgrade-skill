@@ -236,6 +236,34 @@ Rails 5.0 changes `constraints` again (it returns the options grouped by kind an
 
 ---
 
+#### Arel Attribute as a Hash-Condition Value Is Cast
+
+**Pattern:** `AREL_ATTRIBUTE_AS_VALUE`
+
+**What Changed:**
+From Rails 4.2.3 on, `where` turns any hash value without a special handler into a bind value cast through the column type (`PredicateBuilder.can_be_bound?` in `create_binds`). An Arel attribute is such a value. So `where(owner_id: Owner.arel_table[:id])`, which compared two columns through 4.1, now casts the attribute: an integer column gets `"posts"."owner_id" = NULL` and the query silently returns no rows, with nothing raised. A string column fails by adapter: sqlite3, which sends bind values, raises `TypeError: can't cast Arel::Attributes::Attribute to string` when the query runs, while mysql2 (no prepared statements on 4.2) quotes the attribute as a YAML string (`= '--- !ruby/struct:Arel::Attributes::Attribute ...'`) and silently returns no rows. Rails 4.2.0 to 4.2.2 still passed the attribute through in `where`, but `gem 'rails', '~> 4.2.0'` installs 4.2.11.3, and class-level `find_by(owner_id: Owner.arel_table[:id])` casts it from 4.2.0, because its statement cache binds every value. Rails 5.0 keeps the 4.2.3 behavior.
+
+**Detection Pattern:**
+```ruby
+Post.where(owner_id: Owner.arel_table[:id])
+where(:owner_id => self.class.arel_table[:id])
+```
+
+`AREL_ATTRIBUTE_AS_VALUE` flags a symbol or quoted hash key (`key:` or `=>`) whose value is `X.arel_table[...]` or a bare `arel_table[...]`, on any receiver. It skips a dotted `"posts.owner_id" =>` key, which 4.2 does not bind; Rails 5.0 binds it, so it breaks on the next hop. It flags a nested hash under the model's own table name (`posts: { owner_id: Owner.arel_table[:id] }`), which also works on 4.2 and breaks on 5.0, so rewrite it now. A hash in a trailing comment after code is flagged too. It also flags a hash that never reaches `where` (a sort-column map, an `update_all` hash), so check where each hit goes. It does not see an attribute held in a variable first (`t = Owner.arel_table` then `where(owner_id: t[:id])`) or one passed to a scope that builds the hash itself (`for_owner(Owner.arel_table[:id])`); search for `arel_table` by hand when the app uses Arel tables that way.
+
+**Fix:**
+```ruby
+# BEFORE (column-to-column on 4.1, owner_id = NULL on 4.2.3+)
+Post.joins(:owner).where(owner_id: Owner.arel_table[:id])
+
+# AFTER (same SQL on 4.1 and 4.2, no conditional needed)
+Post.joins(:owner).where(Post.arel_table[:owner_id].eq(Owner.arel_table[:id]))
+```
+
+Pin each site with a test that checks the query returns rows (or the generated SQL) before the bump.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### HTML Sanitizer Rewritten (Loofah/Nokogiri)
@@ -977,24 +1005,25 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 ### Phase 5: Fix Breaking Changes
 1. Replace `.deliver` / `.deliver!` with `.deliver_now` / `.deliver_now!` (or `.deliver_later` for async)
 2. Replace `.find(obj)` / `.exists?(obj)` with `.find(obj.id)` / `.exists?(obj.id)`
-3. Replace `assert_tag` with `assert_select`
-4. Update `Procfile` with `-b 0.0.0.0` if external access needed
-5. Review HTML sanitizer output in tests
-6. Replace writes into `changed_attributes` with `attribute_will_change!`, or `set_attribute_was` / `clear_attribute_changes` behind `NextRails.next?` (see "Writes into `changed_attributes` Raise")
-7. Add `config.active_record.raise_in_transactional_callbacks = true` (behind `if NextRails.next?` while dual booting) and fix the `after_commit` / `after_rollback` exceptions it surfaces
-8. Add `config.active_support.test_order = :sorted` (or `:random` once the suite passes in random order)
-9. Rename `serve_static_assets` → `serve_static_files`
-10. Add a unit to `ago` / `until` / `since` / `from_now` called on a bare number (`5.ago` → `5.seconds.ago`)
-11. Add the leading slash to integration and request spec paths (`get "/users"`)
-12. If the app patches `Mapper::Mapping` (`normalize_conditions!` and friends), move the custom route options under `defaults:` and drop the patch
-13. Replace one-argument `column.type_cast(value)` with `type_cast_from_database` behind `NextRails.next?`
-14. Replace `ConnectionAdapters::Column.value_to_boolean` and the other removed class-level cast helpers with app-owned casts
-15. Replace `columns_hash[...].default` and `column_for_attribute(...).default` reads with `column_defaults[...]`; cast a model-less `connection.columns(...)` default with `type_cast_from_database` behind `NextRails.next?`
-16. Replace direct `@attributes` access in models with `read_attribute` / `write_attribute`
-17. Pass a cast type to fake `ConnectionAdapters::Column.new` calls (tableless models, virtual typed fields)
-18. Rebuild Arel `union` / `intersect` subqueries from each relation's `to_sql`
-19. Consider replacing Timecop with `travel_to` (optional)
-20. Consider dropping Foreigner for native FKs (optional)
+3. Replace Arel attributes used as hash-condition values with `.eq` predicates
+4. Replace `assert_tag` with `assert_select`
+5. Update `Procfile` with `-b 0.0.0.0` if external access needed
+6. Review HTML sanitizer output in tests
+7. Replace writes into `changed_attributes` with `attribute_will_change!`, or `set_attribute_was` / `clear_attribute_changes` behind `NextRails.next?` (see "Writes into `changed_attributes` Raise")
+8. Add `config.active_record.raise_in_transactional_callbacks = true` (behind `if NextRails.next?` while dual booting) and fix the `after_commit` / `after_rollback` exceptions it surfaces
+9. Add `config.active_support.test_order = :sorted` (or `:random` once the suite passes in random order)
+10. Rename `serve_static_assets` → `serve_static_files`
+11. Add a unit to `ago` / `until` / `since` / `from_now` called on a bare number (`5.ago` → `5.seconds.ago`)
+12. Add the leading slash to integration and request spec paths (`get "/users"`)
+13. If the app patches `Mapper::Mapping` (`normalize_conditions!` and friends), move the custom route options under `defaults:` and drop the patch
+14. Replace one-argument `column.type_cast(value)` with `type_cast_from_database` behind `NextRails.next?`
+15. Replace `ConnectionAdapters::Column.value_to_boolean` and the other removed class-level cast helpers with app-owned casts
+16. Replace `columns_hash[...].default` and `column_for_attribute(...).default` reads with `column_defaults[...]`; cast a model-less `connection.columns(...)` default with `type_cast_from_database` behind `NextRails.next?`
+17. Replace direct `@attributes` access in models with `read_attribute` / `write_attribute`
+18. Pass a cast type to fake `ConnectionAdapters::Column.new` calls (tableless models, virtual typed fields)
+19. Rebuild Arel `union` / `intersect` subqueries from each relation's `to_sql`
+20. Consider replacing Timecop with `travel_to` (optional)
+21. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -1003,6 +1032,7 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 - Test forms with HTML-sanitized content
 - Test any code that caches `form_authenticity_token`
 - Test serialized attributes that may receive `nil`
+- Test queries that compare two columns through `arel_table`
 
 ---
 
@@ -1035,6 +1065,9 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ArgumentError: wrong number of arguments (given N, expected 0)` (or `(N for 0)` before Ruby 2.3) when routes are drawn | "Routing `Mapper::Mapping` Patches Stop Running": a `normalize_defaults!` / `normalize_options!` / `normalize_path!` override needs the 4.2 signature |
 | ``DEPRECATION WARNING: You did not specify a value for the configuration option `active_support.test_order` `` | "`config.active_support.test_order` Not Set", set `:sorted` to keep the 4.1 order |
 | ``NoMethodError: undefined method `ago' for 5:Fixnum`` (or `until` / `since` / `from_now`, `for 1.5:Float`, `for 5:Integer` on Ruby 2.4+) | "`Numeric#ago` / `#until` / `#since` / `#from_now` Removed": add a unit: `5.seconds.ago` |
+| A `where` that compared two columns returns no rows; SQL shows `= NULL` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
+| `TypeError: can't cast Arel::Attributes::Attribute to string` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
+| A `where` on a string column returns no rows; SQL shows `= '--- !ruby/struct:Arel::Attributes::Attribute ...'` (mysql2) | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
 
 ---
 
