@@ -33,6 +33,10 @@ No sub-steps: a "Step 4.1" is either two sequential steps or a conditional branc
   - Workflow 04 file: `workflows/04-setup-next-rails-workflow.md`
 - **rails-load-defaults skill** ([github.com/ombulabs/claude-code_rails-load-defaults-skill](https://github.com/ombulabs/claude-code_rails-load-defaults-skill)) — Handles incremental `load_defaults` updates with tiered risk assessment (Tier 1: low-risk, Tier 2: needs codebase grep, Tier 3: requires human review). Used as the final step after the Rails version upgrade is complete.
 
+**Companion (not required):**
+
+- **rails-roadmap plugin** — Read-only survey of the whole path from the app's current Ruby and Rails to the latest, written to `RAILS_ROADMAP.md`. It is this skill's inverse: it plans every hop without touching anything, where this skill executes one hop at a time. It depends on *this* plugin's pattern catalog and version guides, not the other way round. Point users there when they want scope, an estimate, or a document to take to stakeholders — and especially before they commit to a multi-hop upgrade.
+
 ---
 
 ## Core Methodology (FastRuby.io Approach)

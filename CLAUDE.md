@@ -45,6 +45,12 @@ Inserting a workflow mid-flow renumbers every later file and its inbound links. 
 
 Files that carry a type suffix: `-workflow.md`, `-reference.md`, `-template.md`, `-patterns.yml`. `examples/` and `version-guides/` do not (yet).
 
+- `bin/lint-skill` checks cross-file consistency across all three skill dirs in this repo (`rails-upgrade`, `upgrade-cleanup`, `rails-roadmap`). Pure-stdlib Ruby. Run it before committing any markdown change.
+  - Checks: file-path tokens in prose resolve on disk; no orphaned reference/workflow/template files; the SKILL.md index matches disk; `Step N` headers run 1..N with no gaps; the version-guide hop chain is unbroken; pattern filenames agree with their own `version:` key; and every `.claude-plugin/plugin.json` parses and its `skills` / `commands` paths exist
+  - Lines containing `dual-boot` or `rails-upgrade/` are exempt from the path-resolution check — those are deliberate cross-plugin references
+  - Adding a workflow or reference file means adding it to that skill's SKILL.md index, or the linter fails
+  - Exits 0 on success, 1 on any failure
+
 ## Version guides (`rails-upgrade/version-guides/*.md`)
 
 - **Do NOT include "Difficulty" or "Estimated Time" in the header.** These are subjective, application-dependent, and drift out of date. Keep the header minimal: title, Ruby requirement, and the attribution line.
