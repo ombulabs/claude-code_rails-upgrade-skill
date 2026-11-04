@@ -9,7 +9,8 @@
 # entry's `exclude` regex (when present) does not, a per-line grep + grep -v.
 # The scanner (detection-scripts/scan_patterns.rb) matches whole files instead
 # and tests `exclude` against every line a multi-line match spans, so a
-# multi-line case is proved with pattern_lab.rb scan, not with a fixture.
+# multi-line case is proved with a whole-file scan through scan_patterns.rb,
+# not with a fixture.
 #
 # Run with:
 #   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-42-patterns.yml
@@ -522,7 +523,8 @@ AREL_UNION_BINDS:
 BELONGS_TO_DEPENDENT_DESTROY:
   # Wrapped declarations (trailing comma, a comment line inside, `belongs_to(`
   # newline `:name`, CRLF) are matched by the whole-file scanner and were
-  # proved with pattern_lab.rb scan.
+  # proved with a scan_patterns.rb run on a model file. A commented-out
+  # declaration ending in a comma above a real one no longer starts the match.
   match:
     - "  belongs_to :account, dependent: :destroy"
     # :delete moves to after_destroy too (same handle_dependency callback).

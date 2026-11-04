@@ -451,7 +451,7 @@ belongs_to :account,
   dependent: :destroy
 ```
 
-`BELONGS_TO_DEPENDENT_DESTROY` flags each of these shapes. Each hit is a "check the destroy path", not a bug. It misses a scope lambda whose body spans lines before `dependent:`, so read multi-line `belongs_to :x, -> {` declarations by hand.
+`BELONGS_TO_DEPENDENT_DESTROY` flags each of these shapes. Each hit is a "check the destroy path", not a bug. It misses a scope lambda whose body spans lines before `dependent:` and an option set through `with_options dependent: :destroy do ... end`, so read multi-line `belongs_to :x, -> {` declarations and `with_options` blocks by hand.
 
 **Fix:**
 Default: keep the option and accept the 4.2 order, which every later Rails version keeps. Check each hit for callbacks or tests that depend on the parent being deleted first, or on a failed parent destroy stopping the record's destroy. Pin the order with a spec on the DELETE statements the destroy runs.
@@ -467,7 +467,7 @@ end
 # AFTER: keeps the 4.0/4.1 order on both versions
 class Profile < ActiveRecord::Base
   belongs_to :account
-  before_destroy { account.destroy if account } # account.delete for dependent: :delete
+  before_destroy { account.destroy if account } # use the association's name; account.delete for dependent: :delete
 end
 ```
 
@@ -1076,7 +1076,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `TypeError` or a wrong branch where code reads `columns_hash[...].default` (now a String such as `"604800"` or `"f"`), or `ArgumentError: comparison of String with ...` | "`Column#default` Returns the Raw Database String", read `column_defaults[...]` |
 | `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess` from a model | "Writes into `changed_attributes` Raise": `attribute_will_change!`, `clear_attribute_changes` |
 | `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
-| Parent row deleted after the child, or a child destroy that used to return `false` now succeeds | "`belongs_to` `dependent:` Cascade Runs After the Record's Own Delete", cascade is now `after_destroy` |
+| The `belongs_to` target row is deleted after the record, a `destroy` that used to return `false` now succeeds, or the target row is left behind after the record is gone | "`belongs_to` `dependent:` Cascade Runs After the Record's Own Delete", cascade is now `after_destroy` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
 | `NoMethodError: undefined method 'value_to_boolean' for ActiveRecord::ConnectionAdapters::Column:Class` (or `string_to_time`, `value_to_decimal`, ...) | "`ConnectionAdapters::Column` Class-Level Cast Helpers Removed": app-owned cast |
 | ``NoMethodError: undefined method `type_cast' for #<ActiveRecord::ConnectionAdapters::...Column>`` | "`Column#type_cast` Removed", use `type_cast_from_database` |
