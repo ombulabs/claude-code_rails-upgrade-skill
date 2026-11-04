@@ -727,7 +727,8 @@ def self_test
     "set" => ["    config.active_record.raise_in_transactional_callbacks = true\n",
               "  config.active_support.test_order = :sorted\n", false],
     "set to nil" => [nil, "  config.active_support.test_order = nil\n", true],
-    "set from ENV" => [nil, "  config.active_support.test_order = ENV.fetch('ORDER', 'random').to_sym\n", false]
+    "set from ENV" => [nil, "  config.active_support.test_order = ENV.fetch('ORDER', 'random').to_sym\n", false],
+    "set behind the NextRails gate" => ["    config.active_record.raise_in_transactional_callbacks = true if NextRails.next?\n", nil, false]
   }.each do |state, (app_line, test_line, flagged)|
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "config/environments"))
@@ -741,6 +742,16 @@ def self_test
                    r[:hits].length == (flagged ? 1 : 0) && r[:suppressed].empty? && r[:files_scanned] == 1 &&
                    status_of(r) == (flagged ? "found" : "clean"))
       end
+    end
+  end
+  # TEST_ORDER also flags the <App>::Application.configure form of older apps.
+  [["  config.active_support.test_order = :sorted\n", 0], ["", 1]].each do |line, want|
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "config/environments"))
+      File.write(File.join(dir, "config/environments/test.rb"), "Demo::Application.configure do\n#{line}end\n")
+      r = Scanner.new(dir).scan(e42["TEST_ORDER"])
+      check.call("TEST_ORDER on Demo::Application.configure with #{want.zero? ? 'the setting' : 'no setting'}: want #{want} hit(s), got #{r[:hits].length}",
+                 r[:hits].length == want)
     end
   end
   Dir.mktmpdir do |dir|
