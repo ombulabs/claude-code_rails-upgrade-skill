@@ -1082,7 +1082,7 @@ The pattern matches `Couldn't` and `Couldn\'t`, so single-quoted strings are fla
 #### Automatic `inverse_of` Brings Back the Bidirectional `dependent: :destroy` Loop
 
 **What Changed:**
-Rails 4.1 detects `inverse_of` automatically (`automatic_inverse_of` in `activerecord-4.1.x/lib/active_record/reflection.rb`) for a `has_one` / `has_many` / `belongs_to` pair whose names match and that has no scope, `foreign_key:`, `polymorphic:`, `through:` or `inverse_of: false`. Rails 4.0 never set an inverse unless the app declared one.
+Rails 4.1 detects `inverse_of` automatically (`automatic_inverse_of` in `activerecord-4.1.x/lib/active_record/reflection.rb`) when the association on the other model has the expected name (`Attachment#document` for `Document has_one :attachment`) and neither side has a scope, `foreign_key:`, `polymorphic:`, `through:` or `inverse_of: false`. For a `has_one` pair both sides get the inverse. For a `has_many` pair only the `has_many` side does, on the records it loads, because the `belongs_to` side looks for the singular name (`has_one :attachment`, not `has_many :attachments`). Rails 4.0 never set an inverse unless the app declared one.
 
 That breaks the 4.0 workaround for a reciprocal `dependent: :destroy` pair (3.2 to 4.0 guide, "Bidirectional `dependent: :destroy` Now Recurses Forever") when it was applied without the instance flag:
 
@@ -1101,10 +1101,10 @@ class Document < ActiveRecord::Base
 end
 ```
 
-On 4.0 the second pass re-reads `attachment.document` from the database and gets `nil`. On 4.1 the detected inverse hands back the same in-memory `Document`, its callbacks run again, and `destroy` raises `SystemStackError`. Run on activerecord 4.0.13 and 4.1.16 with SQLite, this shape terminates on 4.0 and recurses on 4.1 from either side; it terminates on both with the flag below or with `inverse_of: false` on both associations. It keeps recursing on 4.2 (which moves the `belongs_to` cascade back to `after_destroy`) and stops only on 5.0.
+On 4.0 the second pass re-reads `attachment.document` from the database and gets `nil`, unless both records were already linked in memory (`Attachment.create!(document: document)` followed by `document.attachment = attachment`), which recursed on 4.0 too. On 4.1 the detected inverse hands back the same in-memory `Document`, its callbacks run again, and `destroy` raises `SystemStackError`. Run on activerecord 4.0.13 and 4.1.16 with SQLite, this shape terminates on 4.0 and recurses on 4.1 from either side; it terminates on both with the flag below or with `inverse_of: false` on both associations. It keeps recursing on 4.2 (which moves the `belongs_to` cascade back to `after_destroy`) and stops only on 5.0.
 
 **Detection Pattern:**
-`BELONGS_TO_DEPENDENT_AUTO_INVERSE` in `rails-41-patterns.yml` flags the `belongs_to ..., dependent: :destroy` side. A regex cannot see the other model, so for each hit check whether the target model destroys this record back from an `after_destroy` without a guard.
+`BELONGS_TO_DEPENDENT_AUTO_INVERSE` in `rails-41-patterns.yml` flags the `belongs_to ..., dependent: :destroy` side. It skips a declaration that turns automatic detection off (`polymorphic:`, `foreign_key:`, `inverse_of: false`, a scope lambda), since 4.1 changes nothing for it. A regex cannot see the other model, so a `foreign_key:` or scope on the other side is not seen either; so for each hit check whether the target model destroys this record back from an `after_destroy` without a guard.
 
 **Fix:**
 ```ruby
@@ -1125,7 +1125,7 @@ def destroy_attachment
 end
 ```
 
-Once the cascade is in `after_destroy`, `inverse_of: false` on both associations also stops the loop, but it gives up the in-memory inverse for every other caller, so prefer the flag. It does not help a pair that still has `dependent: :destroy` on both sides: there the `belongs_to` cascade is a `before_destroy` on 4.1, and the pair recurses with or without an inverse.
+Once the cascade is in `after_destroy`, `inverse_of: false` on both associations also stops the loop, but it gives up the in-memory inverse for every other caller, so prefer the flag. With an inverse (automatic on 4.1 and 4.2), or when the records are already linked in memory, the guarded version still calls `destroy` a second time on the record that started the delete. The row is already gone, so nothing is deleted twice, but that model's other `before_destroy` / `after_destroy` callbacks run twice (seen on 4.0.13, 4.1.16 and 4.2.11.3). Make those callbacks safe to run twice (an audit row, a webhook, a file cleanup), or skip them with `return if destroyed?` in a `before_destroy`. It does not help a pair that still has `dependent: :destroy` on both sides: there the `belongs_to` cascade is a `before_destroy` on 4.1, and the pair recurses with or without an inverse.
 
 ---
 
