@@ -126,23 +126,31 @@ User.exists?(current_user.id)
 **Pattern:** `TRANSACTIONAL_CALLBACKS`
 
 **What Changed:**
-Exceptions raised in `after_commit` or `after_rollback` callbacks are still silently rescued by default in 4.2, but Rails now emits a deprecation warning. Rails 5.0+ removes the suppression entirely and always raises.
+Exceptions raised in `after_commit` or `after_rollback` callbacks are still rescued and logged by default in 4.2. While `config.active_record.raise_in_transactional_callbacks` is `false` (the 4.2 default), Rails emits a deprecation warning for every `after_commit` / `after_rollback` declaration as each model class loads, so a model with three such callbacks warns three times. Rails 5.0 removes the suppression and always raises.
+
+The setting is new in 4.2. Rails 4.1 has no `ActiveRecord::Base.raise_in_transactional_callbacks=`, and its `active_record.set_configs` initializer sends every `config.active_record` key to `ActiveRecord::Base` when it loads. An unconditional line therefore breaks the 4.1 side of a dual-boot app as soon as `ActiveRecord::Base` loads: at boot when `eager_load` is true (production), at the first model reference otherwise (development and test, so `rails runner 'puts Rails.version'` can still pass):
+
+```
+NoMethodError: undefined method `raise_in_transactional_callbacks=' for #<Class:0x...>
+```
+
+Setting it to `true` is a behavior change, not only a way to silence the warning: callback exceptions then propagate out of `save` / `transaction` (after the database commit) instead of being logged, so tests or requests that passed before can fail.
 
 **Detection Pattern:**
-Missing configuration:
-```ruby
-# config/application.rb
-config.active_record.raise_in_transactional_callbacks = true
-```
+The `TRANSACTIONAL_CALLBACKS` pattern flags `config/application.rb` itself, because a missing setting cannot be grepped. Open it and check the setting is present and gated.
 
 **Fix:**
-Opt into the Rails 5.0 behavior to surface callback bugs now:
 ```ruby
-# config/application.rb
+# BEFORE (config/application.rb): raises NoMethodError on Rails 4.1
 config.active_record.raise_in_transactional_callbacks = true
+
+# AFTER (config/application.rb): works on 4.1 and 4.2
+config.active_record.raise_in_transactional_callbacks = true if NextRails.next?
 ```
 
-Without this flag, bugs in transactional callbacks become silent warnings that you'll have to address in the Rails 5.0 hop anyway.
+A direct `ActiveRecord::Base.raise_in_transactional_callbacks = true` in an initializer fails on 4.1 the same way and needs the same `if NextRails.next?`. Without next_rails (a single-Gemfile bump), set the line without the condition in the commit that moves to 4.2.
+
+Then run the suite on 4.2 and fix each `after_commit` / `after_rollback` exception that now propagates. Once the app runs only on 4.2, drop the `if NextRails.next?`. Without the flag, bugs in transactional callbacks stay hidden in the log until the Rails 5.0 hop, where they raise anyway.
 
 ---
 
@@ -166,6 +174,65 @@ assert_tag :tag => "a", :attributes => { :href => "/foo" }
 # AFTER
 assert_select "a[href='/foo']"
 ```
+
+---
+
+#### Routing `Mapper::Mapping` Patches Stop Running
+
+**Pattern:** `MAPPER_NORMALIZE_CONDITIONS`
+
+**What Changed:**
+Rails 4.2 rewrote the private `ActionDispatch::Routing::Mapper::Mapping`. On 4.0 and 4.1, `normalize_conditions!` builds each route's `required_defaults`: every option that is not a `Regexp`, a path segment or an ignored option. Apps patch it to keep custom route options (authorization metadata, for instance) out of `required_defaults`, so `url_for(controller: ..., action: ...)` without the named helper still finds the route. On 4.2:
+- `normalize_conditions!`, `normalize_requirements!` and `default_controller_and_action` are gone. `required_defaults` is built in a new private `constraints(options, path_params)`.
+- `normalize_defaults!`, `normalize_options!` and `normalize_path!` now take arguments.
+
+What the app sees depends on how the patch hooks in:
+- `alias_method` / `alias_method_chain` on a removed method: ``NameError: undefined method `normalize_conditions!' for class `ActionDispatch::Routing::Mapper::Mapping'`` at boot.
+- Reopen or `prepend` overriding a removed method: the override never runs, the custom option is required again, and `url_for` raises `ActionController::UrlGenerationError`. Nothing fails at boot.
+- A zero-argument override of `normalize_defaults!`, `normalize_options!` or `normalize_path!`: `ArgumentError: wrong number of arguments (given 1, expected 0)` on Ruby 2.3 and later, `(1 for 0)` on earlier Rubies (2 for `normalize_path!`, 5 for `normalize_options!`), when routes are drawn.
+- An `initialize` override: 4.2 calls `Mapping.new(scope, set, path, defaults, as, options)` instead of `(set, scope, path, options)`, so a four-argument override raises `ArgumentError` when routes are drawn. The `scope`, `path` and `options` readers are gone, so a hook that reads `options[:authorize]` raises `NameError`.
+
+**Detection Pattern:**
+`MAPPER_NORMALIZE_CONDITIONS` flags the removed method names, `Routing::Mapper::Mapping` references and a `Mapping` reopen nested in `module Routing` / `class Mapper` (or written `class Mapper::Mapping` inside `module Routing`), in `app/`, `lib/` and `config/`. The `NextRails.next?` fallback below keeps matching until its 4.1 branch is removed. A bare `Mapper::Mapping` constant written inside `module Routing`, or a nested reopen with other code between `class Mapper` and `class Mapping`, is missed unless it names a removed method.
+
+**Fix:**
+Prefer dropping the patch. Options passed under `defaults:` land in `params` but never become required defaults, on 4.1 and 4.2 alike:
+```ruby
+# BEFORE (needs the Mapping patch so url_for ignores :authorize)
+get "/posts/:id" => "posts#show", as: :post, authorize: :admin
+
+# AFTER (no patch; scope defaults: { authorize: :admin } works the same way)
+get "/posts/:id" => "posts#show", as: :post, defaults: { authorize: :admin }
+```
+
+If the patch must stay, hook the method each side has. Hooking `constraints` on 4.1 raises `ArgumentError` when routes are drawn, so pick it with `NextRails.next?`. An override of `normalize_defaults!`, `normalize_options!` or `normalize_path!` gets the same treatment with the 4.2 signature. `Module#prepend` needs Ruby 2.0; on 1.9.3 use `alias_method_chain` inside the same branches:
+```ruby
+# config/initializers/route_options.rb
+module RouteOptionsOutOfRequiredDefaults
+  CUSTOM_ROUTE_OPTIONS = [:authorize]
+
+  if NextRails.next?
+    private
+
+    def constraints(options, path_params)
+      result = super
+      @conditions[:required_defaults] -= CUSTOM_ROUTE_OPTIONS
+      result
+    end
+  else
+    private
+
+    def normalize_conditions!
+      super
+      @conditions[:required_defaults] -= CUSTOM_ROUTE_OPTIONS
+    end
+  end
+end
+
+ActionDispatch::Routing::Mapper::Mapping.send(:prepend, RouteOptionsOutOfRequiredDefaults)
+```
+
+Rails 5.0 changes `constraints` again (it returns the options grouped by kind and no longer writes `@conditions`), so a 4.2 hook breaks at the next hop. Move to `defaults:` before then.
 
 ---
 
@@ -243,26 +310,176 @@ Review code and tests that relied on the coder's nil representation. If you need
 
 ---
 
-#### `config.active_support.test_order` Required
+#### `Column#default` Returns the Raw Database String
+
+**Pattern:** `COLUMN_DEFAULT_RAW`
+
+**What Changed:**
+Through 4.1, `Column#initialize` typed the default with `extract_default`, so `Model.columns_hash["ttl"].default` was an `Integer` and a boolean column's default was `true` / `false`. From 4.2.0 the column keeps the string the adapter read from the schema and casting moved to the attribute types, so `.default` returns `"604800"`, and `"f"` for a false boolean on SQLite. Nothing warns. Arithmetic on it raises (`Time.now - default` gives `TypeError: can't convert String into an exact number`), `<` / `>` against an Integer raise `ArgumentError: comparison of String with 3 failed`, `==` against a number or a boolean quietly returns false, and a false boolean default is now a non-empty String, so it is truthy. `Model.column_defaults` is unaffected for plain columns: it returns typed values on 4.0, 4.1 and 4.2.
+
+**Detection Pattern:**
+The `COLUMN_DEFAULT_RAW` pattern flags `.default`, `&.default` and `try` / `send` / `public_send` with `:default` read off `columns_hash[...]` (also `columns_hash(table)[...]` on the schema cache), `columns_hash.fetch(...)`, `column_for_attribute(...)`, a one-line `columns.find { }` / `detect { }` block, `columns.index_by(&:name)[...]`, and `column`, `@column` or `self.column`. It skips `.default.nil?`, which still works. A block variable with another name (`columns.each { |c| c.default }`) or a receiver-qualified `field.column.default` is not flagged, so also review loops over `columns` and wrappers that hold a column.
+
+**Fix:**
+```ruby
+# BEFORE (typed on 4.1, a String on 4.2)
+expires_at = created_at + self.class.columns_hash["ttl"].default
+active = Thing.columns_hash["active"].default
+
+# AFTER (typed on 4.0, 4.1 and 4.2, no conditional needed)
+expires_at = created_at + self.class.column_defaults["ttl"]
+active = Thing.column_defaults["active"]
+```
+
+On 4.2 `column_defaults` goes through the model's attribute types, so a `serialize`d column's default comes back deserialized there. Check those columns on both versions.
+
+For a column read from `connection.columns(table)`, which no model types, cast on 4.2 only:
+
+```ruby
+default = NextRails.next? ? column.type_cast_from_database(column.default) : column.default
+```
+
+---
+
+#### `ConnectionAdapters::Column` Class-Level Cast Helpers Removed
+
+**Pattern:** `COLUMN_CAST_CLASS_METHODS`
+
+**What Changed:**
+Rails 4.2 moved type casting into `ActiveRecord::Type` and dropped the `class << self` block of `ActiveRecord::ConnectionAdapters::Column`. On 4.1 these are public class methods: `value_to_boolean`, `value_to_integer`, `value_to_decimal`, `value_to_date`, `string_to_time`, `string_to_dummy_time`, `binary_to_string`. Seven more are protected on 4.1 and reachable only through `send` or `method`: `new_date`, `new_time`, `fast_string_to_date`, `fast_string_to_time`, `fallback_string_to_date`, `fallback_string_to_time`, `microseconds`. The `PostgreSQLColumn::Cast` helpers (`string_to_hstore`, `string_to_json`, `string_to_array`, `hstore_to_string` and the rest) and the `Cast` module itself go too. Every caller raises `NoMethodError` on 4.2, except `try`, which returns `nil` without a word. 4.1 emits no deprecation warning first. The usual caller is `value_to_boolean`, used to cast checkbox and flag params.
+
+**Detection Pattern:**
+The `COLUMN_CAST_CLASS_METHODS` pattern flags these calls on `Column` (the full constant path, a bare `Column` after `include ActiveRecord::ConnectionAdapters`, `Mysql2Adapter::Column`, `MysqlAdapter::Column.string_to_date`), `PostgreSQLColumn` and `SQLite3Column`, called directly or through `send`, `__send__`, `public_send`, `try` or `method`. App classes such as `ReportColumn` or `Reports::Column` are skipped. It misses calls through `column.class` or `self.class` and bare calls inside a `Column` subclass.
+
+**Fix:**
+Replace each call with app-owned code. It runs on 4.1 and 4.2 alike, so no `NextRails.next?` branch is needed. Do not reach for `ActiveRecord::Type::Boolean` (absent on 4.1, renamed methods on 5.0, and on 4.2 it logs a deprecation for any value outside its true and false lists) or `Column::TRUE_VALUES` (removed in 5.0).
+
+```ruby
+# BEFORE
+archived = ActiveRecord::ConnectionAdapters::Column.value_to_boolean(params[:archived])
+
+# AFTER (same results as the 4.1 helper)
+require "set"
+
+module BooleanCast
+  # A Set, like 4.1: it compares with eql?, so 1.0 and BigDecimal("1") stay false
+  TRUE_VALUES = [true, 1, "1", "t", "T", "true", "TRUE", "on", "ON"].to_set.freeze
+
+  def self.call(value)
+    return nil if value.is_a?(String) && value.empty?
+    TRUE_VALUES.include?(value)
+  end
+end
+
+archived = BooleanCast.call(params[:archived])
+```
+
+For the other helpers:
+- `value_to_integer(v)`: map `true` / `false` to `1` / `0`, otherwise `(v.to_i rescue nil)`, since 4.1 returned `nil` for a value with no `to_i`.
+- `value_to_decimal(v)`: `v.respond_to?(:to_d) ? v.to_d : v.to_s.to_d` after `require "bigdecimal/util"`.
+- `value_to_date`, `string_to_time`, `string_to_dummy_time` and the protected helpers they call: copy the method bodies from activerecord 4.1.16 `connection_adapters/column.rb` into an app module, together with the `Format::ISO_DATE` / `ISO_DATETIME` regexes (removed in 5.0), and spell `Base.default_timezone` as `ActiveRecord::Base.default_timezone`. `ActiveSupport::TimeZone#parse` is not a drop-in: it raises `ArgumentError` for `"2014-13-01 10:00"`, rolls `"2014-02-30"` over to March 2, fills in today for `"10:20"`, and turns `"2014-01-01T23:00:00-05:00"` into January 2 where `value_to_date` returned January 1. On those inputs the helpers returned `nil` or the written date.
+- `binary_to_string(v)` on the base `Column` returns its argument: drop the call.
+- A call on an adapter subclass (`SQLite3Column.binary_to_string`, `PostgreSQLColumn.string_to_time`, the MySQL `Column.string_to_time` / `string_to_date`, the `PostgreSQLColumn::Cast` helpers): copy that subclass override instead. SQLite3 forces `ASCII-8BIT`, and PostgreSQL maps `"infinity"` to `Float::INFINITY`.
+
+Pin the replacement with a spec that covers every input the old helper saw.
+
+---
+
+#### Writes into `changed_attributes` Raise
+
+**Pattern:** `CHANGED_ATTRIBUTES_WRITE`
+
+**What Changed:**
+On Active Record models, `changed_attributes` returns a frozen copy from Rails 4.2.0 (`super.reverse_merge(attributes_changed_in_place).freeze` in `attribute_methods/dirty.rb`). Through 4.1 it returned the live hash, and apps wrote into it to mark a virtual attribute as changed (so save callbacks or versioning gems run) or to drop a change before saving. On 4.2, `changed_attributes[name] = value`, `.delete`, `.merge!`, `.store`, `.clear`, `.except!` and the other in-place Hash writers raise `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess`. Reads are unaffected, and so is a plain `ActiveModel::Dirty` class, whose `changed_attributes` is not frozen.
+
+**Detection Pattern:** `CHANGED_ATTRIBUTES_WRITE` flags element writes and in-place Hash writers on `changed_attributes`. It skips reads, copies (`.dup.delete`), the `@changed_attributes` instance variable and any line that mentions `NextRails.next?`, so the one-line dual-boot form below scans clean. A hit in a non-Active Record class, on a local variable with the same name, or inside a string needs no change. Writes through indirection are missed: `send(:changed_attributes)`, a `tap` block, or a copy of the reference (`h = changed_attributes` then `h.delete(k)`).
+
+**Fix:**
+`attribute_will_change!` exists on both versions and records what the reader returns now as the old value (nil when there is no reader). It does nothing when the attribute is already changed, so the first old value is kept. Where the old code wrote some other value, use `set_attribute_was` instead. Recording a specific old value and dropping a change use private `ActiveModel::Dirty` methods that only exist from 4.2, so branch on the Rails version until the upgrade ships:
+```ruby
+# BEFORE (raises on 4.2)
+def tag_list=(value)
+  changed_attributes["tag_list"] = @tag_list unless value == @tag_list
+  @tag_list = value
+end
+
+def skip_timestamp_change
+  changed_attributes.delete("updated_at")
+end
+
+# AFTER (4.1 and 4.2)
+def tag_list=(value)
+  attribute_will_change!("tag_list") unless value == @tag_list
+  @tag_list = value
+end
+
+def skip_timestamp_change
+  NextRails.next? ? clear_attribute_changes(["updated_at"]) : changed_attributes.delete("updated_at")
+end
+
+# A specific old value
+NextRails.next? ? set_attribute_was(name, old) : changed_attributes[name] = old
+
+# From another object: the 4.2 methods are private
+NextRails.next? ? record.send(:clear_attribute_changes, [:token]) : record.changed_attributes.delete(:token)
+```
+`clear_attribute_changes` drops only a change recorded through a setter. On 4.2 a serialized or JSON column that was mutated in place (`prefs["x"] = 1`) stays in `changes` and is still written on save.
+
+---
+
+#### Integration Test Paths Need a Leading Slash
+
+**Pattern:** `INTEGRATION_RELATIVE_PATH`
+
+**What Changed:**
+Integration sessions (`ActionDispatch::IntegrationTest`, RSpec request specs) now build the request URI as a string: scheme, host and port, then the path as given (`Integration::Session#build_full_uri`, new in 4.2.0). Rails 4.1 resolved the path against `/` with `URI#+`, so `get "users"` worked by accident. On 4.2 the same call requests `http://www.example.com:80users` and rack-test raises `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` (Ruby 2.x wording). The actionpack 4.2.0 CHANGELOG lists it: the leading slash is now required in the integration test `process` helpers. A path that starts with `?` or `#`, and a full URL, still work. Specs that include `Rack::Test::Methods` directly (Grape or Sinatra apps) are not affected, since rack-test adds the slash itself.
+
+**Detection Pattern:**
+The pattern flags `get`/`post`/`put`/`patch`/`delete`/`head` (and the `xhr`, `xml_http_request`, `*_via_redirect` forms, where the path is the second argument) whose path is a string literal with no leading slash, in `spec/requests/`, `spec/integration/`, `spec/api/` and `test/integration/`. It skips rswag-style `get "List users" do` blocks, symbols, path helpers and variables. It misses a path that starts with interpolation (`get "#{id}/edit"`), a request used as an expression (`expect(get "users")`), a request followed by a block, calls on a session object (`sess.get "users"`) and request helpers in `spec/support/` or `test/support/` (left out because controller shared examples there pass action names such as `get "show"`): search those by hand.
+
+**Fix:**
+```ruby
+# BEFORE
+get "users", format: :json
+xhr :post, "comments", body: "x"
+
+# AFTER (works on 4.1 and 4.2)
+get "/users", format: :json
+xhr :post, "/comments", body: "x"
+# or a path helper
+get users_path(format: :json)
+```
+
+---
+
+
+
+---
+
+#### `config.active_support.test_order` Not Set
 
 **Pattern:** `TEST_ORDER`
 
 **What Changed:**
-Rails 4.2 emits a deprecation warning when `test_order` is not explicitly set. The default becomes `:random`.
+Rails 4.2 adds `config.active_support.test_order`. When it is not set, `ActiveSupport::TestCase` keeps the 4.1 order (`:sorted`, alphabetical) and prints a deprecation warning saying the default becomes `:random` in Rails 5. The warning comes from `ActiveSupport::TestCase.test_order`, which runs only when Minitest runs an `ActiveSupport::TestCase` subclass, so a suite that is RSpec only may never print it. Set the option anyway: the 4.2 to 5.0 hop changes the default.
 
 **Detection Pattern:**
-Missing setting in `config/environments/test.rb`.
+The `TEST_ORDER` pattern cannot detect a missing setting, so it flags the configure block of `config/environments/test.rb` for manual review. It matches both `Rails.application.configure do` (generated by Rails 4.1 and later) and `<App>::Application.configure do` (generated by Rails 4.0 and earlier, kept by apps that never regenerated the file). Open the file and check for `test_order`; an app may instead set `ActiveSupport::TestCase.test_order = ...` in `test/test_helper.rb`, which also counts on 4.2. Do not add the setting that way during the dual boot: 4.1 has no `ActiveSupport::TestCase.test_order=`, so that line raises `NoMethodError` on the 4.1 side. The `config.active_support` form below works on both.
 
 **Fix:**
 ```ruby
 # config/environments/test.rb
+Rails.application.configure do # or MyApp::Application.configure do
+  # Keep the 4.1 order during the upgrade
+  config.active_support.test_order = :sorted
 
-# Run tests in random order (recommended)
-config.active_support.test_order = :random
-
-# Or preserve 4.1's implicit sorted behavior
-# config.active_support.test_order = :sorted
+  # Or opt into the 4.2 generator value and the Rails 5 default
+  # once the suite passes in random order
+  # config.active_support.test_order = :random
+end
 ```
+
+The line works on both sides of the dual boot with no conditional. On 4.1 the `active_support.set_configs` initializer skips any key that `ActiveSupport` has no setter for, and 4.1 has no `ActiveSupport.test_order=`, so the line is ignored there.
 
 ---
 
@@ -327,6 +544,234 @@ form_authenticity_token
 
 **Fix:**
 Rails form helpers handle masking automatically. If you build forms outside Rails (e.g., a static page posting to your app), fetch the token per request rather than caching it.
+
+---
+
+#### `ConnectionAdapters::Column.new` Takes a Cast Type Third
+
+**Pattern:** `COLUMN_NEW_SQL_TYPE_ARG`
+
+**What Changed:**
+`ActiveRecord::ConnectionAdapters::Column#initialize` changes from `(name, default, sql_type = nil, null = true)` to `(name, default, cast_type, sql_type = nil, null = true)`, and the column hands `type`, `limit`, `precision`, `scale` and every cast (`type_cast_from_user`, `type_cast_from_database`, ...) to `cast_type`. `AbstractMysqlAdapter::Column` takes the same arguments (4.2 drops the `Mysql2Adapter::Column` and `MysqlAdapter::Column` subclasses, so those names resolve to it). Code that builds fake columns, such as the tableless-model recipe or a virtual typed field appended to a real model's `columns`, still loads, but the SQL type string now lands in `cast_type`, so the first assignment, read or column lookup raises:
+
+```
+NoMethodError: undefined method `type_cast_from_user' for "boolean":String
+```
+
+(or `type_cast_from_database`, `type`, `limit`, depending on what touches the column first).
+
+**Detection Pattern:**
+The `COLUMN_NEW_SQL_TYPE_ARG` pattern flags every `ConnectionAdapters::Column.new` call outside comments. A call split before `.new` is matched by the whole-file scanner. A splat call, `Column.new(*args)`, is skipped because it is the shape the fix below uses: check any other splat call by hand. It misses a bare `Column.new` reached through a reopened or included `ConnectionAdapters` module or a constant alias, so also search the tableless models for `Column.new` by hand.
+
+**Fix:**
+Build the cast type yourself on 4.2 and keep the old call on 4.1. `ActiveRecord::Type` does not exist on 4.1, so the branch is needed while both versions boot. Do not use `connection.lookup_cast_type`: it needs a database connection at class load, and on PostgreSQL it runs `SELECT 'string'::regtype::oid`, which raises for `string`.
+
+```ruby
+# BEFORE
+def self.column(name, sql_type = nil, default = nil, null = true)
+  columns << ActiveRecord::ConnectionAdapters::Column.new(name.to_s, default, sql_type.to_s, null)
+end
+
+# AFTER
+VIRTUAL_CAST_TYPES = {
+  "boolean" => "Boolean", "integer" => "Integer", "date" => "Date",
+  "datetime" => "DateTime", "timestamp" => "DateTime", "time" => "Time",
+  "decimal" => "Decimal", "float" => "Float", "binary" => "Binary",
+  "string" => "Value", "text" => "Value", "" => "Value"
+}.freeze
+
+def self.column(name, sql_type = nil, default = nil, null = true)
+  args = [name.to_s, default, sql_type.to_s, null]
+  if NextRails.next?
+    # 4.2 takes a cast type before sql_type; "string(255)" looks up "string"
+    type_name = VIRTUAL_CAST_TYPES.fetch(sql_type.to_s.sub(/\(.*/, ""))
+    args.insert(2, ActiveRecord::Type.const_get(type_name).new)
+  end
+  columns << ActiveRecord::ConnectionAdapters::Column.new(*args)
+end
+```
+
+`string`, `text` and untyped fields map to `ActiveRecord::Type::Value`, which casts nothing, as 4.1 did for them (`Type::String` would call `to_s` on an Array kept in the field). `Value#type` is `nil`, so a form builder or other code that reads `column.type` (to pick a textarea for `text`, for example) gets `nil` where 4.1 gave `:string` or `:text`: map those fields to `ActiveRecord::Type::String` / `Type::Text` if that matters, accepting that they call `to_s`. An undeclared type (`varchar`, `json`) raises `KeyError` at class load instead of failing later: add it to the map. After the upgrade, drop the `NextRails.next?` branch and pass the cast type directly.
+
+A table-backed model can instead declare the field with the 4.2 class method `attribute :flag, ActiveRecord::Type::Boolean.new` (absent on 4.0 and 4.1). A set `attribute` with no table column still goes into the INSERT on 4.2.0, and on later 4.2 releases when `partial_writes` is off. The long-term replacement is the Rails 5.0 attributes API.
+
+---
+
+#### `@attributes` Is an `AttributeSet`, Not a Hash
+
+**Pattern:** `ATTRIBUTES_IVAR_REPLACE`
+
+**What Changed:**
+Through 4.1 a record kept its raw column values in `@attributes`, a plain Hash. Rails 4.2.0 replaces it with `ActiveRecord::AttributeSet`, which keeps `[]`, `key?`, `keys` and `to_hash` but drops the rest of the Hash API (`[]=`, `fetch`, `merge!`, `delete`, `each` and so on). Code that reaches into the instance variable breaks:
+
+- Swapping in a Hash (`instance_variable_set(:@attributes, attributes.merge(extra))` or `@attributes = ...`, usually in `after_initialize` to make extra non-column keys readable) fails on the first attribute read with ``NoMethodError: undefined method `fetch_value' for ...:Hash``.
+- Writes (`@attributes['x'] = v`, `merge!`, `update`, `store`, `delete`) and Hash reads such as `fetch` raise `NoMethodError` on `ActiveRecord::AttributeSet`.
+- `@attributes['x']` still works but returns an `ActiveRecord::Attribute` object instead of the value, so a comparison or presence check on it is silently wrong.
+
+**Detection Pattern:**
+```ruby
+class Post < ActiveRecord::Base
+  after_initialize { instance_variable_set(:@attributes, attributes.merge("extra" => 1)) }
+
+  def legacy_title
+    @attributes["title"]
+  end
+end
+```
+
+The pattern flags every direct `@attributes` reference in `app/models/` and `config/initializers/`. A plain Ruby class with its own `@attributes` Hash (a form object or a tableless model in `app/models/`) is unaffected: check that each hit is inside an ActiveRecord model or a patch to one. The pattern does not scan `lib/` or the rest of `app/`, where plain Ruby classes with their own `@attributes` are common. Search those by hand for ActiveRecord patches and for `instance_variable_get(:@attributes)` on a record (this skips `app/models/`, which the scanner already covered, and comment lines):
+```bash
+grep -rnE "(^|[^@[:alnum:]_])@attributes([^[:alnum:]_]|$)" lib app --include="*.rb" --exclude-dir=models \
+  | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#'
+```
+
+**Fix:**
+Use the public attribute API, which behaves the same on 4.1 and 4.2, so no `NextRails.next?` branch is needed:
+```ruby
+# BEFORE
+def legacy_title
+  @attributes["title"]
+end
+
+def title=(value)
+  @attributes["title"] = value.upcase
+end
+
+# AFTER
+def legacy_title
+  read_attribute_before_type_cast(:title)  # or read_attribute(:title) for the cast value
+end
+
+def title=(value)
+  write_attribute(:title, value.upcase)
+end
+```
+
+For extra non-column values, keep them out of `@attributes`:
+```ruby
+# BEFORE
+after_initialize do
+  instance_variable_set(:@attributes, attributes.merge("extra" => compute_extra))
+end
+
+# AFTER
+after_initialize :load_extra
+attr_accessor :extra
+
+def reload(*)
+  super.tap { load_extra }
+end
+
+# becomes (and becomes!) builds the new record with klass.new, so
+# after_initialize runs on blank attributes: copy the value across
+def becomes(klass)
+  super.tap { |record| record.extra = extra if record.respond_to?(:extra=) }
+end
+
+# only if callers expect the value in attributes (serializers, audit gems)
+def attributes
+  super.merge("extra" => extra)
+end
+
+private
+
+def load_extra
+  self.extra = compute_extra
+end
+```
+
+With this shape, `record.extra` and `attributes["extra"]` keep working, but `record[:extra]` and `read_attribute(:extra)` return `nil` on both versions. Search for those call forms and switch them to `record.extra`.
+
+Do not call `attribute_will_change!` for the extra name: on 4.2 the partial `UPDATE` then includes it and fails with an unknown-column error: `no such column` on SQLite, `column "extra" of relation ... does not exist` on PostgreSQL, `Unknown column 'extra'` on MySQL. If saving must react to a change in the extra value, track that change yourself.
+
+---
+
+#### `Column#type_cast` Removed
+
+**Pattern:** `COLUMN_TYPE_CAST_INSTANCE`
+
+**What Changed:**
+Rails 4.2 removes the public instance method `ActiveRecord::ConnectionAdapters::Column#type_cast(value)`. A 4.2 column hands casting to its `cast_type` and exposes it as `type_cast_from_database` and `type_cast_from_user` (both new in 4.2). `Type::Value#type_cast` is private, so `column.type_cast(value)` raises `NoMethodError`. The usual caller casts a param or a calculation result through `Model.columns_hash[name].type_cast(value)`.
+
+The two-argument `connection.type_cast(value, column)` quoting method is a different API, still present on 4.2, and the pattern skips it. The removed class-level helpers (`Column.value_to_boolean` and friends) are a separate change.
+
+**Detection Pattern:** the `COLUMN_TYPE_CAST_INSTANCE` regex flags one-argument `.type_cast` calls, with or without parentheses, and `send` / `try(:type_cast, value)` with or without parentheses. It skips the two-argument `connection.type_cast(value, column)` quoting method, which still exists, unless its first argument nests parentheses two levels deep (`type_cast(foo(a(b, c)), col)` is flagged, check the argument count). The `try` form does not raise on 4.2: Active Support `try` checks `respond_to?` and returns `nil`, so the cast silently becomes `nil`. Any other object with a public one-argument `type_cast` is flagged too, so check that the receiver is a column.
+
+**Fix:**
+First check whether the cast does anything. `minimum` and `maximum` already cast through the column on 4.1 and 4.2, so a cast of their result can simply go. Otherwise branch on the version:
+
+```ruby
+# BEFORE
+column = Order.columns_hash["total"]
+column.type_cast(params[:total])
+
+# AFTER (works on 4.1 and 4.2)
+column = Order.columns_hash["total"]
+NextRails.next? ? column.type_cast_from_database(params[:total]) : column.type_cast(params[:total])
+```
+
+`type_cast_from_database` gives the 4.1 result for string, integer, decimal, boolean and datetime inputs, with one difference: a string column now returns a String for any value (`5` becomes `"5"`). `type_cast_from_user` is what an attribute writer uses, but it differs more: a blank string cast through an integer column gives `nil` instead of `0`. Rails 5.0 replaces both with `Order.type_for_attribute("total").cast(value)`.
+
+---
+
+#### `Numeric#ago` / `#until` / `#since` / `#from_now` Removed
+
+**Pattern:** `NUMERIC_AGO_WITHOUT_UNIT`
+
+**What Changed:**
+Rails 4.1 deprecated calling `ago`, `until`, `since` and `from_now` on a plain number (`Calling #ago or #until on a number (e.g. 5.ago) is deprecated and will be removed in the future, use 5.seconds.ago instead`). Rails 4.2 removes them from `Numeric`, so `5.ago` raises ``NoMethodError: undefined method `ago' for 5:Fixnum`` (`for 5:Integer` on Ruby 2.4 and later). The same methods on a Duration (`5.seconds.ago`) are unchanged.
+
+Two shapes are easy to miss. Through 4.2 a Duration has no `*` or `/` of its own: they go through `method_missing` to the Integer value and return a plain Integer, so `(2.hours * 3).ago` and `(1.day / 2).ago` raise too, while `(1.day + 1.hour).ago` keeps working. And a number of seconds stored in a variable (`timeout.ago`), often read from YAML, ENV or a settings table and passed to a gem that calls `ago` on it, cannot be found by a regex: it shows up only as the 4.1 deprecation warning in logs and test output.
+
+**Detection:**
+The pattern flags numeric literals and `.to_i` / `.to_f` / `.abs` results followed by one of the four methods, and `.round` / `.floor` / `.ceil` results and parenthesized `*` / `/` expressions followed by one of them with no argument. `Time#ago` and `#since` always take an argument, so `Time.current.round.ago(1.hour)` and `(Time.now - 2 * 3600).since(1.hour)` are left alone. A hit can still be a Duration: `(1.day + 2 * 3.hours).ago` is flagged although the sum keeps its unit, so check the receiver before adding `.seconds`. Other Integer-returning calls (`items.count.ago`) are not flagged. On 4.1, also search the test log for `Calling #ago or #until on a number` and `Calling #since or #from_now on a number`.
+
+**Fix:**
+```ruby
+# BEFORE
+expires_at = 5.ago
+cutoff = timeout.from_now
+window = (2.hours * 3).ago
+
+# AFTER (works on 4.1 and 4.2)
+expires_at = 5.seconds.ago
+cutoff = timeout.seconds.from_now
+window = (2.hours * 3).seconds.ago
+```
+For a value read from configuration, convert it once where it is read (`setting.seconds`) so every consumer gets a Duration. A Duration is `==` to its Integer value, does arithmetic like it and serializes to JSON as it. It is not the same object to `Integer === x` (so `case x when Integer`), `eql?` or a Hash key lookup, on 4.1 and on 4.2, so check the setting's other consumers before converting it at read time.
+
+---
+
+#### Arel `union` / `intersect` Drops Bind Values
+
+**Pattern:** `AREL_UNION_BINDS`
+
+**What Changed:**
+Rails 4.2 keeps the values of `where(column: value)` as bind values on the relation and fills them in only when the query runs. `Relation#union` and `#intersect` (passed through to `Arel::SelectManager`) and `Arel::Nodes::Union` / `UnionAll` / `Intersect` / `Except.new` combine the Arel trees but not their bind values, so the SQL reaches the database with an unfilled placeholder:
+
+- SQLite gets `?`, binds it as `NULL` and silently returns no rows
+- MySQL gets `?` and raises a syntax error near `?`
+- PostgreSQL gets `$1` and raises `there is no parameter $1`
+
+On 4.1 the values were inlined and the same code worked, unless a relation came from an association (`user.posts`), which was already wrong there. No deprecation warning comes first.
+
+The `active_record_union` gem defines its own `Relation#union` / `#union_all` that keep both sets of bind values. If the app uses that gem, its `.union` calls are fine; the pattern cannot tell them apart from the Arel ones.
+
+**Detection Pattern:**
+The `AREL_UNION_BINDS` pattern flags `.union(` / `.intersect(` calls and `Arel::Nodes::Union` / `UnionAll` / `Intersect` / `Except.new`. It skips `Regexp.union`, `Set.new(...).union`, `Set[...].union`, `.to_set.union`, array literals, lodash `_.union` and comment lines. A `Set` or `Array` held in a plain variable is still flagged.
+
+**Fix:**
+```ruby
+# BEFORE (works on 4.1; no rows or a database error on 4.2)
+active   = Post.where(state: "active")
+archived = Post.where(state: "archived")
+Post.from(Post.arel_table.create_table_alias(active.union(archived), :posts).to_sql)
+
+# AFTER (works on 4.1 and 4.2: to_sql quotes and inlines each relation's values)
+Post.from("(#{active.to_sql} UNION #{archived.to_sql}) posts")
+```
+
+Keep `UNION ALL` only where the old code passed `:all`. On 4.1, `to_sql` of a relation built from an association still prints `?`. For those, or to keep a relation instead of a `FROM` string, add `gem 'active_record_union', '~> 1.3'` (1.4 needs Rails 6) and call `active.union(archived)`, which works on 4.1 and 4.2.
 
 ---
 
@@ -472,9 +917,9 @@ Version bumps for defaults:
 Run `bin/rake rails:update` to walk through config changes interactively. Key diffs to review:
 
 ### `config/application.rb`
-Add (inside the Application class):
+Add (inside the Application class). While dual booting, gate it with `NextRails.next?`, because Rails 4.1 has no such setter (see "Transactional Callback Exception Suppression"). Without next_rails, drop the condition:
 ```ruby
-config.active_record.raise_in_transactional_callbacks = true
+config.active_record.raise_in_transactional_callbacks = true if NextRails.next?
 ```
 
 ### `config/environments/development.rb`
@@ -486,7 +931,7 @@ config.assets.digest = true
 ### `config/environments/test.rb`
 Add:
 ```ruby
-config.active_support.test_order = :random
+config.active_support.test_order = :sorted # keeps the 4.1 order; the 4.2 generator writes :random
 ```
 
 Rename:
@@ -564,11 +1009,21 @@ Cross-check against [RailsDiff 4.1.16 → 4.2.11.3](http://railsdiff.org/4.1.16/
 4. Replace `assert_tag` with `assert_select`
 5. Update `Procfile` with `-b 0.0.0.0` if external access needed
 6. Review HTML sanitizer output in tests
-7. Add `config.active_record.raise_in_transactional_callbacks = true`
-8. Add `config.active_support.test_order = :random`
-9. Rename `serve_static_assets` → `serve_static_files`
-10. Consider replacing Timecop with `travel_to` (optional)
-11. Consider dropping Foreigner for native FKs (optional)
+7. Replace writes into `changed_attributes` with `attribute_will_change!`, or `set_attribute_was` / `clear_attribute_changes` behind `NextRails.next?` (see "Writes into `changed_attributes` Raise")
+8. Add `config.active_record.raise_in_transactional_callbacks = true` (behind `if NextRails.next?` while dual booting) and fix the `after_commit` / `after_rollback` exceptions it surfaces
+9. Add `config.active_support.test_order = :sorted` (or `:random` once the suite passes in random order)
+10. Rename `serve_static_assets` → `serve_static_files`
+11. Add a unit to `ago` / `until` / `since` / `from_now` called on a bare number (`5.ago` → `5.seconds.ago`)
+12. Add the leading slash to integration and request spec paths (`get "/users"`)
+13. If the app patches `Mapper::Mapping` (`normalize_conditions!` and friends), move the custom route options under `defaults:` and drop the patch
+14. Replace one-argument `column.type_cast(value)` with `type_cast_from_database` behind `NextRails.next?`
+15. Replace `ConnectionAdapters::Column.value_to_boolean` and the other removed class-level cast helpers with app-owned casts
+16. Replace `columns_hash[...].default` and `column_for_attribute(...).default` reads with `column_defaults[...]`; cast a model-less `connection.columns(...)` default with `type_cast_from_database` behind `NextRails.next?`
+17. Replace direct `@attributes` access in models with `read_attribute` / `write_attribute`
+18. Pass a cast type to fake `ConnectionAdapters::Column.new` calls (tableless models, virtual typed fields)
+19. Rebuild Arel `union` / `intersect` subqueries from each relation's `to_sql`
+20. Consider replacing Timecop with `travel_to` (optional)
+21. Consider dropping Foreigner for native FKs (optional)
 
 ### Phase 6: Testing
 - Run full test suite
@@ -589,10 +1044,27 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `NoMethodError: undefined method 'deliver' for #<Mail::Message>` | "ActionMailer `#deliver` / `#deliver!` Deprecated" — `deliver_now` / `deliver_later` |
 | `undefined method 'respond_with' for ApplicationController` | "`respond_with` / Class-Level `respond_to` Extracted" — `gem 'responders', '~> 2.0'` |
-| Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression" — `config.active_record.raise_in_transactional_callbacks = true` |
+| Data inconsistencies that tests don't catch after `after_commit` | "Transactional Callback Exception Suppression": opt in on the 4.2 side |
+| `NoMethodError: undefined method 'raise_in_transactional_callbacks='` on Rails 4.1 when `ActiveRecord::Base` loads | "Transactional Callback Exception Suppression": gate the line with `if NextRails.next?` |
+| Deprecation warning ``Currently, Active Record suppresses errors raised within `after_rollback`/`after_commit` callbacks`` | "Transactional Callback Exception Suppression": one per callback declaration until opted in |
+| `NoMethodError: undefined method 'type_cast_from_user'` (or `type_cast_from_database`, `type`, `limit`) for a SQL type String such as `"boolean"` | "`ConnectionAdapters::Column.new` Takes a Cast Type Third": pass a cast type on 4.2 |
 | Can't reach `rails server` from another machine | "Rack Server Bind Host Changed" — `rails server -b 0.0.0.0` |
 | Serialized attributes that stored `"null"` now store `NULL` | "Serialized Attributes with Custom Coder: `nil` Handling" — assign `JSON.generate(nil)` only if the string was intentional |
+| `there is no parameter $1` or a syntax error near `?` on a `UNION` / `INTERSECT` query, or no rows on SQLite | "Arel `union` / `intersect` Drops Bind Values": build the subquery from `to_sql` |
+| ``NoMethodError: undefined method `fetch_value' for ...:Hash`` on an attribute read | "`@attributes` Is an `AttributeSet`, Not a Hash": stop replacing `@attributes` |
+| ``NoMethodError: undefined method `[]=' for #<ActiveRecord::AttributeSet:0x...>`` (or `merge!`, `fetch`, `delete`) | "`@attributes` Is an `AttributeSet`, Not a Hash": `write_attribute` / `read_attribute` |
+| `@attributes['x']` returns an `ActiveRecord::Attribute` instead of the value | "`@attributes` Is an `AttributeSet`, Not a Hash": `read_attribute_before_type_cast` |
+| `TypeError` or a wrong branch where code reads `columns_hash[...].default` (now a String such as `"604800"` or `"f"`), or `ArgumentError: comparison of String with ...` | "`Column#default` Returns the Raw Database String", read `column_defaults[...]` |
+| `RuntimeError: can't modify frozen ActiveSupport::HashWithIndifferentAccess` from a model | "Writes into `changed_attributes` Raise": `attribute_will_change!`, `clear_attribute_changes` |
+| `URI::InvalidURIError: bad URI(is not URI?): http://www.example.com:80users` in a request or integration spec | "Integration Test Paths Need a Leading Slash", add the leading `/` |
 | `InvalidAuthenticityToken` on forms submitted from static pages | "Masked CSRF Tokens (Per-Request)" — fetch a fresh token per request |
+| `NoMethodError: undefined method 'value_to_boolean' for ActiveRecord::ConnectionAdapters::Column:Class` (or `string_to_time`, `value_to_decimal`, ...) | "`ConnectionAdapters::Column` Class-Level Cast Helpers Removed": app-owned cast |
+| ``NoMethodError: undefined method `type_cast' for #<ActiveRecord::ConnectionAdapters::...Column>`` | "`Column#type_cast` Removed", use `type_cast_from_database` |
+| ``NameError: undefined method `normalize_conditions!' for class `ActionDispatch::Routing::Mapper::Mapping'`` at boot | "Routing `Mapper::Mapping` Patches Stop Running": drop the patch, move the option under `defaults:` |
+| `ActionController::UrlGenerationError` from `url_for` on a route with a custom option that worked on 4.1 | "Routing `Mapper::Mapping` Patches Stop Running": the `normalize_conditions!` patch no longer runs |
+| `ArgumentError: wrong number of arguments (given N, expected 0)` (or `(N for 0)` before Ruby 2.3) when routes are drawn | "Routing `Mapper::Mapping` Patches Stop Running": a `normalize_defaults!` / `normalize_options!` / `normalize_path!` override needs the 4.2 signature |
+| ``DEPRECATION WARNING: You did not specify a value for the configuration option `active_support.test_order` `` | "`config.active_support.test_order` Not Set", set `:sorted` to keep the 4.1 order |
+| ``NoMethodError: undefined method `ago' for 5:Fixnum`` (or `until` / `since` / `from_now`, `for 1.5:Float`, `for 5:Integer` on Ruby 2.4+) | "`Numeric#ago` / `#until` / `#since` / `#from_now` Removed": add a unit: `5.seconds.ago` |
 | A `where` that compared two columns returns no rows; SQL shows `= NULL` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
 | `TypeError: can't cast Arel::Attributes::Attribute to string` | "Arel Attribute as a Hash-Condition Value Is Cast": build the predicate with `.eq` |
 
