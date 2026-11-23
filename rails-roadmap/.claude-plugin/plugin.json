@@ -1,0 +1,25 @@
+{
+  "name": "rails-roadmap",
+  "version": "0.1.0",
+  "description": "Read-only survey of everything needed to bring a Rails app to the latest Ruby and Rails. Writes RAILS_ROADMAP.md; changes nothing else.",
+  "skills": "./rails-roadmap/",
+  "commands": "./commands/",
+  "author": {
+    "name": "OmbuLabs",
+    "url": "https://github.com/ombulabs"
+  },
+  "repository": "https://github.com/ombulabs/claude-code_rails-upgrade-skill",
+  "license": "MIT",
+  "keywords": [
+    "ruby",
+    "rails",
+    "upgrade",
+    "roadmap",
+    "assessment",
+    "planning",
+    "fastruby",
+    "next_rails",
+    "tech-debt",
+    "ruby-on-rails"
+  ]
+}
